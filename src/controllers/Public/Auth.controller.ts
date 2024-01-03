@@ -21,9 +21,12 @@ import { NODE_ENV } from "../../utils/Constants";
 import NotificationService from "../../services/Notification.service";
 import WebhookService from "../../services/Webhook.service";
 import RoleService from "../../services/Role.service";
+const newrelic = require('newrelic');
 
 export default class AuthController {
     static async signup(req: Request, res: Response, next: NextFunction) {
+        newrelic.setTransactionName("Sign up")
+        
         const { email, password } = req.body
 
         const validEmail = Validator.validateEmail(email)
@@ -173,6 +176,8 @@ export default class AuthController {
     }
 
     static async verifyEmail(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+        newrelic.setTransactionName("Verify Email")
+        
         const { otpCode }: { otpCode: string } = req.body
 
         const { entity: { id } } = req.user.user
@@ -208,6 +213,8 @@ export default class AuthController {
     }
 
     static async resendVerificationEmail(req: Request, res: Response, next: NextFunction) {
+        newrelic.setTransactionName("Resend Verification Email")
+
         const email = req.query.email as string
 
         const newPartner = await PartnerService.viewSinglePartnerByEmail(email)
@@ -355,6 +362,8 @@ export default class AuthController {
     }
 
     static async login(req: Request, res: Response) {
+        newrelic.setTransactionName("Login")
+
         const { email, password } = req.body
 
         const entity = await EntityService.viewSingleEntityByEmail(email)
@@ -460,6 +469,8 @@ export default class AuthController {
     }
 
     static async getLoggedUserData(req: AuthenticatedRequest, res: Response) {
+        newrelic.setTransactionName("Logged User Data")
+        
         const entity = await EntityService.viewSingleEntityByEmail(req.user.user.entity.email)
         if (!entity) {
             throw new InternalServerError('Entity not found')

@@ -1,4 +1,5 @@
 import kafka from "kafkajs";
+require('newrelic');
 import {
     KAFKA_BROKER,
     KAFKA_CLIENT_ID,

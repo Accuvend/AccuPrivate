@@ -6,6 +6,7 @@ import cors from 'cors';
 import router from "./routes";
 import morgan from 'morgan'
 import helmet from 'helmet';
+require('newrelic');
 
 const app = express();
 

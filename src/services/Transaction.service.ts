@@ -16,6 +16,7 @@ import Meter from "../models/Meter.model";
 import { Op } from "sequelize";
 import { generateRandomString } from "../utils/Helper";
 import { Sequelize } from "sequelize-typescript";
+require('newrelic');
 
 // Define the TransactionService class for handling transaction-related operations
 export default class TransactionService {

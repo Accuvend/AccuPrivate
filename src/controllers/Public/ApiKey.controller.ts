@@ -6,9 +6,12 @@ import { TokenUtil } from "../../utils/Auth/Token";
 import ApiKeyService from "../../services/ApiKey.service ";
 import Cypher from "../../utils/Cypher";
 import { AuthenticatedRequest } from "../../utils/Interface";
+const newrelic = require('newrelic');
 
 export default class ApiController {
     static async getActiveAPIKey(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+        newrelic.setTransactionName("Get Active ApiKeys")
+
         const { entity, profile } = req.user.user
 
         if (entity.role !== 'PARTNER') {
@@ -41,6 +44,8 @@ export default class ApiController {
     }
 
     static async generateApiKeys(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+        newrelic.setTransactionName("Generate ApiKeys")
+
         const { email } = req.user.user.entity
 
         const partner: Partner | null = await PartnerService.viewSinglePartnerByEmail(email)

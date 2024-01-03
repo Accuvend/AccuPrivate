@@ -6,9 +6,11 @@ import { AuthenticatedRequest } from "../../utils/Interface";
 import Validator from "../../utils/Validators";
 import { PartnerProfileService } from "../../services/Entity/Profiles";
 import { RoleEnum } from "../../models/Role.model";
+const newrelic = require('newrelic');
 
 export default class WebhookController {
     static async updateWebhook(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+        newrelic.setTransactionName("Update Webhook")
         const { url }: { url: string } = req.body;
         const { user: { profile: partner } } = req.user
 
@@ -39,6 +41,7 @@ export default class WebhookController {
     }
 
     static async viewWebhookByPartnerId(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+        newrelic.setTransactionName("Webhook View by Partner")
         const { partnerId } = req.query as Record<string, string>;
         
         const partnerIdProvidedAndNotAdmin = partnerId && ![RoleEnum.Admin].includes(req.user.user.entity.role)
@@ -115,6 +118,7 @@ export default class WebhookController {
     }
 
     static async viewAllWebhooks(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+        newrelic.setTransactionName("View all Webhooks")
         const webhooks = await WebhookService.viewAllWebhooks();
 
         res.status(200).json({

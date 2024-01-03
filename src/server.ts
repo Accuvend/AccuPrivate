@@ -1,7 +1,9 @@
+require('newrelic');
 import app from "./app";
 import KafkaService from "./kafka";
 import { initiateDB, Database } from "./models";
 import logger from "./utils/Logger";
+
 
 // Asynchronous function to start the server
 async function startServer(): Promise<void> {

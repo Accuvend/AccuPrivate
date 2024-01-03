@@ -9,7 +9,7 @@ import crypto from 'crypto'
 import Transaction from "../models/Transaction.model";
 import { generateRandomToken } from "../utils/Helper";
 import { response } from "express";
-
+require('newrelic');
 export interface PurchaseResponse extends BaseResponse {
     source: 'BUYPOWERNG';
     status: string;

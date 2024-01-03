@@ -3,6 +3,7 @@ import { ITransaction } from "../../models/Transaction.model";
 import { NotFoundError } from "../../utils/Errors";
 import MeterService from "../../services/Meter.service";
 import Meter from "../../models/Meter.model";
+const newrelic = require('newrelic');
 
 interface getTransactionInfoRequestBody {
     bankRefId: string
@@ -18,6 +19,7 @@ interface getMetersQueryParams extends ITransaction {
 
 export default class TransactionController {
     static async getMeterInfo(req: Request, res: Response) {
+        newrelic.setTransactionName("Get Meter Info")
         const { meterNumber } = req.query as Record<string, string>
 
         const meter: Meter | null = await MeterService.viewSingleMeterByMeterNumber(meterNumber)
@@ -35,6 +37,7 @@ export default class TransactionController {
     }
 
     static async getMeters(req: Request, res: Response) {
+        newrelic.setTransactionName("Get Meters")
         const {
             page, limit,
             disco, vendType, userId

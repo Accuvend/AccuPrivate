@@ -1,6 +1,8 @@
 import Meter from "../models/Meter.model";
 import { IMeter, ICreateMeter } from "../models/Meter.model";
 import logger from "../utils/Logger";
+require('newrelic');
+
 export default class MeterService {
     static async addMeter(meter: ICreateMeter): Promise<Meter> {
         const newMeter: Meter = Meter.build(meter)

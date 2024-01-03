@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { CustomAPIError, } from '../utils/Errors';
 import logger from '../utils/Logger';
+require("newrelic");``
 
 function errorHandler(err: Error, req: Request, res: Response, next: NextFunction): Response {
     console.error(err)

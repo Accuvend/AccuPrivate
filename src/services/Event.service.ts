@@ -5,6 +5,7 @@ import Event from "../models/Event.model";
 import Transaction from "../models/Transaction.model";
 import logger from "../utils/Logger";
 import TransactionEventService from "./TransactionEvent.service";
+require('newrelic');
 
 // EventService class for handling event-related operations
 export default class EventService {

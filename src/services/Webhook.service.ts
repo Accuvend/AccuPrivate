@@ -5,6 +5,7 @@ import ApiKeyService from "./ApiKey.service ";
 import Cypher from "../utils/Cypher";
 import { PartnerProfileService } from "./Entity/Profiles";
 import logger from "../utils/Logger";
+require('newrelic');
 
 export default class WebhookService {
     static async addWebhook(data: IWebHook, transaction: Transaction): Promise<WebHook> {

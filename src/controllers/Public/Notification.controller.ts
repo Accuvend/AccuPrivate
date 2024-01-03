@@ -7,9 +7,11 @@ import Notification from "../../models/Notification.model"
 import EntityService from "../../services/Entity/Entity.service"
 import { Op } from "sequelize"
 import { RoleEnum } from "../../models/Role.model"
+const newrelic = require('newrelic');
 
 export default class NotificationController {
     static async getNotifications(req: AuthenticatedRequest, res: Response, _next: NextFunction) {
+        newrelic.setTransactionName("Get Notification")
         const { entity: { id } } = req.user.user
         const { page, limit, status } = req.query as { page: `${number}`, limit: `${number}`, status: 'read' | 'unread' }
 
@@ -47,6 +49,7 @@ export default class NotificationController {
     }
 
     static async getNotificationInfo(req: AuthenticatedRequest, res: Response, _next: NextFunction) {
+        newrelic.setTransactionName("Get Notification info")
         const { notificationId } = req.query as Record<string, string>
 
         const notification = await NotificationService.viewSingleNotificationById(notificationId)
@@ -64,6 +67,7 @@ export default class NotificationController {
     }
 
     static async sendNotification(req: AuthenticatedRequest, res: Response, _next: NextFunction) {
+        newrelic.setTransactionName("Send Ntification")
         const { notificationId, userId }: { notificationId: string, userId?: string } = req.body
 
         const notification = await NotificationService.viewSingleNotificationById(notificationId)

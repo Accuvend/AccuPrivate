@@ -2,9 +2,12 @@ import { Request, Response } from "express";
 import { NotFoundError } from "../../utils/Errors";
 import User from "../../models/User.model";
 import UserService from "../../services/User.service";
+const newrelic = require('newrelic');
 
 export default class TransactionController {
     static async getUserInfo(req: Request, res: Response) {
+        newrelic.setTransactionName("Get User Info")
+
         const { email } = req.query as Record<string, string>
 
         const user: User | null = await UserService.viewSingleUserWithEmail(email)
@@ -23,6 +26,8 @@ export default class TransactionController {
     }
 
     static async getUsers(req: Request, res: Response) {
+        newrelic.setTransactionName("Get Users")
+        
         const users: User[] | null = await UserService.viewUsers()
         res.status(200).json({
             status: 'success',

@@ -4,10 +4,13 @@ import { BadRequestError } from "../../utils/Errors";
 import RoleService from "../../services/Role.service";
 import { RoleEnum } from "../../models/Role.model";
 import { AuthenticatedRequest } from "../../utils/Interface";
+const newrelic = require('newrelic');
+
 
 export default class RoleController {
     //  Create role
     static async createRole(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+        newrelic.setTransactionName("Create Role")
         const { name, description, type } = req.body
       
         const role = await RoleService.addRole({ name, description, id: uuidv4(), type })
@@ -20,6 +23,8 @@ export default class RoleController {
     }
 
     static async updateRole(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+        newrelic.setTransactionName("Update role")
+
         const { roleId, name, description }: { roleId: string, name: RoleEnum, description: string } = req.body
 
         const role = await RoleService.viewRoleById(roleId)

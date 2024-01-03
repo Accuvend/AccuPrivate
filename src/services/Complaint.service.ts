@@ -3,6 +3,7 @@ import Entity from "../models/Entity/Entity.model";
 import ComplaintReply, {ICreateComplaintReply , IUpdateComplaintReply} from "../models/ComplaintReply.model";
 import logger from "../utils/Logger";
 import { v4 as uuidv4 } from 'uuid';
+require('newrelic');
 
 export default class ComplaintService {
   static async addComplaint(

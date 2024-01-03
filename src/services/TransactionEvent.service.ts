@@ -6,6 +6,7 @@ import Event, { ICreateEvent, Status } from "../models/Event.model";
 import Transaction from "../models/Transaction.model";
 import EventService from "./Event.service";
 import { v4 as uuidv4 } from 'uuid';
+require('newrelic');
 
 interface IMeterValidationReceivedEventParams {
     user: { name: string, email: string, address: string, phoneNumber: string };

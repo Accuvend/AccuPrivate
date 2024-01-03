@@ -18,9 +18,11 @@ import ResponseTrimmer from "../../utils/ResponseTrimmer";
 import { IPartnerProfile, IPartnerStatsProfile } from "../../models/Entity/Profiles/PartnerProfile.model";
 import TransactionController from "./Transaction.controller";
 import TransactionService from "../../services/Transaction.service";
+const newrelic = require('newrelic');
 
 export default class PartnerProfileController {
     static async invitePartner(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+        newrelic.setTransactionName("Invite Partners")
         // The partner is the entity that is inviting the team member
         const { email, companyName, address } = req.body
 
@@ -102,6 +104,7 @@ export default class PartnerProfileController {
     }
 
     static async getPartnerInfo(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+        newrelic.setTransactionName("Get Partner Info")
         const { entity: { id } } = req.user.user
         const { email } = req.query as Record<string, string>
 
@@ -125,6 +128,7 @@ export default class PartnerProfileController {
     }
 
     static async getAllPartners(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+        newrelic.setTransactionName("Show All Partners")
         const {
             page, limit,
         } = req.query as any

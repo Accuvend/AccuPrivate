@@ -7,6 +7,7 @@ import { Status } from "../../models/Complaint.model";
 import { InternalServerError , BadRequestError } from "../../utils/Errors";
 import Complaint from "../../models/Complaint.model";
 import ComplaintService from "../../services/Complaint.service";
+const newrelic = require('newrelic');
 
 export class ComplaintController {
 

@@ -7,6 +7,7 @@ import logger from "../utils/Logger";
 import Partner from "../models/Entity/Profiles/PartnerProfile.model";
 import { TokenUtil } from "../utils/Auth/Token";
 import Cypher from "../utils/Cypher";
+require('newrelic');
 
 // EventService class for handling event-related operations
 export default class ApiKeyService {

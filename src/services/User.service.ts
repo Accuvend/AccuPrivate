@@ -1,6 +1,8 @@
 import Transaction from "../models/Transaction.model";
 import User from "../models/User.model";
 import { IUser, ICreateUser } from "../models/User.model";
+require('newrelic');
+
 export default class UserService {
 
     static async addUserIfNotExists(user: IUser): Promise<User> {

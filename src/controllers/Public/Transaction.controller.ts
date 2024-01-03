@@ -17,6 +17,7 @@ import { RoleEnum } from "../../models/Role.model";
 import TransactionEventService from "../../services/TransactionEvent.service";
 import { VendorPublisher } from "../../kafka/modules/publishers/Vendor";
 import { Op } from 'sequelize'
+const newrelic = require('newrelic');
 
 interface getTransactionsRequestBody extends ITransaction {
     page: `${number}`;
@@ -32,6 +33,7 @@ interface getTransactionsRequestBody extends ITransaction {
 
 export default class TransactionController {
     static async getTransactionInfo(req: Request, res: Response) {
+        newrelic.setTransactionName("Show Transaction Info")
         const { bankRefId, transactionId } = req.query as Record<string, string>;
 
         const transaction: Transaction | null = bankRefId
@@ -51,6 +53,7 @@ export default class TransactionController {
     }
 
     static async getTransactions(req: AuthenticatedRequest, res: Response) {
+        newrelic.setTransactionName("Show Transactions")
         const {
             page, limit, status, startDate, endDate,
             userId, disco, superagent, partnerId
@@ -165,7 +168,7 @@ export default class TransactionController {
     static async requeryTimedOutTransaction(
         req: AuthenticatedRequest,
         res: Response,
-    ) {
+    ) { newrelic.setTransactionName("Requery TimedOut Transaction")
         const { bankRefId }: { bankRefId: string } = req.query as any;
 
         let transactionRecord =
@@ -262,7 +265,7 @@ export default class TransactionController {
     static async getYesterdaysTransactions(
         req: AuthenticatedRequest,
         res: Response,
-    ) {
+    ) { newrelic.setTransactionName("Show Yesterdays Transaction")
         const { status } = req.query as any as {
             status: "COMPLETED" | "FAILED" | "PENDING";
         };

@@ -88,3 +88,6 @@ export const SU_HOST_EMAIL_1 = process.env.SU_HOST_EMAIL_1 as string,
     SU_HOST_EMAIL_2 = process.env.SU_HOST_EMAIL_2 as string,
     SU_HOST_EMAIL_3 = process.env.SU_HOST_EMAIL_3 as string;
 
+export const NEW_RELIC_APP_NAME = process.env.NEW_RELIC_APP_NAME as string
+export const  NEW_RELIC_LICENSE_KEY =  process.env.NEW_RELIC_LICENSE_KEY as string
+export const NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED = process.env.NEW_RELIC_APPLICATION_LOGGING_FORWARDING_ENABLED as string

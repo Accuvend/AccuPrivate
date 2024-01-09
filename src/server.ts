@@ -2,6 +2,7 @@ require('newrelic');
 import app from "./app";
 import KafkaService from "./kafka";
 import { initiateDB, Database } from "./models";
+import { NEW_RELIC_APP_NAME, NEW_RELIC_LICENSE_KEY } from "./utils/Constants";
 import logger from "./utils/Logger";
 
 
@@ -13,6 +14,10 @@ async function startServer(): Promise<void> {
 
         await KafkaService.start()
         console.log('Kafka Connected Successfully')
+        
+        //Testing the NewRelic
+        console.log(NEW_RELIC_APP_NAME);
+        console.log(NEW_RELIC_LICENSE_KEY);
 
         // Synchronize the database (you may want to add options like force: true to reset the database)
         await Database.sync({ alter: true });

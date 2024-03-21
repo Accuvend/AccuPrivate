@@ -293,7 +293,7 @@ export class IRechargeVendorService {
         email: string;
         amount: number;
     }) {
-        amount = NODE_ENV === "development" ? 900 : amount; // IRecharge has a minimum amount of 500 naira and the wallet balance is limited
+        // amount = NODE_ENV === "development" ? 900 : amount; // IRecharge has a minimum amount of 500 naira and the wallet balance is limited
         meterNumber = NODE_ENV === "development" ? "1234567890" : meterNumber;
 
         const combinedString =

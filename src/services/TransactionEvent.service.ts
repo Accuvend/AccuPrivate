@@ -64,6 +64,7 @@ export class AirtimeTransactionEventService {
         this.phoneNumber = phoneNumber
     }
 
+
     public async addPhoneNumberValidationRequestedEvent(): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
@@ -847,6 +848,28 @@ export default class TransactionEventService {
         return this.transaction
     }
 
+    public async addMeterValidationFailedEvent(superAgent: string, meterInfo: {
+        meterNumber: string, disco: string, vendType: string
+    }) {
+        const event: ICreateEvent = {
+            transactionId: this.transaction.id,
+            eventType: TOPICS.METER_VALIDATION_FAILED,
+            eventText: TOPICS.METER_VALIDATION_FAILED,
+            payload: JSON.stringify({
+                meterInfo: meterInfo,
+                disco: this.transaction.disco,
+                superagent: this.superAgent,
+                partnerEmail: this.partner
+            }),
+            source: 'API',
+            eventTimestamp: new Date(),
+            id: uuidv4(),
+            status: Status.COMPLETE,
+        }
+
+        return await EventService.addEvent(event);
+    }
+
     public async addMeterValidationRequestedEvent(): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
@@ -1255,7 +1278,7 @@ export default class TransactionEventService {
 
         return await EventService.addEvent(event);
     }
-    
+
     public async addSmsTokenSentToUserEvent(): Promise<Event> {
         const user = await this.transaction.$get('user');
         if (!user) {

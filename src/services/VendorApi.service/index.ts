@@ -520,6 +520,7 @@ export default class VendorService {
                 return {
                     source: "BAXI" as const,
                     status: true,
+                    code: responseData.code,
                     message: "Transaction successful",
                     data: responseData.data,
                     responseCode: 200,
@@ -529,6 +530,7 @@ export default class VendorService {
             return {
                 source: "BAXI" as const,
                 status: false,
+                code: responseData.code,
                 message: responseData.message,
                 data: responseData.data,
                 responseCode: 202,

@@ -72,6 +72,11 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
         superAgent: Transaction['superagent'],
         newVendor: Transaction['superagent'],
     };
+    [TOPICS.VEND_ELECTRICITY_REQUESTED_FROM_VENDOR]: {
+        meter: MeterInfo & { id: string };
+        transactionId: string;
+        superAgent: Transaction['superagent'],
+    };
     [TOPICS.TOKEN_RECIEVED_FROM_VENDOR]: {
         meter: MeterInfo & { id: string; token: string };
         user: User;

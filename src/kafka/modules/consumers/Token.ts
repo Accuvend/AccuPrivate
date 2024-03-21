@@ -574,6 +574,11 @@ class TokenHandler extends Registry {
                 return;
             }
 
+            await VendorPublisher.publishEvnetForVendElectricityRequestedFromVendor({
+                meter: data.meter,
+                transactionId: data.transactionId,
+                superAgent: data.superAgent
+            })
             console.log({ vendorRecord: data.vendorRetryRecord, transaction: transaction.retryRecord })
             const { user, meter, partner } = transaction;
 
@@ -709,6 +714,10 @@ class TokenHandler extends Registry {
 
                     // Requery the transaction if no token in the response
                     requeryTransaction = !tokenInResponse
+                    console.warn({ requeryTransaction, tokenInResponse })
+                    console.warn({ requeryTransaction, tokenInResponse })
+                    console.warn({ requeryTransaction, tokenInResponse })
+                    console.warn({ requeryTransaction, tokenInResponse })
                 } else if (!transactionTimedOut) {
                     // Even when transactionType is POSTPAID, a success message doesn't guarantee that everything went well, we still need to check if it timmedout
                     requeryTransaction = false
@@ -1190,8 +1199,9 @@ class TokenHandler extends Registry {
             }
             const requeryResultFromIrecharge = requeryResult as Awaited<ReturnType<typeof VendorService.irechargeRequeryTransaction>>
 
+            console.log({ result: requeryResultFromBaxi })
             const transactionSuccessFromBuypower = requeryResult.source === 'BUYPOWERNG' ? requeryResultFromBuypower.responseCode === 200 : false
-            const transactionSuccessFromBaxi = requeryResult.source === 'BAXI' ? requeryResultFromBaxi.status && requeryResultFromBaxi.code === 200 : false
+            const transactionSuccessFromBaxi = requeryResult.source === 'BAXI' ? requeryResultFromBaxi.data.statusCode == '0' && requeryResultFromBaxi.code === 200 : false
             const transactionSuccessFromIrecharge = requeryResult.source === 'IRECHARGE' ? requeryResultFromIrecharge.status === '00' && requeryResultFromIrecharge.vend_status === 'successful' : false
             let transactionSuccess = transactionSuccessFromBuypower || transactionSuccessFromBaxi || transactionSuccessFromIrecharge
 
@@ -1208,7 +1218,7 @@ class TokenHandler extends Registry {
 
             let retryTransaction = transactionFailed
 
-           
+            console.warn({ retryTransaction, transactionFailed, transactionSuccessFromBaxi })
             if (TEST_FAILED) {
                 retryTransaction = (retry.testForSwitchingVendor && (data.retryCount >= retry.retryCountBeforeSwitchingVendor))
             }
@@ -1238,14 +1248,14 @@ class TokenHandler extends Registry {
                 return await TokenHandlerUtil.triggerEventToRetryTransactionWithNewVendor({ meter, transaction, transactionEventService, vendorRetryRecord: data.vendorRetryRecord })
             }
 
+            console.log({
+                point: 'requery',
+                requeryResult: (requeryResult as any).data
+            })
             let tokenInResponse: string | undefined
             if (transactionSuccessFromBuypower) {
                 tokenInResponse = requeryResultFromBuypower.responseCode === 200 ? requeryResultFromBuypower.data.token : undefined
             } else if (transactionSuccessFromBaxi) {
-                console.log({
-                    point: 'requery',
-                    requeryResult: (requeryResult as any).data.rawData.standardTokenValue
-                })
                 tokenInResponse = 'rawData' in requeryResultFromBaxi.data ? requeryResultFromBaxi.data.rawData.standardTokenValue : undefined
             } else if (transactionSuccessFromIrecharge) {
                 tokenInResponse = requeryResultFromIrecharge.token
@@ -1263,13 +1273,13 @@ class TokenHandler extends Registry {
                 if (!_product) throw new CustomError('Product not found')
 
                 const discoLogo =
-                DISCO_LOGO[_product.productName as keyof typeof DISCO_LOGO] ?? LOGO_URL
+                    DISCO_LOGO[_product.productName as keyof typeof DISCO_LOGO] ?? LOGO_URL
                 let powerUnit =
-                await PowerUnitService.viewSinglePowerUnitByTransactionId(
-                    data.transactionId,
+                    await PowerUnitService.viewSinglePowerUnitByTransactionId(
+                        data.transactionId,
                     );
-                    if (data.meter.vendType === 'PREPAID') {
-                        if (tokenInResponse) {
+                if (data.meter.vendType === 'PREPAID') {
+                    if (tokenInResponse) {
                         logger.warn('Transaction successful')
                         logger.warn('Transaction successful')
                         logger.warn('Transaction successful')

@@ -34,6 +34,35 @@ export class VendorPublisher extends ProducerFactory {
         });
     }
 
+    static async publishEvnetForVendElectricityRequestedFromVendor(
+        data: PublisherEventAndParameters[TOPICS.VEND_ELECTRICITY_REQUESTED_FROM_VENDOR]
+    ) {
+        Logger.kafkaPublisher.info('Sending message to topic: ' + TOPICS.VEND_ELECTRICITY_REQUESTED_FROM_VENDOR, {
+            meta: {
+                transactionId: data.transactionId,
+            }
+        })
+        return ProducerFactory.sendMessage({
+            topic: TOPICS.VEND_ELECTRICITY_REQUESTED_FROM_VENDOR,
+            message: {
+                meter: {
+                    meterNumber: data.meter.meterNumber,
+                    disco: data.meter.disco,
+                    vendType: data.meter.vendType,
+                    id: data.meter.id
+                },
+                transactionId: data.transactionId,
+                superAgent: data.superAgent
+            },
+        }).catch((e) => {
+            Logger.kafkaPublisher.error(
+                `An error occured while publishing ${TOPICS.VEND_ELECTRICITY_REQUESTED_FROM_VENDOR} event for transaction` +
+                data.transactionId,
+            );
+            return e;
+        });
+    }
+
     static async publishEventForMeterValidationReceived(
         data: PublisherEventAndParameters[TOPICS.METER_VALIDATION_RECIEVED_FROM_VENDOR],
     ) {

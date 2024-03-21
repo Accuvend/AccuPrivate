@@ -9,7 +9,7 @@
         "dev": "nodemon -r newrelic ./src/server.ts",
         "debug": "ts-node-dev --inspect=4321 --respawn --transpile-only --project tsconfig.json ./src/server.ts",
         "dev:render": "node ./dist/server.js",
-        "build": "tsc --project tsconfig.json",
+        "build": "tsc --project tsconfig.json --noEmitOnError true",
         "lint": "tslint -c tslint.json -p tsconfig.json --fix",
         "db:makemigration": "sequelize db:migrate --config ./config/config.json --env production",
         "db:undomigration": "sequelize db:migrate:undo --env production --config ./config/config.json"

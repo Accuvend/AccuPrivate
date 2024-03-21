@@ -574,6 +574,10 @@ class TokenHandler extends Registry {
                 return;
             }
 
+            const _transactionEventService = new TransactionEventService(
+                transaction, data.meter, data.superAgent, data.partner.email
+            )
+            await _transactionEventService.addVendElectricityRequestedFromVendorEvent()
             await VendorPublisher.publishEvnetForVendElectricityRequestedFromVendor({
                 meter: data.meter,
                 transactionId: data.transactionId,

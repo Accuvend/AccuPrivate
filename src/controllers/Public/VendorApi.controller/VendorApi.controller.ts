@@ -584,7 +584,7 @@ export default class VendorController {
         const transaction: Transaction =
             await TransactionService.addTransactionWithoutValidatingUserRelationship({
                 id: transactionId,
-                amount: "0",
+                amount: "",
                 status: Status.PENDING,
                 superagent: superagent,
                 paymentType: PaymentType.PAYMENT,

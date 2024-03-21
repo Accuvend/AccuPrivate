@@ -7,6 +7,7 @@ import { AuthenticatedRequest } from "../../utils/Interface";
 import EntityService from "../../services/Entity/Entity.service";
 import { AuthUtil, TokenUtil } from "../../utils/Auth/Token";
 import { RoleEnum } from "../../models/Role.model";
+require('newrelic');
 
 export default class ProfileController {
 

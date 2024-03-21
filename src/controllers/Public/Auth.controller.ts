@@ -21,6 +21,7 @@ import { NODE_ENV } from "../../utils/Constants";
 import NotificationService from "../../services/Notification.service";
 import WebhookService from "../../services/Webhook.service";
 import RoleService from "../../services/Role.service";
+require('newrelic');
 
 export default class AuthController {
     static async signup(req: Request, res: Response, next: NextFunction) {

@@ -2,7 +2,7 @@ import axios, { AxiosError } from "axios";
 import { ONESIGNAL_API_KEY, ONESIGNAL_APP_ID } from './Constants';
 import logger from "./Logger";
 import { INotification } from "./Interface";
-
+import * as OneSignal from '@onesignal/node-onesignal'
 
 /**
  * Login
@@ -10,35 +10,24 @@ import { INotification } from "./Interface";
  * New account
  */
 class NotificationUtil {
-    private static API = axios.create({
-        'baseURL': 'https://onesignal.com/api/v1/notifications',
-        'headers': {
-            'Authorization': `Basic ${ONESIGNAL_API_KEY}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        }
-    })
+    private static client = new OneSignal.DefaultApi(OneSignal.createConfiguration({
+        appKey: ONESIGNAL_API_KEY,
+        userKey: ONESIGNAL_APP_ID,
+    }))
 
     static async sendNotificationToUser(userId: string, notification: INotification): Promise<'success' | null> {
         try {
-            // send notification to user
-            const notificationDetails = {
-                name: notification.title,
-                include_aliases: { external_id: [userId] },
-                target_channel: "push",
-                contents: {
-                    en: notification.message
-                },
-                headings: {
-                    en: notification.heading || notification.title
-                },
-                app_id: ONESIGNAL_APP_ID
-            }
+            const oneSignalNotification = new OneSignal.Notification()
+            oneSignalNotification.contents = { en: notification.message }
+            oneSignalNotification.headings = { en: notification.heading || notification.title }
+            oneSignalNotification.include_external_user_ids = [userId]
+            oneSignalNotification.app_id = ONESIGNAL_APP_ID
+            oneSignalNotification.included_segments = ['All']
 
-            await this.API.post('', notificationDetails)
+            await this.client.createNotification(oneSignalNotification)
             return 'success'
         } catch (error: AxiosError | unknown) {
-            logger.error('Error sending notification to users', { meta: { error } })
+            logger.error('Error sending notification to users', { meta: { error: (error as Error).stack } })
             return null
         }
     }

@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import { BadRequestError } from "../../utils/Errors";
 import RoleService from "../../services/Role.service";
+require('newrelic');
 
 export default class RoleController {
 

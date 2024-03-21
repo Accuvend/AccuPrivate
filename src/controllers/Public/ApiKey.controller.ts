@@ -8,6 +8,7 @@ import Cypher from "../../utils/Cypher";
 import { AuthenticatedRequest } from "../../utils/Interface";
 import { TeamMemberProfileService } from "../../services/Entity/Profiles";
 import PartnerProfile from "../../models/Entity/Profiles/PartnerProfile.model";
+require('newrelic');
 
 export default class ApiController {
     static async getActiveAPIKey(req: AuthenticatedRequest, res: Response, next: NextFunction) {

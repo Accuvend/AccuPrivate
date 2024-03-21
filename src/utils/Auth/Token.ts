@@ -9,6 +9,7 @@ import RoleService from "../../services/Role.service";
 import { extensions } from "sequelize/types/utils/validator-extras";
 import { randomUUID } from "crypto";
 import { UUID } from "sequelize";
+require('newrelic');
 
 interface SaveTokenToCache {
     key: string,

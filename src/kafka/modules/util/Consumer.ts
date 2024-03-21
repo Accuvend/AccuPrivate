@@ -4,6 +4,7 @@ import MessageProcessorFactory from './MessageProcessor'
 import Kafka from '../../config'
 import { KafkaTopics, MessagePayload } from './Interface'
 import { randomUUID } from 'crypto'
+import { CustomError } from '../../../utils/Errors'
 
 export default class ConsumerFactory {
     private kafkaConsumer: Consumer
@@ -29,6 +30,11 @@ export default class ConsumerFactory {
             })
 
         } catch (error) {
+            if (error instanceof CustomError) {
+                logger.error(error.message, error.meta)
+            } else {
+                logger.error((error as Error).message)
+            }
             console.error(error)
         } finally {
             return this
@@ -48,7 +54,11 @@ export default class ConsumerFactory {
                 eachBatch: (messagePayload) => this.messageProcessor.processEachBatch(messagePayload)
             })
         } catch (error) {
-            logger.info(error)
+            if (error instanceof CustomError) {
+                logger.error(error.message, error.meta)
+            } else {
+                logger.error((error as Error).message)
+            }
         }
     }
 
@@ -57,8 +67,8 @@ export default class ConsumerFactory {
     }
 
     private createKafkaConsumer(): Consumer {
-        const uuid = randomUUID()
-        const consumer = Kafka.consumer({ groupId: this.messageProcessor.getConsumerName() + uuid })
+        console.log({ groupId: this.messageProcessor.getConsumerName() })
+        const consumer = Kafka.consumer({ groupId: this.messageProcessor.getConsumerName() })
         return consumer
     }
 }

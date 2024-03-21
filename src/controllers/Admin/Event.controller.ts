@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import EventService from "../../services/Event.service";
 import { AuthenticatedRequest } from "../../utils/Interface";
+require('newrelic');
 
 export default class EventController {
 

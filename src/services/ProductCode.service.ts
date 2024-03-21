@@ -29,6 +29,11 @@ export default class ProductService {
         return productCode;
     }
 
+    static async viewSingleProductCodeByCode(productCode: string, include = false): Promise<ProductCode | null> {
+        const _productCode = await ProductCode.findOne({ where: { productCode }, include: include ? [VendorRates] : undefined });
+        return _productCode;
+    }
+
     // Method for adding a new vendor rate to the database
     static async addVendorRate(data: IVendorRates, transaction?: Transaction): Promise<VendorRates> {
         const vendorRate = VendorRates.build(data);
@@ -38,6 +43,11 @@ export default class ProductService {
 
     static async viewSingleVendorRate(vendorRateId: string): Promise<VendorRates | null> {
         const vendorRate = await VendorRates.findByPk(vendorRateId);
+        return vendorRate;
+    }
+
+    static async viewSingleVendorRateByNames(vendorName: string, discoCode: string): Promise<VendorRates | null> {
+        const vendorRate = await VendorRates.findOne({ where: { vendorName, discoCode } });
         return vendorRate;
     }
 
@@ -53,11 +63,16 @@ export default class ProductService {
     }
 
     // Method for retrieving all product codes
-    static async getAllProductCodes(): Promise<ProductCode[]> {
-        const productCodes = await ProductCode.findAll();
+    static async getAllProductCodes(include?: boolean): Promise<ProductCode[]> {
+        const productCodes = await ProductCode.findAll({ where: {}, include: include ? [VendorRates] : undefined });
         return productCodes;
     }
 
+    static async getProductCodesByType(type: 'AIRTIME' | 'ELECTRICITY' | 'DATA' | 'CABLE', include?: boolean): Promise<ProductCode[]> {
+        const productCodes = await ProductCode.findAll({ where: { type }, include: include ? [VendorRates] : undefined });
+        return productCodes;
+    }
+    
     // Method for retrieving all vendor rates
     static async getAllVendorRates(): Promise<VendorRates[]> {
         const vendorRates = await VendorRates.findAll();

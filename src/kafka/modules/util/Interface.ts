@@ -45,6 +45,10 @@ export enum TransactionErrorCause {
     NO_TOKEN_IN_RESPONSE = "NO_TOKEN_IN_RESPONSE",
 }
 
+export interface VendorRetryRecord {
+    retryCount: number;
+}
+
 export interface PublisherEventAndParameters extends Record<TOPICS, any> {
     [TOPICS.METER_VALIDATION_REQUEST_SENT_TO_VENDOR]: {
         meter: MeterInfo;
@@ -57,7 +61,8 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
         user: User;
         partner: Partner;
         transactionId: string;
-        superAgent: Transaction['superagent']
+        superAgent: Transaction['superagent'],
+        vendorRetryRecord: VendorRetryRecord
     };
     [TOPICS.RETRY_PURCHASE_FROM_NEW_VENDOR]: {
         meter: MeterInfo & { id: string };
@@ -66,6 +71,11 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
         transactionId: string;
         superAgent: Transaction['superagent'],
         newVendor: Transaction['superagent'],
+    };
+    [TOPICS.VEND_ELECTRICITY_REQUESTED_FROM_VENDOR]: {
+        meter: MeterInfo & { id: string };
+        transactionId: string;
+        superAgent: Transaction['superagent'],
     };
     [TOPICS.TOKEN_RECIEVED_FROM_VENDOR]: {
         meter: MeterInfo & { id: string; token: string };
@@ -89,6 +99,7 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
         retryCount: number;
         superAgent: Transaction['superagent'],
         waitTime: number,
+        vendorRetryRecord: VendorRetryRecord
     };
     [TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_INITIATED]: {
         meter: MeterInfo & { id: string };
@@ -187,6 +198,75 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
         waitTime: number,
     };
     [TOPICS.AIRTIME_PURCHASE_RETRY_FROM_NEW_VENDOR]: {
+        phone: {
+            phoneNumber: string;
+            amount: number;
+        },
+        user: User;
+        partner: Partner;
+        transactionId: string;
+        superAgent: Transaction['superagent'],
+        newVendor: Transaction['superagent'],
+    };
+
+    // Data
+    [TOPICS.DATA_PURCHASE_INITIATED_BY_CUSTOMER]: {
+        phone: {
+            phoneNumber: string;
+            amount: number;
+        },
+        user: User;
+        partner: Partner;
+        transactionId: string;
+        superAgent: Transaction['superagent'],
+        vendorRetryRecord: VendorRetryRecord
+    };
+    [TOPICS.DATA_TRANSACTION_COMPLETE]: {
+        phone: {
+            phoneNumber: string;
+            amount: number;
+        },
+        user: User;
+        partner: Partner;
+        superAgent: Transaction['superagent']
+        transactionId: string;
+    };
+    [TOPICS.RETRY_DATA_PURCHASE_FROM_NEW_VENDOR]: {
+        phone: { phoneNumber: string; amount: number; },
+        user: User;
+        partner: Partner;
+        transactionId: string;
+        superAgent: Transaction['superagent'],
+        newVendor: Transaction['superagent'],
+    };
+    [TOPICS.DATA_PURCHASE_INITIATED_BY_CUSTOMER]: {
+        phone: { phoneNumber: string; amount: number; },
+        user: User;
+        partner: Partner;
+        transactionId: string;
+        superAgent: Transaction['superagent'],
+        vendorRetryRecord: VendorRetryRecord
+    };
+    [TOPICS.DATA_RECEIVED_FROM_VENDOR]: {
+        phone: { phoneNumber: string; amount: number; },
+        user: User;
+        partner: Partner;
+        transactionId: string;
+    };
+    [TOPICS.GET_DATA_FROM_VENDOR_RETRY]: {
+        phone: {
+            phoneNumber: string;
+            amount: number;
+        };
+        transactionId: string;
+        timeStamp: Date;
+        error: { code: number; cause: TransactionErrorCause };
+        retryCount: number;
+        superAgent: Transaction['superagent'],
+        waitTime: number,
+        vendorRetryRecord: VendorRetryRecord
+    };
+    [TOPICS.DATA_PURCHASE_RETRY_FROM_NEW_VENDOR]: {
         phone: {
             phoneNumber: string;
             amount: number;

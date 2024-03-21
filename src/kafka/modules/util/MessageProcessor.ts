@@ -1,6 +1,7 @@
 import { EachBatchPayload, EachMessagePayload, Message } from "kafkajs";
 import logger from "../../../utils/Logger";
 import { CustomMessageFormat, MessageHandler, Topic } from "./Interface";
+import { CustomError } from "../../../utils/Errors";
 
 export default class MessageProcessorFactory {
     private handlers: () => MessageHandler
@@ -21,7 +22,13 @@ export default class MessageProcessorFactory {
         try {
             await handler(messageData.value)
         } catch (error) {
-            throw error
+            if (error instanceof CustomError) {
+                logger.error(error.message, error.meta)
+            } else {
+                logger.error((error as Error).message)
+            }
+
+            console.log(error)    
         }
     }
 
@@ -49,7 +56,9 @@ export default class MessageProcessorFactory {
             for (let i = 0; i < batch.messages.length; i++) {
                 const message = batch.messages[i]
                 const prefix = `${batch.topic}[${batch.partition} | ${message.offset}] / ${message.timestamp}`;
-                logger.info(`- ${prefix} ${message.key}#${message.value}`);
+                logger.info(`- ${prefix} ${message.key}#${message.value}`, { meta: {
+                    transactionId: (message.value as any).transactionId
+                }});
 
                 const data: CustomMessageFormat = {
                     topic: batch.topic as Topic,
@@ -70,8 +79,12 @@ export default class MessageProcessorFactory {
             logger.info('Committing offsets...')
 
         } catch (error) {
-            console.error(error)
-            logger.warn((error as any).message)
+            console.log(error)
+            if (error instanceof CustomError) {
+                logger.error(error.message, error.meta)
+            } else {
+                logger.error((error as Error).message)
+            }
         }
     }
 

@@ -12,6 +12,7 @@ import PasswordService from "../../services/Password.service";
 import EmailService, { EmailTemplate } from "../../utils/Email";
 import RoleService from "../../services/Role.service";
 import { PRIMARY_ROLES } from "../../utils/Constants";
+require('newrelic');
 
 export default class TeamMemberProfileController {
     static async inviteTeamMember(req: AuthenticatedRequest, res: Response, next: NextFunction) {

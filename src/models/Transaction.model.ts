@@ -7,12 +7,15 @@ import PowerUnit from "./PowerUnit.model";
 import Meter from "./Meter.model";
 import { generateRandomString } from "../utils/Helper";
 import { NigerianDate } from "../utils/Date";
+import ProductCode from "./ProductCode.model";
+import Bundle from "./Bundle.model";
 
 // Define enums for status and payment type
 export enum Status {
     COMPLETE = 'COMPLETE',
     PENDING = 'PENDING',
     FAILED = 'FAILED',
+    INPROGRESS = 'INPROGRESS',
     FLAGGED = 'FLAGGED'
 }
 
@@ -72,9 +75,38 @@ export default class Transaction extends Model<ITransaction | Transaction> {
     @Column({ type: DataType.STRING, allowNull: true, defaultValue: () => generateRandomString(10) })
     reference: string;
 
+    @Column({ type: DataType.JSONB, allowNull: true, defaultValue: [] })
+    retryRecord: {
+        vendor: ITransaction['superagent'],
+        reference: string[],
+        data?: Record<string, any>,
+        retryCount: number,
+        attempt: number,
+    }[]
 
     @Column({ type: DataType.STRING, allowNull: true })
-    irecharge_token: string
+    productType: string;
+
+    @ForeignKey(() => ProductCode)
+    @IsUUID(4)
+    @Column({ type: DataType.STRING, allowNull: true })
+    productCodeId: string;
+
+    @Column({ type: DataType.STRING, allowNull: true })
+    irechargeAccessToken: string
+
+    @Column({ type: DataType.STRING, allowNull: true })
+    vendorReferenceId: string
+
+    @Column({ type: DataType.STRING, allowNull: true })
+    networkProvider: string
+
+    @ForeignKey(() => Bundle)
+    @Column({ type: DataType.STRING, allowNull: true })
+    bundleId?: string
+
+    @Column({ type: DataType.ARRAY(DataType.STRING), allowNull: true })
+    previousVendors: string[]
 
     // Foreign key for the associated User
     @ForeignKey(() => User)
@@ -95,7 +127,7 @@ export default class Transaction extends Model<ITransaction | Transaction> {
     @Column
     partnerId: string;
 
-    @ForeignKey(() => Partner)
+    @ForeignKey(() => PowerUnit)
     @IsUUID(4)
     @Column
     powerUnitId?: string;
@@ -122,6 +154,12 @@ export default class Transaction extends Model<ITransaction | Transaction> {
     @BelongsTo(() => Meter)
     meter: Meter;
 
+    @Column({ type: DataType.STRING, allowNull: true })
+    channel: 'USSD' | 'WEB' | 'MOBILE' | 'POS' | 'ATM' | 'OTHERS'
+
+    @BelongsTo(() => Bundle)
+    bundle: Bundle;
+
     @Column({
         type: DataType.DATE,
         allowNull: false,
@@ -139,8 +177,8 @@ export default class Transaction extends Model<ITransaction | Transaction> {
     @BeforeCreate
     static async checkIfAccesstokenExistForIRecharge(transaction: Transaction) {
         if (transaction.superagent === 'IRECHARGE') {
-            if (!transaction.irecharge_token) {
-                // throw new Error('irecharge_token is required')
+            if (!transaction.irechargeAccessToken) {
+                // throw new Error('irechargeAccessToken is required')
             }
         }
     }
@@ -152,13 +190,22 @@ export default class Transaction extends Model<ITransaction | Transaction> {
                 throw new Error('disco is required')
             }
         }
-    }  
+    }
 
     @BeforeCreate
     static async checkDiscoForAirtime(transaction: Transaction) {
         if (transaction.transactionType === TransactionType.AIRTIME) {
             if (['MTN', 'GLO', 'AIRTEL', '9MOBILE', 'ETISALAT'].indexOf(transaction.disco.toUpperCase()) === -1) {
-                throw new Error('disco is required')
+                // throw new Error('disco is required')
+            }
+        }
+    }
+
+    @BeforeCreate
+    static async checkIfProductCodeExistForElectricity(transaction: Transaction) {
+        if (transaction.transactionType === TransactionType.ELECTRICITY) {
+            if (!transaction.productCodeId) {
+                throw new Error('productCodeId is required')
             }
         }
     }
@@ -181,8 +228,22 @@ export interface ITransaction {
     userId: string; // Unique identifier of the user associated with the transaction
     partnerId: string; // Unique identifier of the Partner associated with the transaction
     meterId?: string; // Unique identifier of the Meter associated with the transaction
-    reference: string
-    irecharge_token?: string
+    reference: string;
+    productCodeId: string;
+    irechargeAccessToken?: string;
+    vendorReferenceId: string;
+    previousVendors: string[];
+    retryRecord: {
+        vendor: ITransaction['superagent'],
+        reference: string[],
+        data?: Record<string, any>,
+        retryCount: number,
+        attempt: number,
+    }[],
+    productType: string;
+    networkProvider?: string;
+    bundleId?: string;
+    channel: 'USSD' | 'WEB' | 'MOBILE' | 'POS' | 'ATM' | 'OTHERS'
 }
 
 // Define an interface representing the creation of a transaction (ICreateTransaction).

@@ -7,6 +7,7 @@ import Notification from "../../models/Notification.model"
 import EntityService from "../../services/Entity/Entity.service"
 import { Op } from "sequelize"
 import { RoleEnum } from "../../models/Role.model"
+require('newrelic');
 
 export default class NotificationController {
     static async getNotifications(req: AuthenticatedRequest, res: Response, _next: NextFunction) {

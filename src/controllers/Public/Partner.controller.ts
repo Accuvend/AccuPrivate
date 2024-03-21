@@ -17,6 +17,7 @@ import { PartnerProfile } from "../../models/Entity/Profiles";
 import ResponseTrimmer from "../../utils/ResponseTrimmer";
 import { IPartnerProfile, IPartnerStatsProfile } from "../../models/Entity/Profiles/PartnerProfile.model";
 import TransactionService from "../../services/Transaction.service";
+require('newrelic');
 
 export default class PartnerProfileController {
     static async invitePartner(req: AuthenticatedRequest, res: Response, next: NextFunction) {
@@ -163,45 +164,40 @@ export default class PartnerProfileController {
 
 
         const _stats: any = []
-        //adding partner Statics here        
+        //adding partner Statistics  here        
         for (let index = 0; index < partners.length; index++) {
             let failed_Transactions: number = 0
             let pending_Transactions: number = 0
             let success_Transactions: number = 0
             const element = partners[index];
 
-            const _failed_Transaction = await TransactionService.viewTransactionsWithCustomQuery({
+            const _failed_Transaction = await TransactionService.viewTransactionsCountWithCustomQuery({
                 where: {
                     partnerId: element.id,
                     status: "FAILED"
                 }
             })
-            failed_Transactions = _failed_Transaction.length
+            failed_Transactions = _failed_Transaction
 
 
-            const _pending_Transaction = await TransactionService.viewTransactionsWithCustomQuery({
+            const _pending_Transaction = await TransactionService.viewTransactionsCountWithCustomQuery({
                 where: {
                     partnerId: element.id,
                     status: "PENDING"
                 }
             })
-            pending_Transactions = _pending_Transaction.length
+            pending_Transactions = _pending_Transaction
 
 
-            const _complete_Transaction = await TransactionService.viewTransactionsWithCustomQuery({
+            const _complete_Transaction = await TransactionService.viewTransactionsCountWithCustomQuery({
                 where: {
                     partnerId: element.id,
                     status: "COMPLETE"
                 }
             })
-            success_Transactions = _complete_Transaction.length
+            success_Transactions = _complete_Transaction
 
-            // element.stats = {
-            //     success_Transactions,
-            //     failed_Transactions,
-            //     pending_Transactions
-
-            // }
+            
             _stats.push({
                 id: element.id,
                 success_Transactions,

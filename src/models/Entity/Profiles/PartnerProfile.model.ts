@@ -40,8 +40,6 @@ export default class PartnerProfile extends Model<PartnerProfile | IPartnerProfi
     @HasMany(() => ApiKey)
     apiKeys: ApiKey[];
 
-    
-    
 
     @Column({ type: DataType.STRING, allowNull: false })
     key: string;

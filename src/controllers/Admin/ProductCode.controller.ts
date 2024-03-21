@@ -3,17 +3,24 @@ import ProductService from "../../services/ProductCode.service";
 import { AuthenticatedRequest } from "../../utils/Interface";
 import { BadRequestError, NotFoundError } from "../../utils/Errors";
 import { randomUUID } from "crypto";
+require('newrelic');
 
 export default class ProductController {
 
     static async createProductCode(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-        const { location, type, code } = req.body as {code: string, location: string, type: 'POSTPAID' | 'PREPAID' };
+        const { location, type, code, vendType, amount, network } = req.body as {
+            code: string, location: string,
+            type: 'AIRTIME' | 'ELECTRICITY' | 'DATA' | 'CABLE',
+            vendType: 'POSTPAID' | 'PREPAID',
+            amount?: number,
+            network?: 'MTN' | 'GLO' | 'AIRTEL' | '9MOBILE'
+        };
 
         if (!location || !type) {
             throw new BadRequestError('Location and type are required');
         }
 
-        const data = { location, type, productCode: code, id: randomUUID() };
+        const data = { location, type, productCode: code, id: randomUUID(), vendType, amount, network };
         const productCode = await ProductService.addProductCode(data);
 
         res.status(201).json({
@@ -25,13 +32,13 @@ export default class ProductController {
     }
 
     static async updateProductCode(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-        const { location, type, productCodeId } = req.body as {productCodeId: string, location?: string, type?: 'POSTPAID' | 'PREPAID' };
+        const { location, productCodeId, amount, network, code } = req.body as { productCodeId: string, code: string, location?: string, amount?: number, network?: 'MTN' | 'GLO' | 'AIRTEL' | '9MOBILE' };
 
-        if (!location && !type) {
-            throw new BadRequestError('Location or type is required');
+        if (!location) {
+            // throw new BadRequestError('Location or type is required');
         }
 
-        const data = { location, type };
+        const data = { location, amount, network, productCode: code };
         const updatedProductCode = await ProductService.updateProductCode(productCodeId, data);
 
         if (!updatedProductCode) {
@@ -47,7 +54,8 @@ export default class ProductController {
     }
 
     static async getAllProductCodes(req: Request, res: Response, next: NextFunction) {
-        const productCodes = await ProductService.getAllProductCodes();
+        const { type } = req.query as { type: 'AIRTIME' | 'ELECTRICITY' | 'DATA' | 'CABLE' };
+        const productCodes = type ? await ProductService.getProductCodesByType(type, true) : await ProductService.getAllProductCodes();
 
         res.status(200).json({
             status: 'success',

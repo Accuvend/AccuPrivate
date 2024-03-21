@@ -1,5 +1,5 @@
 config:
-  target: "https://api-dev1.accuvend.ng/api/v0/vendor"
+  target: "http://localhost:3000/api/v0/vendor"
 
   phases:
     - duration: 1
@@ -13,14 +13,14 @@ scenarios:
           json:
             meterNumber: "12345678910"
             venderType: "ELECTRICITY"
-            disco: "AEDC"
+            disco: "ECABEPS"
             partnerName: "ZENITH BANK"
             phoneNumber: "084567834568"
             email: "neilkwdfghj4@test.com"
             vendType: "PREPAID"
           headers:
-            x-api-key: "0b5ec1f0d47a8d4c0d9d1baf686f42f2ccba951dffc45ce7a4aa4a624432b29891fece34ff0a469f4dee96c144ef1490396078a374c10700dc446b7a47df3531"
-            x-api-secret: "252ad693f54b9a7caaae54c5e2effd1208f8c7c36eca5706c0c6658f43fc941c13dcb634c4b050a0752d7034af7d5a3c"
+            x-api-key: "d5eea9197c60cac50f8c1f302caa788372937b272c4d821c7be2cc07e968e1e6155d6403a1cab6ae34a0413c218807559856cfcea905354cab8dd215cdb8e481"
+            x-api-secret: "d6dde56cf6e6eb678af6525f3da0ddeb5071d15936459c96e9452b69c2d118e112b8243ac0ee0116b1c225201fc1cf49"
           capture:
             - json: "$.data.transaction.transactionId"
               as: "transactionId"
@@ -29,6 +29,6 @@ scenarios:
       - get:
           url: "/token/?transactionId={{ transactionId }}&amount=1500&bankComment=test%20comment&vendType=PREPAID"
           headers:
-            x-api-key: "0b5ec1f0d47a8d4c0d9d1baf686f42f2ccba951dffc45ce7a4aa4a624432b29891fece34ff0a469f4dee96c144ef1490396078a374c10700dc446b7a47df3531"
-            x-api-secret: "252ad693f54b9a7caaae54c5e2effd1208f8c7c36eca5706c0c6658f43fc941c13dcb634c4b050a0752d7034af7d5a3c"
+            x-api-key: "d5eea9197c60cac50f8c1f302caa788372937b272c4d821c7be2cc07e968e1e6155d6403a1cab6ae34a0413c218807559856cfcea905354cab8dd215cdb8e481"
+            x-api-secret: "d6dde56cf6e6eb678af6525f3da0ddeb5071d15936459c96e9452b69c2d118e112b8243ac0ee0116b1c225201fc1cf49"
        

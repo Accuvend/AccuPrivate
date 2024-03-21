@@ -3,6 +3,7 @@ import { NotFoundError } from "../../utils/Errors";
 import PowerUnit, { IPowerUnit } from "../../models/PowerUnit.model";
 import PowerUnitService from "../../services/PowerUnit.service";
 import { AuthenticatedRequest } from "../../utils/Interface";
+require('newrelic');
 
 interface getPowerUnitQueryParams extends IPowerUnit {
     limit: `${number}`

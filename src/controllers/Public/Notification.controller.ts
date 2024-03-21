@@ -7,6 +7,7 @@ import Notification from "../../models/Notification.model"
 import EntityService from "../../services/Entity/Entity.service"
 import { Op } from "sequelize"
 import { RoleEnum } from "../../models/Role.model"
+require('newrelic');
 
 export default class NotificationController {
     static async getNotifications(req: AuthenticatedRequest, res: Response, _next: NextFunction) {
@@ -35,7 +36,7 @@ export default class NotificationController {
             query.offset = Math.abs(parseInt(page) - 1) * parseInt(limit)
         }
 
-        const notifications = await NotificationService.viewNotifications()
+        const notifications = await NotificationService.viewNotificationWithCustomQuery(query)
 
         res.status(200).json({
             status: 'success',

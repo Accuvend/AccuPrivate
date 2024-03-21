@@ -1,10 +1,10 @@
-import { Consumer, ConsumerSubscribeTopics, EachMessageHandler, EachMessagePayload } from 'kafkajs'
+import { Consumer } from 'kafkajs'
 import logger from '../../../utils/Logger'
 import MessageProcessorFactory from './MessageProcessor'
 import Kafka from '../../config'
-import { KafkaTopics, MessagePayload, Topic } from './Interface'
-import { v4 as uuid } from 'uuid'
-import { TOPICS } from '../../Constants'
+import { KafkaTopics, MessagePayload } from './Interface'
+import { randomUUID } from 'crypto'
+import { CustomError } from '../../../utils/Errors'
 
 export default class ConsumerFactory {
     private kafkaConsumer: Consumer
@@ -30,17 +30,21 @@ export default class ConsumerFactory {
             })
 
         } catch (error) {
+            if (error instanceof CustomError) {
+                logger.error(error.message, error.meta)
+            } else {
+                logger.error((error as Error).message)
+            }
             console.error(error)
         } finally {
             return this
         }
     }
 
-    public async startBatchConsumer(_topic: Topic): Promise<void> {
+    public async startBatchConsumer(): Promise<void> {
         const topic: KafkaTopics = {
-            topics: [_topic],
+            topics: this.messageProcessor.getTopics(),
             fromBeginning: false,
-
         }
 
         try {
@@ -50,7 +54,11 @@ export default class ConsumerFactory {
                 eachBatch: (messagePayload) => this.messageProcessor.processEachBatch(messagePayload)
             })
         } catch (error) {
-            logger.info(error)
+            if (error instanceof CustomError) {
+                logger.error(error.message, error.meta)
+            } else {
+                logger.error((error as Error).message)
+            }
         }
     }
 
@@ -59,6 +67,7 @@ export default class ConsumerFactory {
     }
 
     private createKafkaConsumer(): Consumer {
+        console.log({ groupId: this.messageProcessor.getConsumerName() })
         const consumer = Kafka.consumer({ groupId: this.messageProcessor.getConsumerName() })
         return consumer
     }

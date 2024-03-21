@@ -15,8 +15,10 @@ import {
   IsUUID,
   PrimaryKey,
   BelongsTo,
+  HasMany
 } from "sequelize-typescript";
 import Entity from "./Entity/Entity.model";
+import ComplaintReply from "./ComplaintReply.model";
 
 // Define an enum for the status of complaint
 export enum Status {
@@ -77,6 +79,10 @@ export default class Complaint extends Model<Complaint | IComplaint> {
    */
   @Column({ type: DataType.ENUM, values: Object.values(Status), defaultValue: Status.PENDING, allowNull: false })
   status: Status
+
+  // List of complaint Replies attached to this complaint 
+  @HasMany(()=>ComplaintReply)
+  complaintReplies: ComplaintReply[];
 }
 
 /**
@@ -102,4 +108,4 @@ export interface ICreateComplaint extends IComplaint {
 /**
  * Interface representing the structure of an updated Complaint.
  */
-export interface IUpdateComplaint extends ICreateComplaint {}
+export interface IUpdateComplaint extends Partial<ICreateComplaint> {}

@@ -6,6 +6,7 @@ import { AuthenticatedRequest } from "../../utils/Interface";
 import Validator from "../../utils/Validators";
 import { PartnerProfileService } from "../../services/Entity/Profiles";
 import { RoleEnum } from "../../models/Role.model";
+require('newrelic');
 
 export default class WebhookController {
     static async updateWebhook(req: AuthenticatedRequest, res: Response, next: NextFunction) {

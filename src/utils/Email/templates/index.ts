@@ -18,8 +18,17 @@ class EmailTemplate {
     failedTransaction = async ({ transaction }: { transaction: Transaction }) => {
         return container(await ejs.renderFile(__dirname + '/failedtxn.ejs', { transaction }))
     }
-    receipt = async ({ transaction, meterNumber, token }: IReceiptEmailTemplateProps) => {
-        return container(await ejs.renderFile(__dirname + '/receipt.ejs', { transaction, meterNumber, token }))
+    receipt = async ({ transaction, meterNumber, token, address, name }: IReceiptEmailTemplateProps) => {
+        return container(await ejs.renderFile(__dirname + '/receipt.ejs', { transaction, meterNumber, token, address, name }))
+    }
+    postpaid_receipt = async ({ transaction, meterNumber, token, address, name }: IReceiptEmailTemplateProps) => {
+        return container(await ejs.renderFile(__dirname + '/postpaid_receipt.ejs', { transaction, meterNumber, token, address, name }))
+    }
+    airTimeReceipt = async ({ transaction, phoneNumber }: {
+        transaction: Transaction,
+        phoneNumber: string,
+    }) => {
+        return container(await ejs.renderFile(__dirname + '/airtime-receipt.ejs', { transaction, phoneNumber }))
     }
     emailVerification = async ({ partnerEmail, otpCode }: EmailVerificationProps) => {
         return container(await ejs.renderFile(__dirname + '/emailverification.ejs', { partnerEmail, otpCode }))

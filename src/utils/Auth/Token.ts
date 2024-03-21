@@ -9,6 +9,7 @@ import RoleService from "../../services/Role.service";
 import { extensions } from "sequelize/types/utils/validator-extras";
 import { randomUUID } from "crypto";
 import { UUID } from "sequelize";
+require('newrelic');
 
 interface SaveTokenToCache {
     key: string,
@@ -47,7 +48,7 @@ class TokenUtil {
     }
 }
 
-export type AuthToken = 'access' | 'refresh' | 'passwordreset' | 'emailverification' | 'su_activation'
+export type AuthToken = 'access' | 'refresh' | 'passwordreset' | 'emailverification' | 'su_activation' | 'otp'
 interface GenerateTokenData<T = AuthToken> {
     type: T,
     profile: IPartnerProfile | ITeamMemberProfile | Entity,
@@ -142,6 +143,13 @@ class AuthUtil {
     static async deleteToken({ entity, tokenType, tokenClass }: DeleteToken) {
         const tokenKey = `${tokenType}_${tokenClass}:${entity.id}`
         await TokenUtil.deleteTokenFromCache(tokenKey)
+    }
+
+    static async clear({ entity }: { entity: IEntity }) {
+        await this.deleteToken({ entity, tokenType: 'access', tokenClass: 'token' })
+        await this.deleteToken({ entity, tokenType: 'refresh', tokenClass: 'token' })
+        await this.deleteToken({ entity, tokenType: 'passwordreset', tokenClass: 'code' })
+        await this.deleteToken({ entity, tokenType: 'emailverification', tokenClass: 'code' })
     }
 }
 

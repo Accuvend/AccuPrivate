@@ -51,4 +51,13 @@ export default class ApiKeyService {
         const key = await TokenUtil.getTokenFromCache(`active_api_key:${partner.id}`)
         return key ? Cypher.decryptString(key) : null
     }
+
+    static async updateLastUsedTime(partnerId: string) {
+        const activeApiKey = await ApiKeyService.viewActiveApiKeyByPartnerId(partnerId)
+        if (!activeApiKey) {
+            throw new Error('Api key not found')
+        }
+
+        await activeApiKey.update({ lastUsed: new Date() })
+    }
 }

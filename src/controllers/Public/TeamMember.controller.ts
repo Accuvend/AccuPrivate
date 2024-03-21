@@ -12,6 +12,7 @@ import PasswordService from "../../services/Password.service";
 import EmailService, { EmailTemplate } from "../../utils/Email";
 import RoleService from "../../services/Role.service";
 import { PRIMARY_ROLES } from "../../utils/Constants";
+require('newrelic');
 
 export default class TeamMemberProfileController {
     static async inviteTeamMember(req: AuthenticatedRequest, res: Response, next: NextFunction) {
@@ -29,52 +30,65 @@ export default class TeamMemberProfileController {
         }
 
         const transaction = await Database.transaction()
-        const teamMemberProfile = await TeamMemberProfileService.addTeamMemberProfile({
-            id: uuidv4(),
-            partnerId: profile.id,
-            name
-        }, transaction)
 
-        const entity = await EntityService.addEntity({
-            id: uuidv4(),
-            email: email,
-            status: {
-                activated: true,
-                emailVerified: false
-            },
-            role: role.name,
-            teamMemberProfileId: teamMemberProfile.id,
-            notificationSettings: {
-                login: false,
-                logout: false,
-                failedTransactions: false
-            }
-        }, transaction)
+        try {
+            const teamMemberProfile = await TeamMemberProfileService.addTeamMemberProfile({
+                id: uuidv4(),
+                partnerId: profile.id,
+                name
+            }, transaction)
 
-        const password = uuidv4()
-        const entityPasswrod = await PasswordService.addPassword({
-            id: uuidv4(),
-            password,
-            entityId: entity.id
-        }, transaction)
+            const entity = await EntityService.addEntity({
+                id: uuidv4(),
+                email: email,
+                status: {
+                    activated: true,
+                    emailVerified: false
+                },
+                role: role.name,
+                teamMemberProfileId: teamMemberProfile.id,
+                notificationSettings: {
+                    login: false,
+                    logout: false,
+                    failedTransactions: false
+                },
+                requireOTPOnLogin: false
+            }, transaction)
 
-        EmailService.sendEmail({
-            to: email,
-            subject: 'Team Invitation',
-            html: await new EmailTemplate().inviteTeamMember({ email, password })
-        })
+            const password = uuidv4()
+            const entityPasswrod = await PasswordService.addPassword({
+                id: uuidv4(),
+                password,
+                entityId: entity.id
+            }, transaction)
 
-        // Commit transaction
-        await transaction.commit()
+            EmailService.sendEmail({
+                to: email,
+                subject: 'Team Invitation',
+                html: await new EmailTemplate().inviteTeamMember({ email, password })
+            })
+            // Commit transaction
+            await transaction.commit()
+            // Generate token for team member
+            res.status(200).json({
+                status: 'success',
+                message: 'Team member invited successfully',
+                data: {
+                    teamMember: { ...teamMemberProfile.dataValues, entity: entity.dataValues },
+                }
+            })
+        } catch (err) {
+            await transaction.rollback()
+            res.status(500).json({
+                status: 'failed',
+                message: 'Team member not invited successfully',
+            })
+        }
 
-        // Generate token for team member
-        res.status(200).json({
-            status: 'success',
-            message: 'Team member invited successfully',
-            data: {
-                teamMember: { ...teamMemberProfile.dataValues, entity: entity.dataValues },
-            }
-        })
+
+
+
+
     }
 
     static async getTeamMembers(req: AuthenticatedRequest, res: Response, next: NextFunction) {
@@ -148,16 +162,25 @@ export default class TeamMemberProfileController {
         }
 
         const transaction = await Database.transaction()
-        await EntityService.deleteEntity(entity, transaction)
-        await TeamMemberProfileService.deleteTeamMember(teamMemberProfile, transaction)
-        await transaction.commit()
+        try {
+            await EntityService.deleteEntity(entity, transaction)
+            await TeamMemberProfileService.deleteTeamMember(teamMemberProfile, transaction)
+            await transaction.commit()
 
-        res.status(200).json({
-            status: 'success',
-            message: 'Team member deleted successfully',
-            data: {
-                teamMember: teamMemberProfile
-            }
-        })
+            res.status(200).json({
+                status: 'success',
+                message: 'Team member deleted successfully',
+                data: {
+                    teamMember: teamMemberProfile
+                }
+            })
+        } catch (err) {
+            await transaction.rollback()
+            res.status(500).json({
+                status: 'failed',
+                message: 'Team member not deleted successfully',
+            })
+        }
+
     }
 }

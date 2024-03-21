@@ -8,6 +8,7 @@ const router: Router = express.Router();
 router
     .use(basicAuth('access'))
     .get('/info', AuthenticatedController(PartnerController.getPartnerInfo))
+    .get('/all', AuthenticatedController(PartnerController.getAllPartners))
     .post('/invite', AuthenticatedController(PartnerController.invitePartner))
 
 export default router 

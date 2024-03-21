@@ -43,6 +43,16 @@ export default class EntityService {
         return entity
     }
 
+    static async viewSingleEntityByPhoneNumber(phoneNumber: string): Promise<Entity | null> {
+        const entity: Entity | null = await Entity.findOne({ where: { phoneNumber }, include: [Role] })
+
+        if (!entity) {
+            return null
+        }
+
+        return entity
+    }
+
     static async updateEntity(entity: Entity, dataToUpdate: IUpdateEntity): Promise<Entity> {
         await entity.update(dataToUpdate)
 

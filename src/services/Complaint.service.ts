@@ -1,5 +1,6 @@
-import Complaint, { ICreateComplaint } from "../models/Complaint.model";
+import Complaint, { ICreateComplaint , IUpdateComplaint } from "../models/Complaint.model";
 import Entity from "../models/Entity/Entity.model";
+import ComplaintReply, {ICreateComplaintReply , IUpdateComplaintReply} from "../models/ComplaintReply.model";
 import logger from "../utils/Logger";
 import { v4 as uuidv4 } from 'uuid';
 
@@ -31,7 +32,9 @@ export default class ComplaintService {
       });
       return complaint;
     } catch (err) {
+      
       logger.error("Error Reading Complaint");
+      throw err
     }
   }
 
@@ -46,7 +49,7 @@ export default class ComplaintService {
       currentPage?: number;
       totalPages?: number;
       totalItems?: number;
-      pageSize?: number;
+      pageSize?: number; 
     };
   } | void | null> {
     let _limit = 9;
@@ -61,11 +64,14 @@ export default class ComplaintService {
     console.log(findAllObject)
     
     try {
-      const complaints: Complaint[] | null = await Complaint.findAll(findAllObject);
-      const totalItems = await Complaint.count({ where : findAllObject.where });
+      const complaints: {
+        rows: Complaint[]
+        count: number
+       } | null = await Complaint.findAndCountAll(findAllObject);
+      const totalItems  = complaints.count
       const totalPages = Math.ceil(totalItems / _limit);
       return {
-        complaint : complaints,
+        complaint : complaints.rows,
         pagination: {
             currentPage : _offset,
             pageSize : _limit,
@@ -76,6 +82,91 @@ export default class ComplaintService {
     } catch (err) {
         console.log(err)
       logger.error("Error Reading Complaints");
+      throw err
     }
   }
+
+
+  static async updateAComplaint(uuid: string,complaint: IUpdateComplaint){
+    try{
+      const result : [number] = await Complaint.update(complaint,{ where : {id : uuid}})
+      let _complaint : Complaint | null = null
+      if(result[0] > 1) _complaint = await Complaint.findByPk(uuid)
+      return {
+        result,
+        _complaint
+      }
+    }catch (error) {
+      console.log(error)
+      logger.error("Error Reading Complaints");
+      throw error
+    }
+  }
+
+  static async addComplaintReply(uuid: string , complaintReply : ICreateComplaintReply){
+    try {
+      // const complaint : Complaint | null = await Complaint.findByPk(uuid)
+      // const ComplaintReply =  await complaint?.$create('complaintReplies', complaintReply )
+      // return ComplaintReply
+      const newComplaintRely: ComplaintReply = await ComplaintReply.build({
+        id: uuidv4(),
+        complaintId: uuid,
+        ...complaintReply
+        });
+      await newComplaintRely.save();
+      return newComplaintRely; 
+
+    } catch (error) {
+      console.log(error)
+      logger.error("Error Reading Complaints");
+      throw error
+    }
+    
+
+  }
+
+  static async viewListOfComplaintPaginatedRelies(uuid: string , limit?: number | null, offset?: number | null) {
+      let _limit = 9;
+      let _offset = 1;
+      const findAllObject: { where? : { complaintId? : string } , limt?: number , offset?: number} | any =  {}
+      console.log(uuid,'inner')
+      if (limit) findAllObject.limt = limit;
+      if (offset) findAllObject.offset = offset - 1;
+      try {
+      const complaint : Complaint | null = await Complaint.findByPk(uuid,{
+        include: [{
+          model: ComplaintReply,
+          ...findAllObject,
+          include: [Entity]
+        }]
+        
+      })
+      if(uuid){
+        findAllObject.where = {}
+        findAllObject.where.complaintId = uuid
+      }
+      const totalItems = await ComplaintReply.count({ where : findAllObject.where });
+      console.log(totalItems)
+      const totalPages = Math.ceil(totalItems / _limit);
+      return {
+          complaint: complaint,
+          pagination: {
+              currentPage : _offset,
+              pageSize : _limit,
+              totalItems,
+              totalPages
+          }
+        };
+        
+      } catch (error) {
+        console.log(error)
+        logger.error("Error Reading Complaints Relpies");
+        throw error
+      }
+
+  }
+
+  
+
+
 }

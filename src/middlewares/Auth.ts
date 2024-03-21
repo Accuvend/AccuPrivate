@@ -1,10 +1,13 @@
 import { AuthToken, DecodedTokenData, TokenUtil } from "../utils/Auth/Token";
 import { Request, Response, NextFunction } from "express";
 import jwt from 'jsonwebtoken'
-import { JWT_SECRET } from "../utils/Constants";
+import { JWT_SECRET, NODE_ENV } from "../utils/Constants";
 import { UnauthenticatedError } from "../utils/Errors";
 import Cypher from "../utils/Cypher";
 import { AuthenticatedRequest } from "../utils/Interface";
+import ApiKeyService from "../services/ApiKey.service ";
+import logger from "../utils/Logger";
+require('newrelic');
 
 export const basicAuth = function (tokenType: AuthToken) {
     return async (req: Request, res: Response, next: NextFunction) => {
@@ -52,20 +55,26 @@ export const validateApiKey = async (req: Request, res: Response, next: NextFunc
         return next(new UnauthenticatedError('Invalid API key'))
     };
 
-    (req as any).key = validApiKey
+    (req as any).key = validApiKey // Partners id
 
     // Check if this si the current active api key
     const currentActiveApiKey = await TokenUtil.getTokenFromCache(`active_api_key:${validApiKey}`)
+    // NODE_ENV === 'development' && console.log({
+    //     validApiKey,
+    //     currentActiveApiKey
+    // })
     if (!currentActiveApiKey) {
         return next(new UnauthenticatedError('Invalid API key'))
     }
-
-    // console.log(currentActiveApiKey)
 
     // TODO: Disallow api key if user is not yet active
     if (Cypher.decryptString(currentActiveApiKey) !== apiKey) {
         return next(new UnauthenticatedError('Invalid API key'))
     }
+
+    await ApiKeyService.updateLastUsedTime(validApiKey).catch((e) => {
+        logger.info('Error updating last used time for api key')
+    })
 
     next()
 }

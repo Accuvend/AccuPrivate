@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { v4 as uuidv4 } from 'uuid';
-import { BadRequestError, InternalServerError } from "../../utils/Errors";
+import { BadRequestError, ForbiddenError, InternalServerError } from "../../utils/Errors";
 import EmailService, { EmailTemplate } from "../../utils/Email";
 import ResponseTrimmer from '../../utils/ResponseTrimmer';
 import Partner from "../../models/Entity/Profiles/PartnerProfile.model";
@@ -21,6 +21,7 @@ import { NODE_ENV } from "../../utils/Constants";
 import NotificationService from "../../services/Notification.service";
 import WebhookService from "../../services/Webhook.service";
 import RoleService from "../../services/Role.service";
+require('newrelic');
 
 export default class AuthController {
     static async signup(req: Request, res: Response, next: NextFunction) {
@@ -41,76 +42,87 @@ export default class AuthController {
             throw new BadRequestError('Email has been used before')
         }
 
+
+
         const transaction = await Database.transaction()
 
-        const newPartner = await PartnerService.addPartner({
-            id: uuidv4(),
-            email,
-        }, transaction)
 
-        const entity = await EntityService.addEntity({
-            id: uuidv4(),
-            email,
-            status: {
-                activated: false,
-                emailVerified: false
-            },
-            partnerProfileId: newPartner.id,
-            role: RoleEnum.Partner,
-            notificationSettings: {
-                login: true,
-                failedTransactions: true,
-                logout: true
-            }
-        }, transaction)
+        try {
 
-        const apiKey = await ApiKeyService.addApiKey({
-            partnerId: newPartner.id,
-            key: newPartner.key,
-            active: true,
-            id: uuidv4()
-        }, transaction)
+            const newPartner = await PartnerService.addPartner({
+                id: uuidv4(),
+                email,
+            }, transaction)
 
-        const secKeyInCache = Cypher.encryptString(newPartner.sec)
-        await TokenUtil.saveTokenToCache({ key: secKeyInCache, token: Cypher.encryptString(newPartner.key) })
-        await ApiKeyService.setCurrentActiveApiKeyInCache(newPartner, apiKey.key.toString())
+            const entity = await EntityService.addEntity({
+                id: uuidv4(),
+                email,
+                status: {
+                    activated: false,
+                    emailVerified: false
+                },
+                partnerProfileId: newPartner.id,
+                role: RoleEnum.Partner,
+                notificationSettings: {
+                    login: true,
+                    failedTransactions: true,
+                    logout: true
+                },
+                requireOTPOnLogin: false
+            }, transaction)
 
-        const partnerPassword = await PasswordService.addPassword({
-            id: uuidv4(),
-            entityId: entity.id,
-            password
-        }, transaction)
+            const apiKey = await ApiKeyService.addApiKey({
+                partnerId: newPartner.id,
+                key: newPartner.key,
+                active: true,
+                id: uuidv4()
+            }, transaction)
 
-        await WebhookService.addWebhook({
-            id: uuidv4(),
-            partnerId: newPartner.id,
-        }, transaction)
+            const secKeyInCache = Cypher.encryptString(newPartner.sec)
+            await TokenUtil.saveTokenToCache({ key: secKeyInCache, token: Cypher.encryptString(newPartner.key) })
+            await ApiKeyService.setCurrentActiveApiKeyInCache(newPartner, apiKey.key.toString())
 
-        await entity.update({ status: { ...entity.status, emailVerified: true } })
-        const accessToken = await AuthUtil.generateToken({ type: 'emailverification', entity, profile: newPartner, expiry: 60 * 10 })
-        const otpCode = await AuthUtil.generateCode({ type: 'emailverification', entity, expiry: 60 * 10 })
-        await transaction.commit()
+            const partnerPassword = await PasswordService.addPassword({
+                id: uuidv4(),
+                entityId: entity.id,
+                password
+            }, transaction)
 
-        logger.info(otpCode)
-        await EmailService.sendEmail({
-            to: newPartner.email,
-            subject: 'Succesful Email Verification',
-            html: await new EmailTemplate().awaitActivation(newPartner.email)
-        })
+            await WebhookService.addWebhook({
+                id: uuidv4(),
+                partnerId: newPartner.id,
+            }, transaction)
 
-        res.status(201).json({
-            status: 'success',
-            message: 'Partner created successfully',
-            data: {
-                partner: ResponseTrimmer.trimPartner({ ...newPartner.dataValues, entity }),
-                accessToken,
-            }
-        })
+            await entity.update({ status: { ...entity.status, emailVerified: true } })
+            const accessToken = await AuthUtil.generateToken({ type: 'emailverification', entity, profile: newPartner, expiry: 60 * 10 })
+            const otpCode = await AuthUtil.generateCode({ type: 'emailverification', entity, expiry: 60 * 10 })
+            await transaction.commit()
+
+            logger.info(otpCode)
+            await EmailService.sendEmail({
+                to: newPartner.email,
+                subject: 'Succesful Email Verification',
+                html: await new EmailTemplate().awaitActivation(newPartner.email)
+            })
+            res.status(201).json({
+                status: 'success',
+                message: 'Partner created successfully',
+                data: {
+                    partner: ResponseTrimmer.trimPartner({ ...newPartner.dataValues, entity }),
+                    accessToken,
+                }
+            })
+        } catch (err) {
+            await transaction.rollback()
+            res.status(500).json({
+                status: 'failed',
+                message: 'Partner created unsuccessfully',
+            })
+        }
     }
 
     static async otherSignup(req: Request, res: Response, next: NextFunction) {
         const { email, password, roleId } = req.body
-
 
         const role = await RoleService.viewRoleById(roleId)
         if (!role) {
@@ -129,47 +141,57 @@ export default class AuthController {
 
         const transaction = await Database.transaction()
 
-        const entity = await EntityService.addEntity({
-            id: uuidv4(),
-            email,
-            status: {
-                activated: false,
-                emailVerified: false
-            },
-            role: role.name,
-            notificationSettings: {
-                login: true,
-                failedTransactions: true,
-                logout: true
-            }
-        }, transaction)
 
-        const entityPassword = await PasswordService.addPassword({
-            id: uuidv4(),
-            entityId: entity.id,
-            password
-        }, transaction)
+        try {
+            const entity = await EntityService.addEntity({
+                id: uuidv4(),
+                email,
+                status: {
+                    activated: false,
+                    emailVerified: false
+                },
+                role: role.name,
+                notificationSettings: {
+                    login: true,
+                    failedTransactions: true,
+                    logout: true
+                },
+                requireOTPOnLogin: false
+            }, transaction)
 
-        await entity.update({ status: { ...entity.status, emailVerified: true } })
-        const accessToken = await AuthUtil.generateToken({ type: 'emailverification', entity, profile: entity as any, expiry: 60 * 10 })
-        const otpCode = await AuthUtil.generateCode({ type: 'emailverification', entity, expiry: 60 * 10 })
-        await transaction.commit()
+            const entityPassword = await PasswordService.addPassword({
+                id: uuidv4(),
+                entityId: entity.id,
+                password
+            }, transaction)
 
-        logger.info(otpCode)
-        await EmailService.sendEmail({
-            to: entity.email,
-            subject: 'Succesful Email Verification',
-            html: await new EmailTemplate().awaitActivation(entity.email)
-        })
+            await entity.update({ status: { ...entity.status, emailVerified: true } })
+            const accessToken = await AuthUtil.generateToken({ type: 'emailverification', entity, profile: entity as any, expiry: 60 * 10 })
+            const otpCode = await AuthUtil.generateCode({ type: 'emailverification', entity, expiry: 60 * 10 })
+            await transaction.commit()
 
-        res.status(201).json({
-            status: 'success',
-            message: 'Partner created successfully',
-            data: {
-                entity: entity.dataValues,
-                accessToken,
-            }
-        })
+            logger.info(otpCode)
+            await EmailService.sendEmail({
+                to: entity.email,
+                subject: 'Succesful Email Verification',
+                html: await new EmailTemplate().awaitActivation(entity.email)
+            })
+
+            res.status(201).json({
+                status: 'success',
+                message: 'User created successfully',
+                data: {
+                    entity: entity.dataValues,
+                    accessToken,
+                }
+            })
+        } catch (err) {
+            await transaction.rollback()
+            res.status(500).json({
+                status: 'failed',
+                message: 'User creation unsuccessfully',
+            })
+        }
     }
 
     static async verifyEmail(req: AuthenticatedRequest, res: Response, next: NextFunction) {
@@ -354,10 +376,17 @@ export default class AuthController {
         })
     }
 
-    static async login(req: Request, res: Response) {
-        const { email, password } = req.body
+    static async initLogin(req: Request, res: Response) {
 
-        const entity = await EntityService.viewSingleEntityByEmail(email)
+    }
+
+    static async login(req: Request, res: Response) {
+        const { email, password, phoneNumber: _phoneNumber } = req.body
+
+        const phoneNumber = _phoneNumber ? _phoneNumber.startsWith('+234') ? _phoneNumber.replace('+234', '0') : _phoneNumber : null
+
+        let entity = email && await EntityService.viewSingleEntityByEmail(email)
+        entity = phoneNumber ? await EntityService.viewSingleEntityByPhoneNumber(phoneNumber) : entity
         if (!entity) {
             throw new BadRequestError('Invalid Email or password')
         }
@@ -367,13 +396,29 @@ export default class AuthController {
             throw new InternalServerError('No password found for authneticate entity')
         }
 
-        const validPassword = await PasswordService.comparePassword(password, entityPassword.password)
-        if (!validPassword) {
-            throw new BadRequestError('Invalid Email or password')
-        }
-
         if (!entity.status.activated) {
             throw new BadRequestError('Account not activated')
+        }
+
+        const role = await entity.$get('role')
+        if (!role) {
+            throw new InternalServerError('Role not found for user')
+        }
+
+        //for admins 
+        const requestWasMadeToAdminRoute = req.url === '/login/admin'
+        const userIsAdmin = [RoleEnum.SuperAdmin, RoleEnum.Admin].includes(role.name)
+        const unauthorizedAccess = (requestWasMadeToAdminRoute && !userIsAdmin) || (!requestWasMadeToAdminRoute && userIsAdmin)
+        if (unauthorizedAccess) {
+            throw new ForbiddenError('Unauthorized access to current login route')
+        }
+
+        //for customer
+        const requestWasMadeToCustomerRoute = req.url === '/login/customer'
+        const userIsCustomer = [RoleEnum.EndUser].includes(role.name)
+        const unauthorizedAccessCustomer = (requestWasMadeToCustomerRoute && !userIsCustomer) || (!requestWasMadeToCustomerRoute && userIsCustomer)
+        if (unauthorizedAccessCustomer) {
+            throw new ForbiddenError('Unauthorized access to current login route')
         }
 
         // Only partners and team members have a profile
@@ -382,8 +427,26 @@ export default class AuthController {
             throw new InternalServerError('Profile not found')
         }
 
-        const accessToken = await AuthUtil.generateToken({ type: 'access', entity, profile: profile ?? entity, expiry: 60 * 60 * 60 * 60 })
-        const refreshToken = await AuthUtil.generateToken({ type: 'refresh', entity, profile: profile ?? entity, expiry: 60 * 60 * 24 * 30 })
+        let accessToken: string | null = null
+        if (entity.requireOTPOnLogin) {
+            const otpCode = await AuthUtil.generateCode({ type: 'otp', entity, expiry: 60 * 60 * 3 })
+            console.log({ otpCode })
+            accessToken = await AuthUtil.generateToken({ type: 'otp', entity, profile: entity, expiry: 60 * 60 * 3 })
+
+            await EmailService.sendEmail({
+                to: entity.email,
+                text: 'Login authorization code is ' + otpCode,
+                subject: 'Login Authorization'
+            })
+        } else {
+            const validPassword = await PasswordService.comparePassword(password, entityPassword.password)
+            if (!validPassword) {
+                throw new BadRequestError('Invalid Email or password')
+            }
+        }
+
+        const refreshToken = accessToken ? undefined : await AuthUtil.generateToken({ type: 'refresh', entity, profile: profile ?? entity, expiry: 60 * 60 * 60 * 60 })
+        accessToken = accessToken ?? await AuthUtil.generateToken({ type: 'access', entity, profile: profile ?? entity, expiry: 60 * 60 * 24 * 30 })
 
         if ([RoleEnum.TeamMember].includes(entity.role.name)) {
             const memberProfile = profile as TeamMemberProfile
@@ -419,6 +482,44 @@ export default class AuthController {
 
         res.status(200).json({
             status: 'success',
+            message: 'Login request initiated successfully',
+            data: {
+                entity: entity.dataValues,
+                unreadNotificationsCount: (await NotificationService.getUnreadNotifications(entity.id)).length,
+                accessToken,
+                refreshToken
+            }
+        })
+    }
+
+    static async completeLogin(req: AuthenticatedRequest, res: Response) {
+        const { otpCode } = req.body
+
+        const entity = await EntityService.viewSingleEntityByEmail(req.user.user.entity.email)
+        if (!entity) {
+            throw new InternalServerError('Entity not found')
+        }
+
+        const validCode = await AuthUtil.compareCode({ entity, tokenType: 'otp', token: otpCode })
+        if (!validCode) {
+            throw new BadRequestError('Invalid otp code')
+        }
+
+        const profile = await EntityService.getAssociatedProfile(entity)
+        if (!profile && req.user.user.entity.role !== RoleEnum.EndUser) {
+            throw new InternalServerError('Entity not found for authenticated user')
+        }
+
+        console.log({
+            profile: profile?.dataValues,
+            entity: entity.dataValues
+        })
+
+        const accessToken = await AuthUtil.generateToken({ type: 'access', entity, profile: profile ?? entity, expiry: 60 * 60 * 24 * 30 })
+        const refreshToken = await AuthUtil.generateToken({ type: 'refresh', entity, profile: profile ?? entity, expiry: 60 * 60 * 60 * 60 })
+
+        res.status(200).json({
+            status: 'success',
             message: 'Login successful',
             data: {
                 entity: entity.dataValues,
@@ -427,6 +528,66 @@ export default class AuthController {
                 refreshToken
             }
         })
+
+    }
+
+    static async updateLoginOTPRequirement(req: AuthenticatedRequest, res: Response) {
+        const { requireOtp, entityId } = req.body
+
+        let entity = await EntityService.viewSingleEntityByEmail(req.user.user.entity.email)
+        if (!entity) {
+            throw new InternalServerError('Entity record not found for Authenticated user')
+        }
+
+        const requestMadeByPartner = req.user.user.entity.role === RoleEnum.Partner
+        if (requestMadeByPartner && entityId && entity?.id !== entityId) {
+            const userEntity = await EntityService.viewSingleEntity(entityId)
+            if (!userEntity) {
+                throw new InternalServerError('Entity record not found for user')
+            }
+
+            const profile = await EntityService.getAssociatedProfile(userEntity)
+            if (!profile) {
+                throw new InternalServerError('Profile not found')
+            }
+
+            if (profile instanceof TeamMemberProfile && profile.partnerId !== req.user.user.profile.id) {
+                throw new ForbiddenError('Unauthorized access to user')
+            }
+
+            entity = userEntity
+        }
+
+        await EntityService.updateEntity(entity, { requireOTPOnLogin: requireOtp })
+
+        if (entity.role.name === RoleEnum.Partner) {
+            // Update the same for all teammembers under partner
+            const partner = await entity.$get('partnerProfile')
+            if (!partner) {
+                throw new InternalServerError('Partner not found')
+            }
+
+            const teamMembers = await partner.$get('teamMembers')
+            if (!teamMembers) {
+                throw new InternalServerError('Team members not found')
+            }
+
+            for (const member of teamMembers) {
+                const memberEntity = await member.$get('entity')
+                if (!memberEntity) {
+                    throw new InternalServerError('Entity not found for team member')
+                }
+
+                await EntityService.updateEntity(memberEntity, { requireOTPOnLogin: requireOtp })
+            }
+        }
+
+        res.status(200).json({
+            status: 'success',
+            message: 'OTP requirement updated successfully',
+            data: null
+        })
+
     }
 
     static async logout(req: AuthenticatedRequest, res: Response) {
@@ -460,7 +621,7 @@ export default class AuthController {
         }
 
         const returnData = role === 'PARTNER'
-            ? { partner: ResponseTrimmer.trimPartner({ ...partner!.dataValues, entity }) }
+            ? { entity: entity.dataValues, partner: ResponseTrimmer.trimPartner({ ...partner!.dataValues, entity }) }
             : { entity: entity.dataValues }
 
         res.status(200).json({

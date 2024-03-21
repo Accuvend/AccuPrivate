@@ -4,12 +4,13 @@ import { BadRequestError } from "../../utils/Errors";
 import RoleService from "../../services/Role.service";
 import { RoleEnum } from "../../models/Role.model";
 import { AuthenticatedRequest } from "../../utils/Interface";
+require('newrelic');
 
 export default class RoleController {
     //  Create role
     static async createRole(req: AuthenticatedRequest, res: Response, next: NextFunction) {
         const { name, description, type } = req.body
-
+      
         const role = await RoleService.addRole({ name, description, id: uuidv4(), type })
 
         res.status(200).json({

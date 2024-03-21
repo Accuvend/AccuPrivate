@@ -1,0 +1,691 @@
+name: ci-cd - test
+
+on:
+  push:
+    branches: 
+      - build
+  pull_request: 
+    branches: 
+      - build
+  workflow_dispatch:
+
+jobs:
+  # test-backend: 
+  #   name: test-backend
+  #   runs-on: ubuntu-latest
+  #   steps: 
+  #     - name: Checkout
+  #       uses: actions/checkout@v2
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 18
+  #     - run: npm ci
+  #     - run: npm test
+
+  # Generates the Env file and pushes to s3 bucket 
+  generate-env-file:
+    name: generate-env-file
+    # needs: [push-build]
+    runs-on: ubuntu-latest
+    if : github.ref == 'refs/heads/build'
+    steps:
+    - name: chechkout
+      uses: actions/checkout@v2
+    - name: Configure AWS Credentials 2
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-region: eu-west-2
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET_KEY }}
+    - name: save .env to file 
+      run: |
+        BAXI_TOKEN=${{ secrets.BAXI_TOKEN}}
+        BAXI_URL=${{ secrets.BAXI_URL}}
+        BUYPOWER_TOKEN=${{ secrets.BUYPOWER_TOKEN}}
+        BUYPOWER_URL=${{ secrets.BUYPOWER_URL}}
+        CLOUDINARY_API_KEY=${{ secrets.CLOUDINARY_API_KEY}}
+        CLOUDINARY_API_SECRET=${{ secrets.CLOUDINARY_API_SECRET}}
+        CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME}}
+        CRYPTO_ALGORITHM=${{ secrets.CRYPTO_ALGORITHM}}
+        CRYPTO_IV=${{ secrets.CRYPTO_IV}}
+        CRYPTO_PASSWORD=${{ secrets.CRYPTO_PASSWORD}}
+        DB_DB_NAME=${{ secrets.TEST_DB_DB_NAME}}
+        DB_DIALECT=${{ secrets.DB_DIALECT}}
+        DB_HOST=${{ secrets.TEST_DB_HOST}}
+        DB_NAME=${{ secrets.DB_NAME}}
+        DB_PASS=${{ secrets.TEST_DB_PASS}}
+        DB_PASSWORD=${{ secrets.TEST_DB_PASS}}
+        DB_URL=${{ secrets.DB_URL}}
+        DB_PORT=${{ secrets.TEST_DB_PORT}}
+        DB_USER_NAME=${{ secrets.TEST_DB_USER_NAME}}
+        DEFAULT_ELECTRICITY_PROVIDER=${{ secrets.DEFAULT_ELECTRICITY_PROVIDER}}
+        DEPLOYMENT_PREFIX=${{ secrets.DEPLOYMENT_PREFIX}}
+        EMAIL_HOST=${{ secrets.EMAIL_HOST}}
+        EMAIL_HOST_ADDRESS=${{ secrets.EMAIL_HOST_ADDRESS}}
+        EMAIL_PORT=${{ secrets.EMAIL_PORT}}
+        EMAIL_PASSWORD=${{ secrets.EMAIL_PASSWORD}}
+        IRECHARGE_PRIVATE_KEY=${{ secrets.IRECHARGE_PRIVATE_KEY}}
+        IRECHARGE_PUBLIC_KEY=${{ secrets.IRECHARGE_PUBLIC_KEY}}
+        IRECHARGE_VENDOR_CODE=${{ secrets.IRECHARGE_VENDOR_CODE}}
+        JWT_SECRET=${{ secrets.JWT_SECRET}}
+        KAFKA_INSTANCE_TYPE=${{ secrets.KAFKA_INSTANCE_TYPE}}
+        LOAD_TEST_MODE=${{ secrets.LOAD_TEST_MODE}}
+        LOGO_URL=${{ secrets.LOGO_URL}}
+        NEW_RELIC_APP_NAME=${{ secrets.TEST_NEW_RELIC_APP_NAME}}
+        NEW_RELIC_ENABLED=${{ secrets.NEW_RELIC_ENABLED}}
+        NEW_RELIC_LICENSE_KEY=${{ secrets.TEST_NEW_RELIC_LICENSE_KEY}}
+        NEW_RELIC_LOG_LEVEL=${{ secrets.NEW_RELIC_LOG_LEVEL}}
+        NODE_ENV=${{ secrets.NODE_ENV}}
+        OAUTH_CLIENT_ID=${{ secrets.OAUTH_CLIENT_ID}}
+        OAUTH_CLIENT_SECRET=${{ secrets.OAUTH_CLIENT_SECRET}}
+        OAUTH_REFRESH_TOKEN=${{ secrets.OAUTH_REFRESH_TOKEN}}
+        ONESIGNAL_API_KEY=${{ secrets.ONESIGNAL_API_KEY}}
+        ONESIGNAL_APP_ID=${{ secrets.ONESIGNAL_APP_ID}}
+        REDIS_HOST=${{ secrets.TEST_REDIS_HOST}}
+        REDIS_PASSWORD=${{ secrets.TEST_REDIS_PASSWORD}}
+        REDIS_PORT=${{ secrets.TEST_REDIS_PORT}}
+        REDIS_URL=${{ secrets.TEST_REDIS_URL}}
+        REDIS_USERNAME=${{ secrets.TEST_REDIS_USERNAME}}
+        SENDGRID_API_KEY=${{ secrets.SENDGRID_API_KEY}}
+        SU_HOST_EMAIL_1=${{ secrets.SU_HOST_EMAIL_1}}
+        SU_HOST_EMAIL_2=${{ secrets.SU_HOST_EMAIL_2}}
+        SU_HOST_EMAIL_3=${{ secrets.SU_HOST_EMAIL_3}}
+        KAFKA_LOGS=${{ secrets.KAFKA_LOGS}}
+        KAFKA_REGION=${{ secrets.KAFKA_REGION}}
+        KAFKA_BROKER=${{ secrets.TEST_KAFKA_BROKER}}
+        KAFKA_CLIENT_ID=${{ secrets.TEST_KAFKA_CLIENT_ID}}
+        KAFKA_PASSWORD=${{ secrets.KAFKA_PASSWORD}}
+        KAFKA_INSTANCE_TYPE=${{ secrets.KAFKA_INSTANCE_TYPE}}
+        KAFKA_USERNAME=${{ secrets.KAFKA_USERNAME}}
+        KAFKA_ENV=${{ secrets.KAFKA_ENV}}
+
+        IRECHARGE_DEV_URL=${{ secrets.IRECHARGE_DEV_URL}}
+        IRECHARGE_PROD_URL=${{ secrets.IRECHARGE_PROD_URL}}
+        
+        BAXI_DEV_URL=${{ secrets.BAXI_DEV_URL}}
+        BAXI_PROD_URL=${{ secrets.BAXI_PROD_URL}}
+        
+        BUYPOWERNG_DEV_URL=${{ secrets.BUYPOWERNG_DEV_URL}}
+        BUYPOWERNG_PROD_URL=${{ secrets.BUYPOWERNG_PROD_URL}}
+
+        AFRICASTALKING_API_KEY=${{ secrets.AFRICASTALKING_API_KEY}}
+        AFRICASTALKING_SENDER=${{ secrets.AFRICASTALKING_SENDER}}
+        AFRICASTALKING_USERNAME=${{ secrets.AFRICASTALKING_USERNAME}}
+
+        echo "AFRICASTALKING_API_KEY=$AFRICASTALKING_API_KEY" >> .env
+        echo "AFRICASTALKING_SENDER=$AFRICASTALKING_SENDER" >> .env
+        echo "AFRICASTALKING_USERNAME=$AFRICASTALKING_USERNAME" >> .env
+        
+
+        echo "IRECHARGE_DEV_URL=$IRECHARGE_DEV_URL" >> .env
+        echo "IRECHARGE_PROD_URL=$IRECHARGE_PROD_URL" >> .env
+        
+        echo "BAXI_DEV_URL=$BAXI_DEV_URL" >> .env
+        echo "BAXI_PROD_URL=$BAXI_PROD_URL" >> .env
+        
+        echo "BUYPOWERNG_DEV_URL=$BUYPOWERNG_DEV_URL" >> .env
+        echo "BUYPOWERNG_PROD_URL=$BUYPOWERNG_PROD_URL" >> .env
+
+        echo "KAFKA_ENV=$KAFKA_ENV" >> .env
+        echo "KAFKA_LOGS=$KAFKA_LOGS" >> .env
+        echo "KAFKA_REGION=$KAFKA_REGION" >> .env
+        echo "KAFKA_BROKER=$KAFKA_BROKER" >> .env
+        echo "KAFKA_CA_CERT=$KAFKA_CA_CERT" >> .env
+        echo "KAFKA_CLIENT_ID=$KAFKA_CLIENT_ID" >> .env
+        echo "KAFKA_PASSWORD=$KAFKA_PASSWORD" >> .env
+        echo "KAFKA_USERNAME=$KAFKA_USERNAME" >> .env
+        echo "KAFKA_INSTANCE_TYPE=$KAFKA_INSTANCE_TYPE" >> .env
+        
+        
+        echo "BAXI_TOKEN=$BAXI_TOKEN" >> .env
+        echo "BAXI_URL=$BAXI_URL" >> .env
+        echo "BUYPOWER_TOKEN=$BUYPOWER_TOKEN" >> .env
+        echo "BUYPOWER_URL=$BUYPOWER_URL" >> .env
+        echo "CLOUDINARY_API_KEY=$CLOUDINARY_API_KEY" >> .env
+        echo "CLOUDINARY_API_SECRET=$CLOUDINARY_API_SECRET" >> .env
+        echo "CLOUDINARY_CLOUD_NAME=$CLOUDINARY_CLOUD_NAME" >> .env
+        echo "CRYPTO_ALGORITHM=$CRYPTO_ALGORITHM" >> .env
+        echo "CRYPTO_IV=$CRYPTO_IV" >> .env
+        echo "CRYPTO_PASSWORD=$CRYPTO_PASSWORD" >> .env
+        echo "DB_DB_NAME=$DB_DB_NAME" >> .env
+        echo "DB_DIALECT=$DB_DIALECT" >> .env
+        echo "DB_HOST=$DB_HOST" >> .env
+        echo "DB_NAME=$DB_NAME" >> .env
+        echo "DB_PASS=$DB_PASS" >> .env
+        echo "DB_PORT=$DB_PORT" >> .env
+        echo "DB_PASSWORD=$DB_PASSWORD" >> .env
+        echo "DB_USER_NAME=$DB_USER_NAME" >> .env
+        echo "DEFAULT_ELECTRICITY_PROVIDER=$DEFAULT_ELECTRICITY_PROVIDER" >> .env
+        echo "DEPLOYMENT_PREFIX=$DEPLOYMENT_PREFIX" >> .env
+        echo "EMAIL_HOST=$EMAIL_HOST" >> .env
+        echo "EMAIL_HOST_ADDRESS=$EMAIL_HOST_ADDRESS" >> .env
+        echo "EMAIL_PORT=$EMAIL_PORT" >> .env
+        echo "EMAIL_PASSWORD=$EMAIL_PASSWORD" >> .env
+        echo "IRECHARGE_PRIVATE_KEY=$IRECHARGE_PRIVATE_KEY" >> .env
+        echo "IRECHARGE_PUBLIC_KEY=$IRECHARGE_PUBLIC_KEY" >> .env
+        echo "IRECHARGE_VENDOR_CODE=$IRECHARGE_VENDOR_CODE" >> .env
+        echo "JWT_SECRET=$JWT_SECRET" >> .env
+        echo "LOAD_TEST_MODE=$LOAD_TEST_MODE" >> .env
+        echo "LOGO_URL=$LOGO_URL" >> .env
+        echo "NEW_RELIC_APP_NAME=$NEW_RELIC_APP_NAME" >> .env
+        echo "NEW_RELIC_LOG_ENABLED=$NEW_RELIC_ENABLED" >> .env
+        echo "NEW_RELIC_LICENSE_KEY=$NEW_RELIC_LICENSE_KEY" >> .env
+        echo "NEW_RELIC_LOG_LEVEL=$NEW_RELIC_LOG_LEVEL" >> .env
+        echo "NODE_ENV=$NODE_ENV" >> .env
+        echo "OAUTH_CLIENT_ID=$OAUTH_CLIENT_ID" >> .env
+        echo "OAUTH_CLIENT_SECRET=$OAUTH_CLIENT_SECRET" >> .env
+        echo "OAUTH_REFRESH_TOKEN=$OAUTH_REFRESH_TOKEN" >> .env
+        echo "ONESIGNAL_API_KEY=$ONESIGNAL_API_KEY" >> .env
+        echo "ONESIGNAL_APP_ID=$ONESIGNAL_APP_ID" >> .env
+        echo "REDIS_HOST=$REDIS_HOST" >> .env
+        echo "REDIS_PASSWORD=$REDIS_PASSWORD" >> .env
+        echo "REDIS_PORT=$REDIS_PORT" >> .env
+        echo "REDIS_URL=$REDIS_URL" >> .env
+        echo "REDIS_USERNAME=$REDIS_USERNAME" >> .env
+        echo "SENDGRID_API_KEY=$SENDGRID_API_KEY" >> .env
+        echo "SU_HOST_EMAIL_1=$SU_HOST_EMAIL_1" >> .env
+        echo "SU_HOST_EMAIL_2=$SU_HOST_EMAIL_2" >> .env
+        echo "SU_HOST_EMAIL_3=$SU_HOST_EMAIL_3" >> .env
+        echo "NODE_TLS_REJECT_UNAUTHORIZED=0" >> .env
+        cat .env
+    - name: push to state to s3
+      run: |
+        cp ./.env test.env
+        aws s3 cp ./test.env s3://accuvend-bucket-configuration/ 
+    - name: Save env file
+      uses: actions/cache@v2
+      with:
+        path: ./.env
+        key: env-file
+
+   # Scans the backend for an vulenrabilities
+  scan-backend: 
+    name: scan-backend
+    runs-on: ubuntu-latest
+    if : github.ref == 'refs/heads/build'
+    # needs: [test-backend]
+    needs: [generate-env-file]
+    steps: 
+      - name: Checkout
+        uses: actions/checkout@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - run: npm ci
+      - run: npm audit fix --force
+      - run: npm audit fix --audit-level=critical --force
+      - run: npm audit --audit-level=critical
+      - name: Save nodemodules cache
+        uses: actions/cache@v2
+        with:
+          path: node_modules
+          key: backend-build
+
+
+  # Creates the artifacts for the build process 
+  build-backend:
+    name: build-backend
+    needs: [scan-backend]
+    if : github.ref == 'refs/heads/build'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Restore frontend cache
+        uses: actions/cache@v2
+        with:
+          path: node_modules
+          key: backend-build
+      - name: Restore env file
+        uses: actions/cache@v2
+        with:
+          path: ./.env
+          key: env-file
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Back-end build
+        run: |
+          ls 
+          ls ./src/models
+          ./build.sh
+          ls ./dist/models
+          ls | grep -q dist.zip && echo "dist.zip exists in the directory" || echo "dist.zip does not exist in the directory"
+          if [ -d "./dist.zip" ]; then
+            echo "It's a directory"
+          else
+            echo "It's not a directory"
+          fi
+          if [ -f "./dist.zip" ]; then
+              echo "It's a file"
+          else
+              echo "It's not a file"
+          fi
+          echo "-----"
+          unzip dist.zip -d ./dist_1
+          ls -R dist_1
+          rm -rf dist_1
+          
+      - name: cache dist.zip
+        uses: actions/cache@v2
+        with:
+          path: ./dist.zip
+          key: dist-zip
+      - run: |
+          tsc --version
+
+  # Pushes the build zip to s3 bucket
+  push-build:
+    name: push-build
+    needs: [build-backend]
+    if : github.ref == 'refs/heads/build'
+    runs-on: ubuntu-latest
+    steps:
+      - name: chechkout
+        uses: actions/checkout@v2
+      - name: restore dist.zip
+        uses: actions/cache@v2
+        with:
+          path: ./dist.zip
+          key: dist-zip
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET_KEY }}
+          aws-region: eu-west-2
+      - name: push to state to s3
+        run: |
+          ls | grep -q dist.zip && echo "dist.zip exists in the directory" || echo "dist.zip does not exist in the directory"
+          if [ -d "./dist.zip" ]; then
+            echo "It's a directory"
+          else
+            echo "It's not a directory"
+          fi
+          if [ -f "./dist.zip" ]; then
+              echo "It's a file"
+          else
+              echo "It's not a file"
+          fi
+          unzip dist.zip 
+          ls -R dist
+          cp ./dist.zip testdist.zip
+          aws s3 cp ./testdist.zip s3://staging-bucket-deployment/ 
+
+  # Depolys the backend to build
+  deploy-build:
+    name: deploy-build
+    needs: [push-build]
+    if : github.ref == 'refs/heads/build'
+    runs-on: ubuntu-latest
+    steps:
+      - name: chechkout
+        uses: actions/checkout@v2
+      - name: restore dist 
+        uses: actions/cache@v2
+        with:
+          path: ./dist.zip
+          key: dist-zip
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET_KEY }}
+          aws-region: eu-west-2
+      - name: get ip address for staging ec2
+        id: get_ip_address_ec2
+        run: |
+          EC2_HOST_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Test-core-engine" --query "Reservations[].Instances[].[PublicIpAddress]" --output text)
+          echo "EC2_HOST_IP=$EC2_HOST_IP" >> $GITHUB_OUTPUT
+      - name: SSH to EC2 Instance
+        env: 
+          PRIVATE_KEY: ${{ secrets.SAND_BOX_SSH_KEY }}
+          GITHUB_RUN_NUMBER: ${{ secrets.GITHUB_RUN_NUMBER }}
+          EC2_HOST_IP: ${{steps.get_ip_address_ec2.outputs.EC2_HOST_IP}}
+        run: |
+          echo "$EC2_HOST_IP"
+          echo "$PRIVATE_KEY" > private_key.pem && chmod 400 private_key.pem 
+          ssh -o StrictHostKeyChecking=no -i 'private_key.pem' ubuntu@${EC2_HOST_IP} '
+            cd /home/ubuntu/
+            pm2 stop server #stop the server 
+            # GET THE LATEST_SUCCESSFUL_RUN_ID 
+            if aws s3 cp s3://accuvend-bucket-configuration/test_staging_last_run.txt ./test_staging_last_run.txt | grep "does not exist" 
+            then
+                echo 'FILE DOES NOT EXIST'
+                LAST_SUCCESSFUL_RUN_NUMBER=0               
+            else
+                echo 'FILE EXIST'
+                LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./test_staging_last_run.txt | cut -d "=" -f2)            
+            fi
+            #rename the old folder 
+            echo "$LAST_SUCCESSFUL_RUN_NUMBER"
+            if [ -d "dist" ]; then
+                mv "dist" "dist"_"$LAST_SUCCESSFUL_RUN_NUMBER"
+                echo "Folder renamed to dist"_"$LAST_SUCCESSFUL_RUN_NUMBER"
+            else
+                echo "Folder does not exist."
+            fi
+            # download build latest
+            aws s3 cp s3://staging-bucket-deployment/testdist.zip dist.zip
+            #unzip latest build
+            unzip dist.zip
+            # cd 
+            cd dist
+
+            # Get ENV file
+            aws s3 cp s3://accuvend-bucket-configuration/test.env ./.env
+            
+            #GET DATABASE CREDENTINALS
+            DB_USERNAME=$(grep DB_USER_NAME ./.env | cut -d "=" -f2) &&\
+            DB_PASSWORD=$(grep DB_PASSWORD ./.env | cut -d "=" -f2) &&\
+            DB_NAME=$(grep DB_DB_NAME ./.env | cut -d "=" -f2) &&\
+            DB_PORT=$(grep DB_PORT ./.env | cut -d "=" -f2) &&\
+            DB_HOST=$(grep DB_HOST ./.env | cut -d "=" -f2)
+          
+            echo "DB_URL=postgres://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=require" >> .env
+            
+            #install depencendies in dist folder
+            npm install
+            
+            #Set up restart server 
+            pm2 start server.js --time'
+          
+  # Smoke Test to check if server is up and running 
+  smoke-test:
+    name: smoke-test
+    if : github.ref == 'refs/heads/build'
+    runs-on: ubuntu-latest
+    needs: [deploy-build]
+    outputs:
+      smoke_test_result: ${{ steps.check_server_status.outputs.smoke_test_result }}
+    steps:
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET_KEY }}
+        aws-region: eu-west-2
+    - name: check if server is up and running 
+      id: check_server_status
+      run : |
+        EC2_HOST_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Test-core-engine" --query "Reservations[].Instances[].[PublicIpAddress]" --output text)
+        sleep 30 # wait 30 seconds to make sure the server is up and running before somke test 
+        echo "http://${EC2_HOST_IP}/healthcheck"
+        if curl "http://${EC2_HOST_IP}/healthcheck" | grep "Server is working"
+        then
+            echo "SMOKE_TEST_RESULT PASSED"
+            echo "smoke_test_result=1" >> "$GITHUB_OUTPUT"
+        else
+            echo "SMOKE_TEST_RESULT FAILED"
+            echo "smoke_test_result=0" >> "$GITHUB_OUTPUT"
+        fi
+    - name: check if smoke test result is saved  
+      run : echo "${{steps.check_server_status.outputs.smoke_test_result}}"
+
+  # Roll back when smoke test fails
+  roll-back:
+    name: roll-back
+    needs: smoke-test
+    if : github.ref == 'refs/heads/build'
+    runs-on: ubuntu-latest
+    steps: 
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET_KEY }}
+          aws-region: eu-west-2
+      - name: roll back_server_if_failure 
+        env: 
+          PRIVATE_KEY: ${{ secrets.SAND_BOX_SSH_KEY }}
+          GITHUB_RUN_NUMBER: ${{ secrets.GITHUB_RUN_NUMBER }}
+        run: |
+          EC2_HOST_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Test-core-engine" --query "Reservations[].Instances[].[PublicIpAddress]" --output text)
+          echo "${{needs.smoke-test.outputs.smoke_test_result}}"
+          if [[ "${{needs.smoke-test.outputs.smoke_test_result}}" == "1" ]];
+          then 
+            echo " No rollback"
+          else
+            echo "Rolling back...."
+            echo "$PRIVATE_KEY" > private_key.pem && chmod 400 private_key.pem
+            ssh -o StrictHostKeyChecking=no -i 'private_key.pem' ubuntu@${EC2_HOST_IP} '
+              cd /home/ubuntu/
+              pm2 stop server #stop the server 
+              # GET THE LATEST_SUCCESSFUL_RUN_ID 
+              if aws s3 cp s3://accuvend-bucket-configuration/test_staging_last_run.txt ./test_staging_last_run.txt | grep "does not exist" 
+              then
+                  echo 'FILE DOES NOT EXIST'
+                  LAST_SUCCESSFUL_RUN_NUMBER=0               
+              else
+                  echo 'FILE EXIST'
+                  LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./test_staging_last_run.txt | cut -d "=" -f2)            
+              fi
+              #rename the old folder 
+              echo "$LAST_SUCCESSFUL_RUN_NUMBER"
+              if [ -d "dist" ] && [ -d "dist"_"$LAST_SUCCESSFUL_RUN_NUMBER" ]; then
+                  rm -rf dist
+                  mv "dist"_"$LAST_SUCCESSFUL_RUN_NUMBER" "dist"
+                  echo "Folder renamed from dist"_"$LAST_SUCCESSFUL_RUN_NUMBER"
+              else
+                  echo "Folder does not exist."
+              fi
+              # cd 
+              cd dist
+              
+              #Set up server 
+              pm2 start server.js --time'
+            
+          fi 
+  # Fail stage initiate on successful roll back 
+  fail-stage-on-rollback: 
+    name:  fail-stage-on-rollback
+    if : github.ref == 'refs/heads/build'
+    needs: [roll-back, smoke-test ]
+    runs-on: ubuntu-latest
+    steps: 
+      - name: fail stage if roll back 
+        run: |
+          echo "${{needs.smoke-test.outputs.smoke_test_result}}"
+          if [[ "${{needs.smoke-test.outputs.smoke_test_result}}" == "1" ]];
+          then 
+            echo "No rollback"
+            exit 0
+          else
+            echo "Rollback occured no need to update LAST_SUCCESSFUL_RUN"  
+            exit 1
+          fi
+
+  # Clean up of old artificats on successful deployment 
+  clean-up:
+    name: clean-up
+    needs: [roll-back, smoke-test ]
+    if : github.ref == 'refs/heads/build'
+    runs-on: ubuntu-latest
+    steps: 
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET_KEY }}
+          aws-region: eu-west-2
+          
+      - name: Delete cache
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BRANCH: refs/pull/${{ github.event.number }}/merge
+        run: |
+          gh extension install actions/gh-actions-cache
+          
+          echo "Fetching list of cache key"
+          echo "$REPO"
+          echo "$BRANCH"
+          cacheKeysForPR=$(gh actions-cache list -R $REPO -L 100 | cut -f 1 )
+
+          ## Setting this to not fail the workflow while deleting cache keys.
+          set +e
+          echo "Deleting caches..."
+          for cacheKey in $cacheKeysForPR
+          do
+              echo "$cacheKey"
+              gh actions-cache delete $cacheKey -R $REPO --confirm
+          done
+          echo "Done deleting cache"
+          
+      - name: cleanup_if_successful
+        env: 
+          PRIVATE_KEY: ${{ secrets.SAND_BOX_SSH_KEY }}
+          GITHUB_RUN_NUMBER: ${{ secrets.GITHUB_RUN_NUMBER }}
+        run: |
+          EC2_HOST_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Test-core-engine" --query "Reservations[].Instances[].[PublicIpAddress]" --output text)
+          echo "${{needs.smoke-test.outputs.smoke_test_result}}"
+          if [[ "${{needs.smoke-test.outputs.smoke_test_result}}" == "1" ]];
+          then 
+            echo "Clean up "
+            echo "$PRIVATE_KEY" > private_key.pem && chmod 400 private_key.pem
+            ssh -o StrictHostKeyChecking=no -i 'private_key.pem' ubuntu@${EC2_HOST_IP} '
+              cd /home/ubuntu/
+              pm2 stop server #stop the server 
+              # GET THE LATEST_SUCCESSFUL_RUN_ID 
+              if aws s3 cp s3://accuvend-bucket-configuration/test_staging_last_run.txt ./test_staging_last_run.txt | grep "does not exist" 
+              then
+                  echo 'FILE DOES NOT EXIST'
+                  LAST_SUCCESSFUL_RUN_NUMBER=0               
+              else
+                  echo 'FILE EXIST'
+                  LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./test_staging_last_run.txt | cut -d "=" -f2)            
+              fi
+              #delete the old folder 
+              echo "$LAST_SUCCESSFUL_RUN_NUMBER"
+              if [ -d "dist" ] && [ -d "dist"_"$LAST_SUCCESSFUL_RUN_NUMBER" ]; then
+                  rm -rf "dist"_"$LAST_SUCCESSFUL_RUN_NUMBER"
+                  echo "Folder removed: dist"_"$LAST_SUCCESSFUL_RUN_NUMBER"
+              else
+                  echo "Folder does not exist."
+              fi
+              # cd 
+              cd dist
+              
+              #Set up restart server 
+              pm2 start server.js --time '
+          else
+            echo "Rolled back No Cleanup"
+            exit 1
+          fi   
+  # Add RUN_id has last successful run
+  save-latest-successful_run:
+    name: save-latest-successful-run
+    # if : github.ref == 'refs/heads/build' && needs.smoke-test.outputs.smoke_test_result == '1'
+    if : github.ref == 'refs/heads/build'
+    needs: [fail-stage-on-rollback , clean-up]
+    # needs: [roll-back, smoke-test]
+    runs-on: ubuntu-latest
+    steps: 
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET_KEY }}
+          aws-region: eu-west-2
+      - name: save-succesful-run-id 
+        env: 
+          PRIVATE_KEY: ${{ secrets.SAND_BOX_SSH_KEY }}
+          GITHUB_RUN_NUMBER: ${{ secrets.GITHUB_RUN_NUMBER }}
+        run: |
+          echo "LAST_SUCCESSFUL_RUN_ID=$GITHUB_RUN_NUMBER" > test_staging_last_run.txt
+          aws s3 cp ./test_staging_last_run.txt s3://accuvend-bucket-configuration/test_staging_last_run.txt
+        
+  # create-update-environment:
+  #   name: create-environment
+  #   needs: [push-build]
+  #   if : github.ref == 'refs/heads/build'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - name: Checkout
+  #     uses: actions/checkout@v2
+  #   - name: Configure AWS Credentials 2
+  #     uses: aws-actions/configure-aws-credentials@v4
+  #     with:
+  #       aws-region: eu-west-2
+  #       aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #       aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET_KEY }}
+  #   - name: pull terraform state from s3
+  #     run: |
+  #       aws s3 cp s3://build-terraform-item/terraform.tfstate ./terraform/build && echo "Success: The AWS CLI command completed successfully." || echo "Error: The AWS CLI command failed."
+    
+  #   - name: Terraform Setup
+  #     uses: hashicorp/setup-terraform@v3
+  #     env:
+  #       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #       TF_ACTION_WORKING_DIR: 'terraform/build'
+  #       TF_AWS_ACCESS_KEY_ID:  ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #       TF_AWS_SECRET_ACCESS_KEY:  ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #       TF_VAR_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #       TF_VAR_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  #       TF_VAR_region: "eu-west-2"
+  #       TF_VAR_subnet_1: ${{secrets.SUBNET_1}}
+  #       TF_VAR_subnet_2: ${{secrets.SUBNET_2}}
+  #       TF_VAR_subnet_3: ${{secrets.SUBNET_3}}
+  #       TF_VAR_accountId: ${{secrets.ACCOUNTID}}
+  #       TF_VAR_image_id: ${{secrets.IMAGE_ID}}
+  #       TF_VAR_instance_type: ${{secrets.INSTANCE_TYPE}}
+  #       TF_VAR_kafka_instance_type: "kafka.t3.small"
+  #       TF_VAR_instance_keypair: "build-key-pair"
+      
+  #   - name: Terraform fmt
+  #     id: fmt
+  #     run: | 
+  #        cd terraform/build
+  #        pwd
+  #        terraform fmt -check
+  #     continue-on-error: true
+
+  #   - name: Terraform Init
+  #     id: init
+  #     run:  | 
+  #        cd terraform/build
+  #        pwd
+  #        terraform init
+    
+  #   - name: Terraform Validate
+  #     id: validate
+  #     run:  | 
+  #        cd terraform/build
+  #        pwd
+  #        terraform validate -no-color
+    
+  #   - name: Terraform Plan
+  #     id: plan
+  #     run:  | 
+  #        cd terraform/build
+  #        pwd
+  #        terraform plan -no-color
+  #     continue-on-error: true
+      
+  #   - name: Terraform apply
+  #     id: apply
+  #     run: |
+  #         cd terraform/build
+  #         pwd
+  #         terraform apply -auto-approve -no-color
+  #     continue-on-error: true
+
+  #   - run: echo ${{ steps.plan.outputs.stdout }}
+  #   - run: echo ${{ steps.plan.outputs.stderr }}
+  #   - run: echo ${{ steps.plan.outputs.exitcode }}
+  #   - run: echo ${{ steps.apply.outputs.stdout }}
+  #   - run: echo ${{ steps.apply.outputs.stderr }}
+  #   - run: echo ${{ steps.apply.outputs.exitcode }}
+
+  #   - name: Save tft.state file 
+  #     run: |
+  #         cd terraform/build
+  #         pwd
+  #         aws s3 cp terraform.tfstate s3://build-terraform-item/
+      
+   
+      
+
+    
+
+      

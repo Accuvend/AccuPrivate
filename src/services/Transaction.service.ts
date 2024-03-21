@@ -13,22 +13,34 @@ import PowerUnit from "../models/PowerUnit.model";
 import Partner from "../models/Entity/Profiles/PartnerProfile.model";
 import User from "../models/User.model";
 import Meter from "../models/Meter.model";
-import { Op } from "sequelize";
+import { Op, literal } from "sequelize";
 import { generateRandomString } from "../utils/Helper";
+import { Sequelize } from "sequelize-typescript";
+import Bundle from "../models/Bundle.model";
 
 // Define the TransactionService class for handling transaction-related operations
 export default class TransactionService {
     // Create an instance of EventService for handling events
     private static eventService: EventService = new EventService();
 
-    static addTransactionWithoutValidatingUserRelationship(
-        transaction: Omit<ICreateTransaction, "userId" | "reference">,
+    static async addTransactionWithoutValidatingUserRelationship(
+        transaction: Omit<ICreateTransaction, "userId">,
     ): Promise<Transaction> {
+        console.log({ transaction })
         const transactionData = Transaction.build({
             ...transaction,
-            reference: generateRandomString(10),
+            // reference: generateRandomString(10),
         } as Transaction);
-        return transactionData.save({ validate: false });
+
+        await transactionData.save({ validate: false });
+        const _transaction = await TransactionService.viewSingleTransaction(
+            transactionData.id,
+        );
+        if (!_transaction) {
+            throw new Error("Error fetching transaction");
+        }
+
+        return _transaction;
     }
 
     // Static method for adding a new transaction
@@ -51,7 +63,8 @@ export default class TransactionService {
         // Retrieve all transactions from the database
         const transactions: Transaction[] = await Transaction.findAll({
             where: {},
-            include: [PowerUnit, Event, Partner, User, Meter],
+            include: [PowerUnit, Event, Partner, User, Meter, Bundle],
+            order: [["transactionTimestamp", "DESC"]],
         });
         return transactions;
     }
@@ -61,10 +74,46 @@ export default class TransactionService {
     ): Promise<Transaction[]> {
         // Retrieve all transactions from the database
         // Sort from latest
+
+        //Removed Because of Performance issues 
+        // Getting the list of columns 
+        // const ListofColumns = await Transaction.describe()
+        //convert the list of columns to array 
+        // const attributesMap: Array<string> = Object.keys(ListofColumns)
         const transactions: Transaction[] = (
             await Transaction.findAll({
                 ...query,
-                include: [PowerUnit, Event, Partner, User, Meter],
+                include: [PowerUnit, Event, Partner, User, Meter, Bundle],
+                //add the transform disco to biller so it can be used in the frontend and for the partner 
+                attributes: [
+                    ['disco', 'biller'],
+                    'id',
+                    'amount',
+                    'status',
+                    'paymentType',
+                    'transactionTimestamp',
+                    'disco',
+                    'bankRefId',
+                    'bankComment',
+                    'superagent',
+                    'reference',
+                    'productType',
+                    'productCodeId',
+                    'irechargeAccessToken',
+                    'vendorReferenceId',
+                    'networkProvider',
+                    'previousVendors',
+                    'userId',
+                    'transactionType',
+                    'partnerId',
+                    'powerUnitId',
+                    'meterId',
+                    'createdAt',
+                    'updatedAt',
+                    'channel'
+                    //...attributesMap
+                ],
+                order: [["transactionTimestamp", "DESC"]],
             })
         ).sort((a, b) => {
             return (
@@ -73,6 +122,54 @@ export default class TransactionService {
             );
         });
         return transactions;
+
+        /**PREVIOUS UTILIZIED CODE */
+        //  // Retrieve all transactions from the database
+        // // Sort from latest
+        // const transactions: Transaction[] = (
+        //     await Transaction.findAll({
+        //         ...query,
+        //         include: [PowerUnit, Event, Partner, User, Meter],
+        //         order: [["transactionTimestamp", "DESC"]],
+        //     })
+        // ).sort((a, b) => {
+        //     return (
+        //         b.transactionTimestamp.getTime() -
+        //         a.transactionTimestamp.getTime()
+        //     );
+        // });
+        // return transactions;
+    }
+
+    static async viewTransactionsCountWithCustomQuery(
+        query: Record<string, any>,
+    ): Promise<number> {
+        // Counting transactions from the database
+        const transactionCount: number = await Transaction.count({
+            ...query,
+        });
+        return transactionCount;
+    }
+
+    static async viewTransactionsAmountWithCustomQuery(
+        query: Record<string, any>,
+    ): Promise<number> {
+        // Summing the total amount of transactions from the database
+
+        const transactionCount: any = await Transaction.findAll({
+            ...query,
+
+            attributes: [
+                [
+                    Sequelize.fn(
+                        "sum",
+                        Sequelize.cast(Sequelize.col("amount"), "DECIMAL"),
+                    ),
+                    "total_amount",
+                ],
+            ],
+        });
+        return transactionCount;
     }
 
     // Static method for viewing a single transaction by UUID
@@ -80,20 +177,69 @@ export default class TransactionService {
         uuid: string,
     ): Promise<Transaction | null> {
         // Retrieve a single transaction by its UUID
+
+        //Removed Because of Performance issues 
+        // Getting the list of columns 
+        // const ListofColumns = await Transaction.describe()
+        //convert the list of columns to array 
+        // const attributesMap: Array<string> = Object.keys(ListofColumns)
+
         const transaction: Transaction | null = await Transaction.findByPk(
             uuid,
             {
-                include: [PowerUnit, Event, Partner, User, Meter],
+                //add the transform disco to biller so it can be used in the frontend and for the partner 
+                attributes: [
+                    ['disco', 'biller'],
+                    'id',
+                    'amount',
+                    'status',
+                    'paymentType',
+                    'transactionTimestamp',
+                    'disco',
+                    'bankRefId',
+                    'bankComment',
+                    'superagent',
+                    'reference',
+                    'productType',
+                    'productCodeId',
+                    'irechargeAccessToken',
+                    'vendorReferenceId',
+                    'networkProvider',
+                    'previousVendors',
+                    'userId',
+                    'transactionType',
+                    'partnerId',
+                    'powerUnitId',
+                    'meterId',
+                    'createdAt',
+                    'updatedAt',
+                    'bundleId',
+                    'retryRecord',
+                    'reference',
+                    //...attributesMap
+                ],
+                include: [PowerUnit, Event, Partner, User, Meter, Bundle],
             },
         );
         return transaction;
+        /**PREVIOUS UTILIZIED CODE */
+        // const transaction: Transaction | null = await Transaction.findByPk(
+        //     uuid,
+        //     {
+        //         include: [PowerUnit, Event, Partner, User, Meter],
+        //     },
+        // );
+        // return transaction;
     }
 
     static async viewSingleTransactionByBankRefID(
         bankRefId: string,
     ): Promise<Transaction | null> {
         // Retrieve a single transaction by its UUID
-        const transaction: Transaction | null = await Transaction.findOne({ where: { bankRefId: bankRefId }, include: [PowerUnit, Event, Partner, User, Meter] },);
+        const transaction: Transaction | null = await Transaction.findOne({
+            where: { bankRefId: bankRefId },
+            include: [PowerUnit, Event, Partner, User, Meter],
+        });
         return transaction;
     }
 
@@ -119,34 +265,32 @@ export default class TransactionService {
         partnerId: string,
     ): Promise<Transaction[]> {
         const yesterdayDate = new Date();
-        yesterdayDate.setDate(yesterdayDate.getDate() - 5);
-        const currentDate = new Date();
-        console.log(yesterdayDate);
-        console.log(new Date());
-        console.log(partnerId);
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
         const transactions: Transaction[] = await Transaction.findAll({
             where: {
-                // partnerId: partnerId,
+                partnerId: partnerId,
                 transactionTimestamp: {
-                    [Op.between]: [yesterdayDate, currentDate],
+                    [Op.between]: [yesterdayDate, new Date()],
                 },
             },
         });
-        // console.log(transactions)
 
         return transactions;
     }
 
-    static async viewTransactionsForYesterdayByStatus(partnerId: string, status: 'COMPLETED' | 'PENDING' | 'FAILED'): Promise<Transaction[]> {
-        const yesterdayDate = new Date()
-        yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+    static async viewTransactionsForYesterdayByStatus(
+        partnerId: string,
+        status: "COMPLETED" | "PENDING" | "FAILED",
+    ): Promise<Transaction[]> {
+        const yesterdayDate = new Date();
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1);
 
         const transactions: Transaction[] = await Transaction.findAll({
             where: {
                 partnerId: partnerId,
                 status,
                 transactionTimestamp: {
-                    $between: [yesterdayDate, new Date()],
+                    [Op.between]: [yesterdayDate, new Date()],
                 },
             },
         });

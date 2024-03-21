@@ -6,21 +6,34 @@ import { TokenUtil } from "../../utils/Auth/Token";
 import ApiKeyService from "../../services/ApiKey.service ";
 import Cypher from "../../utils/Cypher";
 import { AuthenticatedRequest } from "../../utils/Interface";
+import { TeamMemberProfileService } from "../../services/Entity/Profiles";
+import PartnerProfile from "../../models/Entity/Profiles/PartnerProfile.model";
+require('newrelic');
 
 export default class ApiController {
     static async getActiveAPIKey(req: AuthenticatedRequest, res: Response, next: NextFunction) {
         const { entity, profile } = req.user.user
 
-        if (entity.role !== 'PARTNER') {
-            throw new ForbiddenError('Only partners can access this resource')
+        if (entity.role !== 'PARTNER' && entity.role !== 'TEAMMEMBER' ) {
+            throw new ForbiddenError('Only partners or partner\'s members can access this resource')
+        }
+        let partner_ : PartnerProfile | null
+        if(entity.role === 'PARTNER'){
+            partner_ = await PartnerService.viewSinglePartnerByEmail(entity.email)
+            
+        }else{
+            // console.log(entity.email)
+            const teammember_ = await TeamMemberProfileService.viewSingleTeamMemberByEmail(entity.email);
+            if(!teammember_) throw new InternalServerError('Authenticated teammember not found')
+            partner_ = await PartnerService.viewSinglePartner(teammember_.partnerId) 
         }
 
-        const partner_ = await PartnerService.viewSinglePartnerByEmail(entity.email)
         if (!partner_) {
-            throw new InternalServerError('Authenticated partner not found')
+            throw new InternalServerError('Partner not found')
         }
 
-        const apiKey = await ApiKeyService.viewActiveApiKeyByPartnerId(profile.id)
+        
+        const apiKey = await ApiKeyService.viewActiveApiKeyByPartnerId(partner_.id)
         if (!apiKey) {
             throw new BadRequestError('API Key not found')
         }
@@ -33,7 +46,9 @@ export default class ApiController {
             message: 'API Keys retrieved successfully',
             data: {
                 apiKey: apiKey.key,
-                secretKey: secKeyInCache
+                secretKey: secKeyInCache,
+                createdAt: apiKey.createdAt,
+                lastUsed: apiKey.lastUsed
             }
         })
     }
@@ -52,12 +67,19 @@ export default class ApiController {
         await TokenUtil.saveTokenToCache({ key: secKeyInCache, token: Cypher.encryptString(key) })
         await ApiKeyService.setCurrentActiveApiKeyInCache(partner, key)
 
+        const apiKey = await ApiKeyService.viewActiveApiKeyByPartnerId(partner.id)
+        if (!apiKey) {
+            throw new InternalServerError('API key not found for user')
+        }
+
         res.status(200).json({
             status: 'success',
             message: 'Generated API keys successfully',
             data: {
                 apiKey: key,
-                secretKey: secKeyInCache
+                secretKey: secKeyInCache,
+                createdAt: apiKey.createdAt,
+                lastUsed: apiKey.lastUsed
             }
         })
     }

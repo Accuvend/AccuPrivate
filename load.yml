@@ -1,0 +1,34 @@
+config:
+  target: "http://localhost:3000/api/v0/vendor"
+
+  phases:
+    - duration: 1
+      arrivalCount: 1
+      name: "Warm up"
+  
+scenarios:
+  - flow:
+      - post:
+          url: "/validate/meter"
+          json:
+            meterNumber: "12345678910"
+            venderType: "ELECTRICITY"
+            disco: "ECABEPS"
+            partnerName: "ZENITH BANK"
+            phoneNumber: "084567834568"
+            email: "neilkwdfghj4@test.com"
+            vendType: "PREPAID"
+          headers:
+            x-api-key: "d5eea9197c60cac50f8c1f302caa788372937b272c4d821c7be2cc07e968e1e6155d6403a1cab6ae34a0413c218807559856cfcea905354cab8dd215cdb8e481"
+            x-api-secret: "d6dde56cf6e6eb678af6525f3da0ddeb5071d15936459c96e9452b69c2d118e112b8243ac0ee0116b1c225201fc1cf49"
+          capture:
+            - json: "$.data.transaction.transactionId"
+              as: "transactionId"
+      - think: 2
+
+      - get:
+          url: "/token/?transactionId={{ transactionId }}&amount=1500&bankComment=test%20comment&vendType=PREPAID"
+          headers:
+            x-api-key: "d5eea9197c60cac50f8c1f302caa788372937b272c4d821c7be2cc07e968e1e6155d6403a1cab6ae34a0413c218807559856cfcea905354cab8dd215cdb8e481"
+            x-api-secret: "d6dde56cf6e6eb678af6525f3da0ddeb5071d15936459c96e9452b69c2d118e112b8243ac0ee0116b1c225201fc1cf49"
+       

@@ -26,6 +26,12 @@ export default class ApiKey extends Model<ApiKey | IApiKey> {
 
     @Column({ type: DataType.BOOLEAN, allowNull: false })
     active: boolean;
+
+    @Column({ type: DataType.DATE, allowNull: false })
+    createdAt: Date;
+
+    @Column({ type: DataType.DATE, allowNull: true })
+    lastUsed: Date
 }
 
 // Define an interface representing an ApiKey (IEvent) with various properties.
@@ -34,6 +40,7 @@ export interface IApiKey {
     key: string; // Timestamp of the ApiKey
     partnerId: string; // Data associated with the ApiKey (can be a string or JSON)
     active: boolean; // Data associated with the ApiKey (can be a string or JSON)
+    lastUsed?: Date;
 }
 
 // Define an interface (ICreateEvent) that extends IEvent, typically used for creating new events.

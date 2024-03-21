@@ -13,7 +13,7 @@ export default class User extends Model<User | IUser> {
     id: string;
 
     // Define a column for the user's address, specifying data type and non-null constraint
-    @Column({ type: DataType.STRING, allowNull: false })
+    @Column({ type: DataType.STRING, allowNull: true })
     address: string;
 
     // Define a column for the user's email address, specifying data type and non-null constraint
@@ -41,7 +41,7 @@ export default class User extends Model<User | IUser> {
 // Define an interface for a User
 export interface IUser {
     id: string;             // A unique identifier for the user
-    address: string;        // The user's address
+    address?: string;        // The user's address
     email: string;          // The user's email address
     name?: string;           // The user's name
     phoneNumber: string;   // The user's phone number

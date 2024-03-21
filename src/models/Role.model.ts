@@ -9,7 +9,8 @@ export enum RoleEnum {
     Admin = 'ADMIN',
     Partner = 'PARTNER',
     TeamMember = 'TEAMMEMBER',
-    SuperAdmin = 'SUPERADMIN'
+    SuperAdmin = 'SUPERADMIN',
+    EndUser = 'ENDUSER',
 }
 
 @Table

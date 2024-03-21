@@ -7,6 +7,7 @@ import { Status } from "../../models/Complaint.model";
 import { InternalServerError , BadRequestError } from "../../utils/Errors";
 import Complaint from "../../models/Complaint.model";
 import ComplaintService from "../../services/Complaint.service";
+require('newrelic');
 
 export class ComplaintController {
 
@@ -43,7 +44,7 @@ export class ComplaintController {
                 data: complaints,
             })
         }catch(err){
-            console.log(err)
+            // console.log(err)
             next(new InternalServerError('Sorry Couldn\'t get complaint'))
         }
     }
@@ -119,4 +120,66 @@ export class ComplaintController {
         
 
     }
+
+
+    static async updateComplaint(req: AuthenticatedRequest , res : Response , next : NextFunction){
+        const {id} = req.params
+        try{
+            // console.log(req.body)
+
+            const data = await ComplaintService.updateAComplaint(id,req.body)
+            if (data?.result && data?.result[0] < 1) {
+                return next(new InternalServerError('Sorry Couldn\'t update complaint'))
+            }
+            res.status(200).json({
+                status: 'success',
+                affectRows : data?.result,
+                complaint: data?._complaint
+               
+            })
+        }catch(err){
+            next(new InternalServerError('Sorry Couldn\'t update complaint'))
+        }
+    }
+
+    static async addComplaintReply(req: AuthenticatedRequest , res : Response , next : NextFunction){
+        const {id} = req.params
+        try{
+            
+            if (!req.body.message) {
+                return next(new BadRequestError('No message  provided'))
+            }
+            if (!req.body.entityId) {
+                return next(new BadRequestError('No user provided'))
+            }
+            
+            const data = await ComplaintService.addComplaintReply(id, req.body)
+            res.status(200).json({
+                status: 'success',
+                data ,
+               
+            })
+        }catch(err){
+            next(new InternalServerError('Sorry Couldn\'t create complaint Reply'))
+        }
+    }
+
+    static async getComplaintRely(req: AuthenticatedRequest , res : Response , next : NextFunction){
+        const {id} = req.params
+        // console.log(id)
+        try{
+            
+            const data = await ComplaintService.viewListOfComplaintPaginatedRelies(id)
+            res.status(200).json({
+                status: 'success',
+                complaint : data?.complaint ,
+                pagination: data?.pagination
+               
+            })
+            
+        }catch(err){
+            next(new InternalServerError('Sorry Couldn\'t get complaint Reply'))
+        }
+    }
+
 }

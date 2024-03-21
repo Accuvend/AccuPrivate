@@ -36,7 +36,7 @@ export default class PowerUnit extends Model<PowerUnit | IPowerUnit> {
     tokenNumber: number
 
     // Token number associated with the power unit (with a default value)
-    @Column({ type: DataType.STRING, allowNull: false, unique: true })
+    @Column({ type: DataType.STRING, allowNull: false, unique: false })
     token: string
 
     // Token units associated with the power unit (with a default value)

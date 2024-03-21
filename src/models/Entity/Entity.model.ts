@@ -6,6 +6,8 @@ import PartnerProfile from "./Profiles/PartnerProfile.model";
 import TeamMember from "./Profiles/TeamMemberProfile.model";
 import Notification from "../Notification.model";
 import Complaint from "../Complaint.model";
+import ComplaintReply from "../ComplaintReply.model";
+import User from "../User.model";
 
 // Define the "Entity" table model
 @Table({ tableName: 'Entities' })
@@ -49,15 +51,29 @@ export default class Entity extends Model<Entity | IEntity> {
     @Column({ type: DataType.STRING, allowNull: true })
     partnerProfileId: string;
 
-    @Column({ type: DataType.JSONB, allowNull: false, defaultValue: { login: true, logout: true, failedTransactions: true } })
+    @ForeignKey(() => User)
+    @IsUUID(4)
+    @Column({ type: DataType.STRING, allowNull: true })
+    userId: string;
+
+    @Column({ type: DataType.JSONB, allowNull: true, defaultValue: { login: true, logout: true, failedTransactions: true } })
     notificationSettings: {
         login: boolean;
         logout: boolean;
         failedTransactions: boolean;
     }
 
+    @Column({ type: DataType.BOOLEAN, defaultValue: false })
+    requireOTPOnLogin: boolean
+
+    @Column({ type: DataType.STRING, allowNull: true })
+    phoneNumber: string
+
     @BelongsTo(() => Role)
     role: Role;
+
+    @BelongsTo(() => User)
+    user: User;
 
     // Relation to partner profile
     @BelongsTo(() => PartnerProfile)
@@ -70,8 +86,11 @@ export default class Entity extends Model<Entity | IEntity> {
     @HasMany(() => Notification)
     notifications: Notification[];
 
-    @HasMany(()=>Complaint)
+    @HasMany(() => Complaint)
     complaints: Complaint[];
+
+    @HasMany(() => Complaint)
+    complaintReplies: ComplaintReply[];
 
 
     @BeforeValidate
@@ -80,6 +99,10 @@ export default class Entity extends Model<Entity | IEntity> {
 
             if (!instance.teamMemberProfileId && !instance.partnerProfileId) {
                 throw new Error('Either teamMemberProfileId or partnerProfileId must be set.');
+            }
+
+            if (!instance.notificationSettings) {
+                throw new Error('Notification settings is required for partner or teammembers')
             }
         }
     }
@@ -93,16 +116,19 @@ export interface IEntity {
         activated: boolean;
         emailVerified: boolean;
     };
+    userId?: string;
     profilePicture?: string;
     roleId: string;
     partnerProfileId?: string;
     teamMemberProfileId?: string;
-    notificationSettings: {
+    notificationSettings?: {
         login: boolean;
         logout: boolean;
         failedTransactions: boolean;
     }
-    complaints?: Complaint[]
+    complaints?: Complaint[],
+    requireOTPOnLogin: boolean,
+    phoneNumber?: string
 }
 
 // Interface representing the structure for creating a new Entity (inherits from IEntity)
@@ -121,7 +147,8 @@ export interface IUpdateEntity {
     status?: {
         activated: boolean;
         emailVerified: boolean;
-    };
+    },
+    requireOTPOnLogin?: boolean
 
     // You can define specific properties here that are updatable for a Entity
     // This interface is intentionally left empty for flexibility

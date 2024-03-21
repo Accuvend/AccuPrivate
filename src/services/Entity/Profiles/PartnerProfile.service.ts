@@ -53,9 +53,9 @@ export default class PartnerProfileService {
         return partner
     }
 
-    static async viewPartnersWithCustomQuery(query: any): Promise<PartnerProfile[]> {
+    static async viewPartnersWithCustomQuery(query: any , attributes: any = {}): Promise<PartnerProfile[]> {
         const partners: PartnerProfile[] = await PartnerProfile.findAll({
-            ...query, include: [Entity] 
+            ...query ,  include: [Entity]  , attributes: attributes
         })
         return partners
     }

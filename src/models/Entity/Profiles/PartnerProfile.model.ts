@@ -40,6 +40,7 @@ export default class PartnerProfile extends Model<PartnerProfile | IPartnerProfi
     @HasMany(() => ApiKey)
     apiKeys: ApiKey[];
 
+
     @Column({ type: DataType.STRING, allowNull: false })
     key: string;
 
@@ -56,6 +57,14 @@ export interface IPartnerProfile {
     address?: string;
     key: string;
     sec: string;
+}
+
+export interface IPartnerStatsProfile  extends IPartnerProfile {
+    stats ?: {
+        failed_Transactions: number 
+        pending_Transactions: number 
+        success_Transactions: number
+    }
 }
 
 export interface IPartnerProfileAssociations extends IPartnerProfile {

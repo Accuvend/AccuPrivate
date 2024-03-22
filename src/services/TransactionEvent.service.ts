@@ -64,7 +64,6 @@ export class AirtimeTransactionEventService {
         this.phoneNumber = phoneNumber
     }
 
-
     public async addPhoneNumberValidationRequestedEvent(): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,

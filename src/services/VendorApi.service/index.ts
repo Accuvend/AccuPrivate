@@ -942,6 +942,7 @@ export default class VendorService {
         disco: string,
         meterNumber: string,
         reference: string,
+        transactionId: string
     ) {
         const response = await IRechargeVendorService.validateMeter({
             disco,
@@ -953,6 +954,15 @@ export default class VendorService {
             info: "Meter validation request",
             input: { disco, meterNumber, reference },
         });
+        logger.info('Meter validation with IRECHARGE', {
+            meta: {
+                responseData: response,
+                transactionId,
+                disco,
+                meterNumber,
+                reference,
+            }
+        })
         return response;
     }
 

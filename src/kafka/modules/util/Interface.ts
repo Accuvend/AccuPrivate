@@ -50,6 +50,22 @@ export interface VendorRetryRecord {
 }
 
 export interface PublisherEventAndParameters extends Record<TOPICS, any> {
+    [TOPICS.SCHEDULE_REQUERY_FOR_TRANSACTION]: {
+        timeStamp: string,
+        delayInSeconds: number,
+        scheduledMessagePayload: PublisherEventAndParameters[TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_RETRY]
+    }
+    [TOPICS.SCHEDULE_RETRY_FOR_TRANSACTION]: {
+        timeStamp: string,
+        delayInSeconds: number,
+        scheduledMessagePayload: PublisherEventAndParameters[TOPICS.POWER_PURCHASE_INITIATED_BY_CUSTOMER] & {
+            retryRecord: Transaction['retryRecord'],
+            newVendor: Transaction['superagent'],
+            newTransactionReference: string,
+            irechargeAccessToken: string,
+            previousVendors: Transaction['superagent'][],
+        }
+    }
     [TOPICS.METER_VALIDATION_REQUEST_SENT_TO_VENDOR]: {
         meter: MeterInfo;
         transactionId: string;

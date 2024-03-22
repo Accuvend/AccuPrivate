@@ -104,8 +104,8 @@ export async function getCurrentWaitTimeForRequeryEvent(retryCount: number) {
 
 export async function getCurrentWaitTimeForSwitchEvent(retryCount: number) {
     // Use geometric progression  calculate wait time, where R = 2
-    const defaultValues = [10, 20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 10240, 20480, 40960, 81920, 163840, 327680, 655360, 1310720, 2621440, 5242880]
-    const timesToRetry = await WaitTimeService.getWaitTime() ?? defaultValues
+    const defaultValues = [10, 20, 40, 80]
+    const timesToRetry = defaultValues
 
     if (retryCount >= timesToRetry.length) {
         return timesToRetry[timesToRetry.length - 1]
@@ -179,28 +179,15 @@ export class TokenHandlerUtil {
             waitTime: await getCurrentWaitTimeForRequeryEvent(retryCount)
         };
 
-        async function countDownTimer(time: number) {
-            return new Promise<void>((resolve) => {
-                // Start timer to requery transaction at intervals
-                for (let i = time; i > 0; i--) {
-                    setTimeout(() => {
-                        logger.info(`Requerying transaction ${i} seconds`, {
-                            meta: { transactionId: eventData.transactionId }
-                        })
-                        if (i === 1) {
-                            resolve()
-                        }
-                    }, (time - i) * 1000)
-                }
-            })
-        }
-        await countDownTimer(eventMetaData.waitTime);
-
         // Publish event in increasing intervals of seconds i.e 1, 2, 4, 8, 16, 32, 64, 128, 256, 512
-        // TODO: Use an external service to schedule this task
-        await VendorPublisher.publishEventForGetTransactionTokenRequestedFromVendorRetry(
-            eventMetaData,
-        );
+        //  Use an external service to schedule this task
+        await VendorPublisher.publishEventToScheduleRequery(
+            {
+                scheduledMessagePayload: eventMetaData,
+                timeStamp: new Date().toString(),
+                delayInSeconds: eventMetaData.waitTime
+            }
+        )
     }
 
     static async triggerEventToRetryTransactionWithNewVendor(
@@ -296,54 +283,27 @@ export class TokenHandlerUtil {
             accesToken = meterValidationResult.access_token
         }
 
-        // Start timer to requery transaction at intervals
-        async function countDownTimer(time: number): Promise<void> {
-            return new Promise<void>((resolve) => {
-                for (let i = time; i > 0; i--) {
-                    setTimeout(() => {
-                        logger.warn(`Retrying transaction with vendor in ${i} seconds`, {
-                            meta: { transactionId: transaction.id }
-                        });
-                        if (i === 1) {
-                            resolve(); // Resolve the Promise when countdown is complete
-                        }
-                    }, (time - i) * 1000);
-                }
-            });
-        }
-        await countDownTimer(waitTime);
-
-        await TransactionService.updateSingleTransaction(transaction.id, {
-            superagent: newVendor,
-            retryRecord,
-            vendorReferenceId: newTransactionReference,
-            reference: newTransactionReference,
-            irechargeAccessToken: accesToken,
-            previousVendors: [...transaction.previousVendors, newVendor],
-        })
-
-        await TransactionService.updateSingleTransaction(transaction.id, { superagent: newVendor })
-        await transactionEventService.addPowerPurchaseInitiatedEvent(transaction.bankRefId, transaction.amount);
-        await VendorPublisher.publishEventForRetryPowerPurchaseWithNewVendor({
-            meter: meter,
-            partner: partner,
-            transactionId: transaction.id,
-            superAgent: newVendor,
-            user: {
-                name: user.name as string,
-                email: user.email,
-                address: user.address,
-                phoneNumber: user.phoneNumber,
+        await VendorPublisher.publishEventToScheduleRetry({
+            scheduledMessagePayload: {
+                meter: meter,
+                partner: partner,
+                transactionId: transaction.id,
+                superAgent: newVendor,
+                user: {
+                    name: user.name as string,
+                    email: user.email,
+                    address: user.address,
+                    phoneNumber: user.phoneNumber,
+                },
+                vendorRetryRecord: retryRecord[retryRecord.length - 1],
+                retryRecord,
+                newVendor,
+                newTransactionReference,
+                irechargeAccessToken: accesToken,
+                previousVendors: [...transaction.previousVendors, newVendor] as Transaction['superagent'][]
             },
-            newVendor,
-        })
-        await VendorPublisher.publishEventForInitiatedPowerPurchase({
-            meter: meter,
-            user: user,
-            partner: partner,
-            transactionId: transaction.id,
-            superAgent: newVendor,
-            vendorRetryRecord: transaction.retryRecord[transaction.retryRecord.length - 1]
+            timeStamp: new Date().toString(),
+            delayInSeconds: waitTime
         })
     }
 
@@ -501,58 +461,12 @@ export class TokenHandlerUtil {
     }
 
     static async getBestVendorForPurchase(productCodeId: NonNullable<Transaction['productCodeId']>, amount: number): Promise<Transaction['superagent']> {
-        // const product = await ProductService.viewSingleProduct(productCodeId)
-        // if (!product) throw new CustomError('Product code not found')
-
-        // const vendorProducts = await product.$get('vendorProducts')
-        // // Populate all te vendors
-        // const vendors = await Promise.all(vendorProducts.map(async vendorProduct => {
-        //     const vendor = await vendorProduct.$get('vendor')
-        //     if (!vendor) throw new CustomError('Vendor not found')
-        //     vendorProduct.vendor = vendor
-        //     return vendor
-        // }))
-
-        // logger.info('Getting best vendor for purchase')
-        // // Check other vendors, sort them according to their commission rates
-        // // If the current vendor is the vendor with the highest commission rate, then switch to the vendor with the next highest commission rate
-        // // If the next vendor has been used before, switch to the next vendor with the next highest commission rate
-        // // If all the vendors have been used before, switch to the vendor with the highest commission rate
-
-        // const sortedVendorProductsAccordingToCommissionRate = vendorProducts.sort((a, b) => ((b.commission * amount) + b.bonus) - ((a.commission * amount) + a.bonus))
-
-        // const vendorRates = sortedVendorProductsAccordingToCommissionRate.map(vendorProduct => {
-        //     const vendor = vendorProduct.vendor
-        //     if (!vendor) throw new CustomError('Vendor not found')
-        //     return {
-        //         vendorName: vendor.name,
-        //         commission: vendorProduct.commission,
-        //         bonus: vendorProduct.bonus,
-        //         value: (vendorProduct.commission * amount) + vendorProduct.bonus
-        //     }
-        // })
-
-        // console.log({ vendorRates })
         return (await this.getSortedVendorsAccordingToCommissionRate(productCodeId, amount))[0]
     }
 }
 
 
 class TokenHandler extends Registry {
-    // private static async retryPowerPurchaseWithNewVendor(data: PublisherEventAndParameters[TOPICS.RETRY_PURCHASE_FROM_NEW_VENDOR]) {
-    //     const transaction = await TransactionService.viewSingleTransaction(data.transactionId);
-    //     if (!transaction) {
-    //         throw new CustomError(`CustomError fetching transaction with id ${data.transactionId}`, {
-    //             transactionId: data.transactionId
-    //         });
-    //     }
-    //     if (!transaction.bankRefId) {
-    //         throw new CustomError('BankRefId not found', {
-    //             transactionId: data.transactionId
-    //         })
-    //     }
-    // }
-
     private static async handleTokenRequest(
         data: PublisherEventAndParameters[TOPICS.POWER_PURCHASE_INITIATED_BY_CUSTOMER],
     ) {
@@ -718,10 +632,6 @@ class TokenHandler extends Registry {
 
                     // Requery the transaction if no token in the response
                     requeryTransaction = !tokenInResponse
-                    console.warn({ requeryTransaction, tokenInResponse })
-                    console.warn({ requeryTransaction, tokenInResponse })
-                    console.warn({ requeryTransaction, tokenInResponse })
-                    console.warn({ requeryTransaction, tokenInResponse })
                 } else if (!transactionTimedOut) {
                     // Even when transactionType is POSTPAID, a success message doesn't guarantee that everything went well, we still need to check if it timmedout
                     requeryTransaction = false
@@ -821,221 +731,6 @@ class TokenHandler extends Registry {
                 powerUnitId: powerUnit?.id,
             });
 
-            // // Requery transaction from provider and update transaction status
-            // const vendResult = await TokenHandlerUtil.requeryTransactionFromVendor(updatedTransaction).catch(e => e);
-
-            // console.log({ vendResult })
-            // const vendResultFromBuypower = vendResult as unknown as ElectricityRequeryResponse['BUYPOWERNG'] & { source: 'BUYPOWERNG' }
-            // const vendResultFromBaxi = vendResult as {
-            //     source: 'BAXI',
-            //     data: BaxiRequeryResultForPurchase['Prepaid']['data'],
-            //     responseCode: 200 | 202,
-            //     status: boolean,
-            //     message: 'Transaction successful'
-            // }
-            // const vendResultFromIrecharge = vendResult as unknown as ElectricityRequeryResponse['IRECHARGE'] & { source: 'IRECHARGE' }
-
-            // const eventMessage = {
-            //     meter: {
-            //         meterNumber: meter.meterNumber,
-            //         disco: disco,
-            //         vendType: meter.vendType,
-            //         id: meter.id,
-            //     },
-            //     transactionId: transaction.id,
-            //     error: {
-            //         code: (tokenInfo instanceof AxiosError
-            //             ? tokenInfo.response?.data?.responseCode
-            //             : undefined) as number | 0,
-            //         cause: TransactionErrorCause.UNKNOWN,
-            //     },
-            // };
-            // const transactionEventService = new TransactionEventService(
-            //     transaction,
-            //     eventMessage.meter,
-            //     data.superAgent,
-            //     partner.email
-            // );
-            // await transactionEventService.addGetTransactionTokenFromVendorInitiatedEvent();
-            // await transactionEventService.addVendElectricityRequestedFromVendorEvent();
-
-            // let tokenInResponse: string | null = null;
-
-            // const prepaid = meter.vendType === 'PREPAID';
-
-            // console.log({ vendResultFromBaxi: vendResultFromBaxi.data })
-            // if (prepaid) {
-            //     if (vendResult.source === 'BUYPOWERNG') {
-            //         tokenInResponse = vendResultFromBuypower.status === true && vendResultFromBuypower.data.responseCode !== 202 ? vendResultFromBuypower.data.token : null
-            //     } else if (tokenInfo.source === 'BAXI') {
-            //         tokenInResponse = vendResultFromBaxi.data.rawData.standardTokenValue
-            //     } else if (tokenInfo.source === 'IRECHARGE') {
-            //         tokenInResponse = vendResultFromIrecharge.token
-            //     }
-            // } else {
-            //     tokenInResponse = null // There is no token for postpaid meters
-            // }
-            // // Check if error occured while purchasing token
-            // // Note that Irecharge api always returns 200, even when an error occurs
-            // if (tokenInfo instanceof Error) {
-            //     logger.error('Error occured while purchasing token', logMeta)
-            //     if (tokenInfo instanceof AxiosError) {
-            //         /**
-            //          * Note that these error codes are only valid for Buypower
-            //          * 202 - Timeout / Transaction is processing
-            //          * 501 - Maintenance error
-            //          * 500 - Unexpected error - Please requery
-            //          */
-            //         // If error is due to timeout, trigger event to requery transactioPn later
-            //         let responseCode = tokenInfo.response?.data.responseCode as keyof typeof TransactionErrorCodeAndCause;
-            //         responseCode = tokenInfo.message === 'Transaction timeout' ? 202 : responseCode
-
-            //         const requeryWasTriggeredTooEarly = (vendResult instanceof AxiosError) && vendResult.response?.status === 429
-
-            //         if (vendResultFromBuypower.source === 'BUYPOWERNG' && ([202, 500, 501].includes(responseCode) || requeryWasTriggeredTooEarly)) {
-            //             return await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
-            //                 {
-            //                     eventService: transactionEventService,
-            //                     eventData: { ...eventMessage, error: { code: responseCode, cause: TransactionErrorCodeAndCause[responseCode] ?? TransactionErrorCause.TRANSACTION_TIMEDOUT } },
-            //                     retryCount: 1,
-            //                     superAgent: data.superAgent,
-            //                     tokenInResponse: null,
-            //                     transactionTimedOutFromBuypower: false,
-            //                     vendorRetryRecord: transaction.retryRecord[transaction.retryRecord.length - 1]
-            //                 },
-            //             );
-            //         }
-
-            //         // This doesn't account for other errors that may arise from other Providers
-            //         // Other errors (4xx ...) occured while purchasing token 
-            //     }
-
-            //     // Transaction failed, trigger event to retry transaction from scratch
-            //     /* Commmented out because no transaction should be allowed to fail, any failed transaction should be retried with a different vendor
-            //     await transactionEventService.addTokenRequestFailedNotificationToPartnerEvent();
-            //     return await VendorPublisher.publishEventForFailedTokenRequest(eventMessage); */
-            //     return await TokenHandlerUtil.triggerEventToRetryTransactionWithNewVendor({ meter: data.meter, transaction: transaction as TransactionWithProductId, transactionEventService, vendorRetryRecord: data.vendorRetryRecord })
-            // }
-
-            // /**
-            //  * Vend token request didn't return an error, but there are two possible outcomes in this case
-            //  *
-            //  * 1. Transaction timedout
-            //  * 2. No token was found in the response
-            //  * 3. Transaction was successful and a token was found in the response
-            //  *
-            //  * In the case of 1 and 2, we need to requery the transaction at intervals
-            //  */
-            // const responseFromIrecharge = tokenInfo as Awaited<ReturnType<typeof VendorService.irechargeVendToken>>
-            // const transactionTimedOutFromIrecharge = vendResultFromIrecharge.source === 'IRECHARGE' ? ['15', '43'].includes(vendResultFromIrecharge.status) : false
-            // let transactionTimedOutFromBuypower = vendResultFromBuypower.source === 'BUYPOWERNG' ? vendResultFromBuypower.status === true && vendResultFromBuypower.data.responseCode == 202 : false // TODO: Add check for when transaction timeout from baxi
-            // const transactionTimedOutFromBaxi = vendResultFromBaxi.source === 'BAXI' ? (vendResultFromBaxi.status === true && vendResultFromBaxi.data.statusCode === '0' && vendResultFromBaxi.data.transactionStatus !== 'success') : false
-            // const transactionTimedOut = transactionTimedOutFromBuypower || transactionTimedOutFromIrecharge || transactionTimedOutFromBaxi
-
-
-            // let requeryTransactionFromVendor = transactionTimedOut
-            // let requeryFromNewVendor = false
-            // if (TEST_FAILED) {
-            //     if (((tokenInResponse && prepaid) || (!tokenInResponse && !prepaid)) && TEST_FAILED) {
-            //         const totalRetries = (retry.retryCountBeforeSwitchingVendor * transaction.previousVendors.length - 1) + retry.count + 1
-
-            //         // If we are in test mode, and the transaction is successful, after a number of retries, we should assume the transaction is successful
-            //         const shouldAssumeToBeSuccessful = (totalRetries > retry.limitToStopRetryingWhenTransactionIsSuccessful) && TEST_FAILED
-            //         requeryTransactionFromVendor = !shouldAssumeToBeSuccessful
-            //     }
-            // }
-
-            // const transactionSuccessfulForBuyPower = tokenInfo.source === 'BUYPOWERNG' ? vendResultFromBuypower.responseCode === 200 : false
-            // const transactionSuccessfulForIrecharge = tokenInfo.source === 'IRECHARGE' ? tokenInfo.status === '00' : false
-            // const transactionSuccessfulForBaxi = tokenInfo.source === 'BAXI' ? tokenInfo.code === 200 : false
-            // const transactionSuccessFul = transactionSuccessfulForBuyPower || transactionSuccessfulForIrecharge || transactionSuccessfulForBaxi
-            // if (!transactionSuccessFul) {
-            //     requeryTransactionFromVendor = false
-            //     requeryFromNewVendor = true
-            // }
-
-            // console.log({ tokenInResponse, requeryTransactionFromVendor })
-            // // If Transaction timedout - Requery the transaction at intervals
-            // if (requeryFromNewVendor) {
-            //     return await TokenHandlerUtil.triggerEventToRetryTransactionWithNewVendor({ meter: data.meter, transaction: transaction as TransactionWithProductId, transactionEventService, vendorRetryRecord: data.vendorRetryRecord })
-            // }
-            // if (requeryTransactionFromVendor || (!tokenInResponse && prepaid)) {
-            //     return await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
-            //         {
-            //             eventService: transactionEventService,
-            //             eventData: eventMessage,
-            //             transactionTimedOutFromBuypower,
-            //             tokenInResponse,
-            //             superAgent: transaction.superagent,
-            //             retryCount: 1,
-            //             vendorRetryRecord: transaction.retryRecord[transaction.retryRecord.length - 1]
-            //         },
-            //     );
-            // }
-
-            // // Token purchase was successful
-            // // And token was found in request
-            // // Add and publish token received event
-            // await transactionEventService.addTokenReceivedEvent(tokenInResponse ?? 'null');
-            // await VendorPublisher.publishEventForTokenReceivedFromVendor({
-            //     transactionId: transaction!.id,
-            //     user: {
-            //         name: user.name as string,
-            //         email: user.email,
-            //         address: user.address,
-            //         phoneNumber: user.phoneNumber,
-            //     },
-            //     partner: {
-            //         email: partner.email,
-            //     },
-            //     meter: {
-            //         id: meter.id,
-            //         meterNumber: meter.meterNumber,
-            //         disco: transaction!.disco,
-            //         vendType: meter.vendType,
-            //         token: tokenInResponse ?? 'null',
-            //     },
-            // });
-
-            // let powerUnit =
-            //     await PowerUnitService.viewSinglePowerUnitByTransactionId(
-            //         data.transactionId,
-            //     );
-
-
-            // console.log({ disco: data.meter })
-            // const _product = await ProductService.viewSingleProduct(transaction.productCodeId)
-            // if (!_product) throw new CustomError('Product not found')
-
-            // const discoLogo =
-            //     DISCO_LOGO[_product.productName as keyof typeof DISCO_LOGO] ?? LOGO_URL
-
-            // if (tokenInResponse) {
-            //     logger.info('Saving token record', logMeta);
-            //     powerUnit = powerUnit
-            //         ? await PowerUnitService.updateSinglePowerUnit(powerUnit.id, {
-            //             token: tokenInResponse,
-            //             transactionId: data.transactionId,
-            //         })
-            //         : await PowerUnitService.addPowerUnit({
-            //             id: uuidv4(),
-            //             transactionId: data.transactionId,
-            //             disco: data.meter.disco,
-            //             discoLogo,
-            //             amount: transaction.amount,
-            //             meterId: data.meter.id,
-            //             superagent: "BUYPOWERNG",
-            //             token: tokenInResponse,
-            //             tokenNumber: 0,
-            //             tokenUnits: "0",
-            //             address: transaction.meter.address,
-            //         });
-            // }
-
-            // return await TransactionService.updateSingleTransaction(data.transactionId, {
-            //     status: Status.COMPLETE,
-            //     powerUnitId: powerUnit?.id,
-            // });
         } catch (error) {
             if (error instanceof CustomError) {
                 error.meta = error.meta ?? {
@@ -1046,110 +741,6 @@ class TokenHandler extends Registry {
             throw error
         }
     }
-
-    // private static async handleTokenReceived(
-    //     data: PublisherEventAndParameters[TOPICS.TOKEN_RECIEVED_FROM_VENDOR],
-    // ) {
-    //     try {
-    //         const logMeta = { meta: { transactionId: data.transactionId } }
-
-    //         const transaction = await TransactionService.viewSingleTransaction(
-    //             data.transactionId,
-    //         );
-    //         if (!transaction) {
-    //             throw new CustomError(
-    //                 `CustomError fetching transaction with id ${data.transactionId}`,
-    //                 {
-    //                     transactionId: data.transactionId
-    //                 }
-    //             );
-    //         }
-
-    //         // Check if transaction is already complete
-    //         if (transaction.status === Status.COMPLETE) {
-    //             throw new CustomError(
-    //                 `Transaction with id ${data.transactionId} is already complete`,
-    //                 {
-    //                     transactionId: data.transactionId
-    //                 }
-    //             );
-    //         }
-
-    //         /**
-    //          * This check was removed because BUYPOWERNG throws an error when you try to requery a transaction that has already been completed within 10s,
-    //          * And the event that triggers this consumer is also used by other consumers which also requery the transaction.
-    //          * 
-    //          * Plus there is no need for extra check because only completed transactions are published to this topic
-    //          */
-    //         // // Requery transaction from provider and update transaction status
-    //         // const requeryResult = await TokenHandlerUtil.requeryTransactionFromVendor(transaction);
-    //         // const requeryResultFromBuypower = requeryResult as Awaited<ReturnType<typeof VendorService.buyPowerRequeryTransaction>>
-    //         // const requeryResultFromBaxi = requeryResult as Awaited<ReturnType<typeof VendorService.baxiRequeryTransaction>>
-    //         // const requeryResultFromIrecharge = requeryResult as Awaited<ReturnType<typeof VendorService.irechargeRequeryTransaction>>
-
-    //         // const transactionSuccessFromBuypower = requeryResultFromBuypower.source === 'BUYPOWERNG' ? requeryResultFromBuypower.responseCode === 200 : false
-    //         // const transactionSuccessFromBaxi = requeryResultFromBaxi.source === 'BAXI' ? requeryResultFromBaxi.responseCode === 200 : false
-    //         // const transactionSuccessFromIrecharge = requeryResultFromIrecharge.source === 'IRECHARGE' ? requeryResultFromIrecharge.status === '00' && requeryResultFromIrecharge. : false
-
-    //         // const transactionSuccess = transactionSuccessFromBuypower || transactionSuccessFromBaxi || transactionSuccessFromIrecharge
-    //         // if (!transactionSuccess) {
-    //         //     throw new CustomError(
-    //         //         `CustomError requerying transaction with id ${data.transactionId}`,
-    //         //     );
-    //         // }
-
-    //         // If successful, check if a power unit exists for the transaction, if none exists, create one
-    //         let powerUnit =
-    //             await PowerUnitService.viewSinglePowerUnitByTransactionId(
-    //                 data.transactionId,
-    //             );
-
-    //         const prepaid = data.meter.vendType === 'PREPAID';
-    //         data.meter.token = !prepaid ? '' : data.meter.token
-
-    //         console.log({ disco: data.meter })
-    //         const product = await ProductService.viewSingleProduct(transaction.productCodeId)
-    //         if (!product) throw new CustomError('Product not found')
-
-
-    //         const discoLogo =
-    //             DISCO_LOGO[product.productName as keyof typeof DISCO_LOGO] ?? LOGO_URL
-
-    //         console.log(discoLogo)
-    //         logger.info('Saving token record', logMeta);
-    //         powerUnit = powerUnit
-    //             ? await PowerUnitService.updateSinglePowerUnit(powerUnit.id, {
-    //                 token: data.meter.token,
-    //                 transactionId: data.transactionId,
-    //             })
-    //             : await PowerUnitService.addPowerUnit({
-    //                 id: uuidv4(),
-    //                 transactionId: data.transactionId,
-    //                 disco: data.meter.disco,
-    //                 discoLogo,
-    //                 amount: transaction.amount,
-    //                 meterId: data.meter.id,
-    //                 superagent: "BUYPOWERNG",
-    //                 token: data.meter.token,
-    //                 tokenNumber: 0,
-    //                 tokenUnits: "0",
-    //                 address: transaction.meter.address,
-    //             });
-
-    //         return await TransactionService.updateSingleTransaction(data.transactionId, {
-    //             status: Status.COMPLETE,
-    //             powerUnitId: powerUnit.id,
-    //         });
-    //     } catch (error) {
-    //         if (error instanceof CustomError) {
-    //             error.meta = error.meta ?? {
-    //                 transactionId: data.transactionId
-    //             }
-    //         }
-
-    //         throw error
-    //     }
-    // }
 
     private static async requeryTransactionForToken(
         data: PublisherEventAndParameters[TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_RETRY],
@@ -1270,6 +861,7 @@ class TokenHandler extends Registry {
 
                 // If we are in test mode, and the transaction is successful, after a number of retries, we should assume the transaction is successful
                 tokenInResponse = totalRetries > retry.limitToStopRetryingWhenTransactionIsSuccessful ? '0' : undefined
+                transactionSuccess = true
             }
 
             if (transactionSuccess) {
@@ -1284,10 +876,6 @@ class TokenHandler extends Registry {
                     );
                 if (data.meter.vendType === 'PREPAID') {
                     if (tokenInResponse) {
-                        logger.warn('Transaction successful')
-                        logger.warn('Transaction successful')
-                        logger.warn('Transaction successful')
-                        logger.warn('Transaction successful')
                         logger.info('Saving token record', logMeta);
                         powerUnit = powerUnit
                             ? await PowerUnitService.updateSinglePowerUnit(powerUnit.id, {
@@ -1544,14 +1132,105 @@ class TokenHandler extends Registry {
         }
     }
 
+    private static async scheduleRequeryTransaction(
+        data: PublisherEventAndParameters[TOPICS.SCHEDULE_REQUERY_FOR_TRANSACTION],
+    ) {
+        // Check the timeStamp, and the delayInSeconds
+        const { timeStamp, delayInSeconds } = data;
+
+        const timeInMIlliSecondsSinceInit = new Date().getTime() - new Date(timeStamp).getTime()
+        const waitTimeInMilliSeconds = parseInt(delayInSeconds.toString(), 10) * 1000
+        const timeDifference = waitTimeInMilliSeconds - timeInMIlliSecondsSinceInit
+
+        console.log({ timeDifference, timeStamp, currentTime: new Date(), delayInSeconds, waitTimeInMilliSeconds, timeInMIlliSecondsSinceInit })
+
+        // Check if current time is greater than the timeStamp + delayInSeconds
+        if (timeDifference < 0) {
+            return await VendorPublisher.publishEventForGetTransactionTokenRequestedFromVendorRetry(data.scheduledMessagePayload)
+        }
+
+        logger.info("Rescheduling requery for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
+        // Else, schedule a new event to requery transaction from vendor
+        return await VendorPublisher.publishEventToScheduleRequery({
+            scheduledMessagePayload: data.scheduledMessagePayload,
+            timeStamp: data.timeStamp,
+            delayInSeconds: data.delayInSeconds,
+        })
+    }
+
+    private static async scheduleRetryTransaction(
+        data: PublisherEventAndParameters[TOPICS.SCHEDULE_RETRY_FOR_TRANSACTION],
+    ) {
+        // Check the timeStamp, and the delayInSeconds
+        const { timeStamp, delayInSeconds } = data;
+
+        const timeInMIlliSecondsSinceInit = new Date().getTime() - new Date(timeStamp).getTime()
+        const waitTimeInMilliSeconds = parseInt(delayInSeconds.toString(), 10) * 1000
+        const timeDifference = waitTimeInMilliSeconds - timeInMIlliSecondsSinceInit
+
+        console.log({ timeDifference, timeStamp, currentTime: new Date(), delayInSeconds, waitTimeInMilliSeconds, timeInMIlliSecondsSinceInit })
+
+        // Check if current time is greater than the timeStamp + delayInSeconds
+        if (timeDifference < 0) {
+            const existingTransaction = await TransactionService.viewSingleTransaction(data.scheduledMessagePayload.transactionId)
+            if (!existingTransaction) {
+                throw new CustomError('Transaction not found')
+            }
+
+            const transactionEventService = new TransactionEventService(
+                existingTransaction,
+                data.scheduledMessagePayload.meter,
+                existingTransaction.superagent,
+                data.scheduledMessagePayload.superAgent,
+            )
+
+            await TransactionService.updateSingleTransaction(data.scheduledMessagePayload.transactionId, {
+                superagent: data.scheduledMessagePayload.newVendor,
+                retryRecord: data.scheduledMessagePayload.retryRecord,
+                vendorReferenceId: data.scheduledMessagePayload.newTransactionReference,
+                reference: data.scheduledMessagePayload.newTransactionReference,
+                irechargeAccessToken: data.scheduledMessagePayload.irechargeAccessToken,
+                previousVendors: data.scheduledMessagePayload.previousVendors,
+            })
+
+            await VendorPublisher.publishEventForRetryPowerPurchaseWithNewVendor({
+                meter: data.scheduledMessagePayload.meter,
+                partner: data.scheduledMessagePayload.partner,
+                transactionId: data.scheduledMessagePayload.transactionId,
+                superAgent: data.scheduledMessagePayload.superAgent,
+                user: data.scheduledMessagePayload.user,
+                newVendor: data.scheduledMessagePayload.newVendor,
+            })
+
+            await transactionEventService.addPowerPurchaseInitiatedEvent(data.scheduledMessagePayload.newTransactionReference, existingTransaction.amount);
+            await VendorPublisher.publishEventForInitiatedPowerPurchase({
+                meter: data.scheduledMessagePayload.meter,
+                user: data.scheduledMessagePayload.user,
+                partner: data.scheduledMessagePayload.partner,
+                transactionId: existingTransaction.id,
+                superAgent: data.scheduledMessagePayload.newVendor,
+                vendorRetryRecord: data.scheduledMessagePayload.vendorRetryRecord
+            })
+            return await VendorPublisher.publishEventForInitiatedPowerPurchase(data.scheduledMessagePayload)
+        }
+
+        logger.info("Rescheduling retry for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
+        // Else, schedule a new event to requery transaction from vendor
+        return await VendorPublisher.publishEventToScheduleRetry({
+            scheduledMessagePayload: data.scheduledMessagePayload,
+            timeStamp: data.timeStamp,
+            delayInSeconds: data.delayInSeconds,
+        })
+    }
+
     static registry = {
         [TOPICS.POWER_PURCHASE_INITIATED_BY_CUSTOMER]: this.handleTokenRequest,
-        // [TOPICS.TOKEN_RECIEVED_FROM_VENDOR]: this.handleTokenReceived,
         [TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_RETRY]:
             this.requeryTransactionForToken,
         [TOPICS.POWER_PURCHASE_INITIATED_BY_CUSTOMER_REQUERY]:
             this.requeryTransactionForToken,
-        // [TOPICS.RETRY_PURCHASE_FROM_NEW_VENDOR]: this.retryPowerPurchaseWithNewVendor
+        [TOPICS.SCHEDULE_REQUERY_FOR_TRANSACTION]: this.scheduleRequeryTransaction,
+        [TOPICS.SCHEDULE_RETRY_FOR_TRANSACTION]: this.scheduleRetryTransaction,
     };
 }
 

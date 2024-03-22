@@ -104,7 +104,7 @@ export async function getCurrentWaitTimeForRequeryEvent(retryCount: number) {
 
 export async function getCurrentWaitTimeForSwitchEvent(retryCount: number) {
     // Use geometric progression  calculate wait time, where R = 2
-    const defaultValues = [10, 20, 40, 80]
+    const defaultValues = [5, 10, 20, 40]
     const timesToRetry = defaultValues
 
     if (retryCount >= timesToRetry.length) {
@@ -826,7 +826,7 @@ class TokenHandler extends Registry {
             const transactionSuccessFromIrecharge = requeryResult.source === 'IRECHARGE' ? requeryResultFromIrecharge.status === '00' && requeryResultFromIrecharge.vend_status === 'successful' : false
             let transactionSuccess = transactionSuccessFromBuypower || transactionSuccessFromBaxi || transactionSuccessFromIrecharge
 
-            const transactionFailedFromIrecharge = requeryResult.source === 'IRECHARGE' ? ['02', '03'].includes(requeryResultFromIrecharge.status) : false
+            const transactionFailedFromIrecharge = requeryResult.source === 'IRECHARGE' ? ['02', '03'].includes(requeryResultFromIrecharge.vend_code) || requeryResultFromIrecharge.vend_status === 'failed' : false
             const transactionFailedFromBaxi = requeryResult.source === 'BAXI' ? (requeryResultFromBaxi.responseCode === 202 && [500, 503, 'BX0002'].includes(requeryResultFromBaxi.code ?? '')) : false
             const transactionFailedFromBuypower = requeryResult instanceof AxiosError
                 ? (

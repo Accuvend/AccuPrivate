@@ -745,7 +745,7 @@ export default class VendorController {
         const errorMeta = { transactionId: transactionId };
         // REMOVED !!!! BECAUSE WE SHOULD NEVER AUTOGENERATE THIS IN THE CODE
         const bankRefId = req.query.bankRefId as string;
-        if (parseInt(amount) < 500) {
+        if (parseInt(amount.toString()) < 1000) {
             throw new BadRequestError("Amount must be greater than 500", errorMeta);
         }
 

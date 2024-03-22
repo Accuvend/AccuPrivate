@@ -152,7 +152,7 @@ interface IRechargeSuccessfulVendResponse {
 interface IRechargeRequeryResponse {
     source: "IRECHARGE";
     status: "00" | "15" | "43";
-    vend_status: "successful";
+    vend_status: "successful" | 'failed';
     vend_code: "00";
     token: string;
     units: `${number}`;

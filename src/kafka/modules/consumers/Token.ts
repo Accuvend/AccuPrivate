@@ -181,6 +181,24 @@ export class TokenHandlerUtil {
 
         // Publish event in increasing intervals of seconds i.e 1, 2, 4, 8, 16, 32, 64, 128, 256, 512
         //  Use an external service to schedule this task
+        const transaction = await TransactionService.viewSingleTransaction(eventData.transactionId)
+        if (!transaction) throw new CustomError('Transaction not found', { transactionId: eventData.transactionId })
+
+        const partner = await transaction.$get('partner')
+        if (!partner) throw new CustomError('Partner not found', { transactionId: eventData.transactionId })
+
+        await new TransactionEventService(
+            transaction,
+            eventData.meter,
+            superAgent,
+            partner.email
+        ).addScheduleRetryEvent({
+            timeStamp: new Date().toString(), waitTime: eventMetaData.waitTime
+        })
+
+        logger.info('Scheduled requery event', {
+            transactionId: transaction.id
+        })
         await VendorPublisher.publishEventToScheduleRequery(
             {
                 scheduledMessagePayload: eventMetaData,
@@ -282,6 +300,14 @@ export class TokenHandlerUtil {
             console.log({ meterValidationResult, info: 'New meter validation result' })
             accesToken = meterValidationResult.access_token
         }
+
+        await new TransactionEventService(
+            transaction, meter, newVendor, partner.email
+        ).addScheduleRetryEvent({
+            timeStamp: new Date().toString(), waitTime
+        })
+
+        logger.info('Scheduled retry event', meta)
 
         await VendorPublisher.publishEventToScheduleRetry({
             scheduledMessagePayload: {

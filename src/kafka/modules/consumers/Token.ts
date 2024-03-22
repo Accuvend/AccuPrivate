@@ -79,8 +79,6 @@ const retry = {
     testForSwitchingVendor: true,
 }
 
-const TEST_FAILED = NODE_ENV === 'production' ? false : false // TOGGLE - Will simulate failed transaction
-
 const TransactionErrorCodeAndCause = {
     501: TransactionErrorCause.MAINTENANCE_ACCOUNT_ACTIVATION_REQUIRED,
     500: TransactionErrorCause.UNEXPECTED_ERROR,
@@ -104,7 +102,7 @@ export async function getCurrentWaitTimeForRequeryEvent(retryCount: number) {
 
 export async function getCurrentWaitTimeForSwitchEvent(retryCount: number) {
     // Use geometric progression  calculate wait time, where R = 2
-    const defaultValues = [5, 10, 20, 40]
+    const defaultValues = [5, 10]
     const timesToRetry = defaultValues
 
     if (retryCount >= timesToRetry.length) {
@@ -664,16 +662,6 @@ class TokenHandler extends Registry {
                 }
             }
 
-            if (TEST_FAILED) {
-                if ((tokenInResponse && meter.vendType === 'PREPAID') || (!tokenInResponse && meter.vendType != 'PREPAID')) {
-                    const totalRetries = (retry.retryCountBeforeSwitchingVendor * transaction.previousVendors.length - 1) + retry.count + 1
-
-                    // If we are in test mode, and the transaction is successful, after a number of retries, we should assume the transaction is successful
-                    const shouldAssumeToBeSuccessful = (totalRetries > retry.limitToStopRetryingWhenTransactionIsSuccessful) && TEST_FAILED
-                    requeryTransaction = !shouldAssumeToBeSuccessful
-                }
-            }
-
             if (requeryTransaction) {
                 // Check the cause of the requery then add to the event message
                 if (transactionTimedOut) {
@@ -830,7 +818,7 @@ class TokenHandler extends Registry {
             const transactionFailedFromBaxi = requeryResult.source === 'BAXI' ? (requeryResultFromBaxi.responseCode === 202 && [500, 503, 'BX0002'].includes(requeryResultFromBaxi.code ?? '')) : false
             const transactionFailedFromBuypower = requeryResult instanceof AxiosError
                 ? (
-                    requeryResult.response?.data?.responseCode === 202 ||   // Not successful 
+                    (requeryResult.response?.data?.responseCode === 202 && requeryResult.response?.data?.message === 'Transaction failed.') ||   // Not successful 
                     requeryResult.response?.data?.responseCode === 203 ||   // Not initiated
                     requeryResult.response?.data?.responseCode === 20       // Transaction not found
                 )
@@ -840,9 +828,6 @@ class TokenHandler extends Registry {
             let retryTransaction = transactionFailed
 
             console.warn({ retryTransaction, transactionFailed, transactionSuccessFromBaxi })
-            if (TEST_FAILED) {
-                retryTransaction = (retry.testForSwitchingVendor && (data.retryCount >= retry.retryCountBeforeSwitchingVendor))
-            }
             if (requeryResult instanceof Error) {
                 logger.error("Error occured while requerying transaction", logMeta)
 
@@ -880,14 +865,6 @@ class TokenHandler extends Registry {
                 tokenInResponse = 'rawData' in requeryResultFromBaxi.data ? requeryResultFromBaxi.data.rawData.standardTokenValue : undefined
             } else if (transactionSuccessFromIrecharge) {
                 tokenInResponse = requeryResultFromIrecharge.token
-            }
-
-            if (transactionSuccess && TEST_FAILED) {
-                const totalRetries = (retry.retryCountBeforeSwitchingVendor * transaction.previousVendors.length - 1) + retry.count + 1
-
-                // If we are in test mode, and the transaction is successful, after a number of retries, we should assume the transaction is successful
-                tokenInResponse = totalRetries > retry.limitToStopRetryingWhenTransactionIsSuccessful ? '0' : undefined
-                transactionSuccess = true
             }
 
             if (transactionSuccess) {
@@ -1006,147 +983,7 @@ class TokenHandler extends Registry {
                     transactionTimedOutFromBuypower: false,
                 },
             );
-            // // if (transactionSuccess && TEST_FAILED) {
-            // //     const totalRetries = (retry.retryCountBeforeSwitchingVendor * transaction.previousVendors.length - 1) + retry.count + 1
 
-            // //     // If we are in test mode, and the transaction is successful, after a number of retries, we should assume the transaction is successful
-            // //     transactionSuccess = (totalRetries > retry.limitToStopRetryingWhenTransactionIsSuccessful) && TEST_FAILED
-            // // }
-
-            // if (!transactionSuccess) {
-            //     console.log({ requeryResult })
-            //     /**
-            //      * Transaction may be unsuccessful but it doesn't mean it has failed
-            //      * The transaction can still be pending
-            //      * If transaction failed, switch to a new vendor
-            //      */
-            //     let requeryFromNewVendor = false
-            //     let requeryFromSameVendor = false
-            //     let error: {
-            //         code: number,
-            //         cause: TransactionErrorCause
-            //     } = { code: 202, cause: TransactionErrorCause.UNKNOWN }
-            //     if (requeryResult.source === 'BUYPOWERNG') {
-            //         console.log({ requeryResultFromBuypower, retry, test: TEST_FAILED })
-            //         let transactionFailed = requeryResultFromBuypower.responseCode === 202
-            //         transactionFailed = TEST_FAILED ? retry.count > retry.retryCountBeforeSwitchingVendor : transactionFailed // TOGGLE - Will simulate failed buypower transaction
-            //         if (transactionFailed) requeryFromNewVendor = true
-            //         else {
-            //             requeryFromSameVendor = true
-            //             error.code = requeryResultFromBuypower.responseCode
-            //             error.cause = requeryResultFromBuypower.responseCode === 201 ? TransactionErrorCause.TRANSACTION_TIMEDOUT : TransactionErrorCause.TRANSACTION_FAILED
-            //         }
-
-            //     } else if (requeryResult.source === 'BAXI') {
-            //         let transactionFailed = !requeryResultFromBaxi.status
-            //         transactionFailed = TEST_FAILED ? retry.count > retry.retryCountBeforeSwitchingVendor : transactionFailed // TOGGLE - Will simulate failed baxi transaction
-            //         if (transactionFailed) requeryFromNewVendor = true
-            //         else {
-            //             requeryFromSameVendor = true
-            //             error.code = requeryResultFromBaxi.responseCode === 200 ? 200 : 202
-            //             error.cause = requeryResultFromBaxi.responseCode === 200 ? TransactionErrorCause.TRANSACTION_TIMEDOUT : TransactionErrorCause.TRANSACTION_FAILED
-            //         }
-            //     } else if (requeryResult.source === 'IRECHARGE') {
-            //         let transactionFailed = !['00', '15', '43'].includes(requeryResultFromIrecharge.status)
-            //         transactionFailed = TEST_FAILED ? retry.count > retry.retryCountBeforeSwitchingVendor : transactionFailed // TOGGLE - Will simulate failed irecharge transaction
-            //         if (transactionFailed) requeryFromNewVendor = true
-            //         else {
-            //             requeryFromSameVendor = true
-            //             error.code = requeryResultFromIrecharge.status === '00' ? 200 : 202
-            //             error.cause = requeryResultFromIrecharge.status === '00' ? TransactionErrorCause.TRANSACTION_TIMEDOUT : TransactionErrorCause.TRANSACTION_FAILED
-            //         }
-            //     }
-
-            //     if (TEST_FAILED) {
-            //         requeryFromNewVendor = requeryFromNewVendor ?? (retry.testForSwitchingVendor && (data.retryCount >= retry.retryCountBeforeSwitchingVendor))
-            //     }
-
-            //     console.log({ retryCount: data.retryCount, retryCountBeforeSwitchingVendor: retry.retryCountBeforeSwitchingVendor, retry, test: TEST_FAILED })
-            //     console.log([requeryFromNewVendor])
-
-            //     if (requeryFromNewVendor) {
-            //         return await TokenHandlerUtil.triggerEventToRetryTransactionWithNewVendor({ meter, transaction, transactionEventService, vendorRetryRecord: data.vendorRetryRecord })
-            //     }
-
-            //     if (requeryFromSameVendor) {
-            //         return await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
-            //             {
-            //                 eventService: transactionEventService,
-            //                 eventData: {
-            //                     meter: data.meter,
-            //                     transactionId: data.transactionId,
-            //                     error: error
-            //                 },
-            //                 retryCount: data.retryCount + 1,
-            //                 superAgent: data.superAgent,
-            //                 tokenInResponse: null,
-            //                 transactionTimedOutFromBuypower: false,
-            //                 vendorRetryRecord: transaction.retryRecord[transaction.retryRecord.length - 1]
-            //             },
-            //         );
-            //     }
-            // }
-
-            // let token: string | undefined = undefined
-            // if (requeryResult.source === 'BUYPOWERNG') token = (requeryResultFromBuypower as SuccessResponseForBuyPowerRequery).data?.token
-            // else if (requeryResult.source === 'BAXI') token = requeryResultFromBaxi.data.rawData.standardTokenValue
-            // else if (requeryResult.source === 'IRECHARGE') token = requeryResultFromIrecharge.token
-
-
-
-            // if (TEST_FAILED) {
-            //     const requeryFromNewVendor = (retry.testForSwitchingVendor && (data.retryCount >= retry.retryCountBeforeSwitchingVendor))
-            //     console.log({ retryCount: data.retryCount, retryCountBeforeSwitchingVendor: retry.retryCountBeforeSwitchingVendor, retry, test: TEST_FAILED, type: 'second' })
-            //     console.log([requeryFromNewVendor])
-            //     if (requeryFromNewVendor) {
-            //         return await TokenHandlerUtil.triggerEventToRetryTransactionWithNewVendor({ meter, transaction, transactionEventService, vendorRetryRecord: data.vendorRetryRecord })
-            //     }
-            // }
-
-            // const prepaid = data.meter.vendType === 'PREPAID';
-            // if (!token && prepaid) {
-            //     return await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
-            //         {
-            //             eventService: transactionEventService,
-            //             eventData: {
-            //                 meter: {
-            //                     meterNumber: meter.meterNumber,
-            //                     disco: disco,
-            //                     vendType: meter.vendType,
-            //                     id: meter.id,
-            //                 },
-            //                 transactionId: transaction.id,
-            //                 error: {
-            //                     code: 202,
-            //                     cause: TransactionErrorCause.NO_TOKEN_IN_RESPONSE,
-            //                 },
-            //             },
-            //             retryCount: data.retryCount + 1,
-            //             superAgent: data.superAgent,
-            //             tokenInResponse: null,
-            //             vendorRetryRecord: transaction.retryRecord[transaction.retryRecord.length - 1],
-            //             transactionTimedOutFromBuypower: false,
-            //         },
-            //     );
-            // }
-
-            // await transactionEventService.addTokenReceivedEvent(prepaid ? token! : 'null')
-            // await VendorPublisher.publishEventForTokenReceivedFromVendor({
-            //     meter: {
-            //         ...data.meter,
-            //         token: prepaid ? token! : 'null'
-            //     },
-            //     transactionId: transaction.id,
-            //     user: {
-            //         name: transaction.user.name as string,
-            //         email: transaction.user.email,
-            //         address: transaction.user.address,
-            //         phoneNumber: transaction.user.phoneNumber,
-            //     },
-            //     partner: {
-            //         email: transaction.partner.email,
-            //     },
-            // });
         } catch (error) {
             if (error instanceof CustomError) {
                 error.meta = error.meta ?? {

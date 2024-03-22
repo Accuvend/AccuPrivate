@@ -81,6 +81,31 @@ interface RequestTokenValidatorResponse {
     transaction: Transaction;
     partnerEntity: Entity;
 }
+
+interface UserInfo {
+    name: string,
+    email: string,
+    phoneNumber: string,
+    id: string
+}
+
+interface ValidateMeterParams extends valideMeterRequestBody {
+    transaction: Transaction,
+    userInfo: UserInfo
+}
+
+interface RequestTokenUtilParams {
+    transaction: Transaction,
+    meterInfo: {
+        meterNumber: string,
+        disco: string,
+        vendType: 'PREPAID' | 'POSTPAID',
+        id: string,
+    },
+    previousRetryEvent: Event
+}
+
+
 class VendorTokenHandler implements Registry {
     private tokenSent = false
     private transaction: Transaction
@@ -163,11 +188,8 @@ class VendorTokenReceivedSubscriber extends ConsumerFactory {
     }
 }
 
-
 // Validate request parameters for each controller
 class VendorControllerValdator {
-    static validateMeter() { }
-
     static async requestToken({
         bankRefId,
         transactionId,
@@ -229,158 +251,6 @@ class VendorControllerValdator {
         };
     }
 
-    static getDiscos() { }
-
-    static checkDisco() { }
-}
-
-
-interface UserInfo {
-    name: string,
-    email: string,
-    phoneNumber: string,
-    id: string
-}
-
-interface ValidateMeterParams extends valideMeterRequestBody {
-    transaction: Transaction,
-    userInfo: UserInfo
-}
-
-interface RequestTokenUtilParams {
-    transaction: Transaction,
-    meterInfo: {
-        meterNumber: string,
-        disco: string,
-        vendType: 'PREPAID' | 'POSTPAID',
-        id: string,
-    },
-    previousRetryEvent: Event
-}
-class VendorControllerUtil {
-    static async replayRequestToken({ transaction, meterInfo, previousRetryEvent }: RequestTokenUtilParams) {
-        const transactionEventService = new TransactionEventService(
-            transaction, meterInfo, transaction.superagent, transaction.partner.email
-        )
-
-        const vendorRetryRecord = transaction.retryRecord[transaction.retryRecord.length - 1]
-        const eventPayload = JSON.parse(previousRetryEvent.payload) as TokenRetryEventPayload
-        await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
-            {
-                eventService: transactionEventService,
-                eventData: {
-                    meter: {
-                        meterNumber: meterInfo.meterNumber,
-                        disco: transaction.disco,
-                        vendType: meterInfo.vendType,
-                        id: meterInfo.id,
-                    },
-                    transactionId: transaction.id,
-                    error: {
-                        code: 100,
-                        cause: TransactionErrorCause.UNKNOWN
-                    },
-                },
-                tokenInResponse: null,
-                transactionTimedOutFromBuypower: false,
-                superAgent: transaction.superagent,
-                retryCount: eventPayload.retryCount + 1,
-                vendorRetryRecord
-            }
-        )
-    }
-
-    static async replayWebhookNotification({ transaction, meterInfo }: { transaction: Transaction, meterInfo: { meterNumber: string, disco: string, vendType: 'PREPAID' | 'POSTPAID', id: string } }) {
-        const transactionEventService = new TransactionEventService(
-            transaction, meterInfo, transaction.superagent,
-            transaction.partner.email
-        )
-
-        const user = await transaction.$get('user')
-        if (!user) {
-            throw new InternalServerError('User not found')
-        }
-
-        const powerUnit = await transaction.$get('powerUnit')
-        if (!powerUnit) {
-            throw new BadRequestError('Can not replay transaction if no powerunit')
-        }
-
-        const partner = await transaction.$get('partner')
-        if (!partner) {
-            throw new InternalServerError('Partner not found')
-        }
-
-        const webhook = await WebhookService.viewWebhookByPartnerId(partner.id)
-        if (!webhook) {
-            throw new InternalServerError('Webhook not found')
-        }
-
-        await transactionEventService.addWebHookNotificationRetryEvent({
-            retryCount: 1,
-            timeStamp: new Date(),
-            url: webhook.url
-        })
-        await VendorPublisher.publishEventForWebhookNotificationToPartnerRetry({
-            meter: { ...meterInfo, token: powerUnit.token },
-            user: {
-                name: user.name as string,
-                ...user.dataValues
-            },
-            transactionId: transaction.id,
-            partner: partner,
-            retryCount: 1,
-            superAgent: transaction.superagent,
-        })
-    }
-
-    static async replayTokenSent({ transaction }: { transaction: Transaction }) {
-        const powerUnit = await transaction.$get('powerUnit')
-        if (!powerUnit) {
-            throw new InternalServerError('Power unit not found')
-        }
-
-        const meter = await powerUnit.$get('meter')
-        if (!meter) {
-            throw new InternalServerError('Meter not found')
-        }
-
-        const user = await transaction.$get('user')
-        if (!user) {
-            throw new InternalServerError('User not found')
-        }
-
-        const partner = await transaction.$get('partner')
-        if (!partner) {
-            throw new InternalServerError('Partner not found')
-        }
-
-        const transactionEventService = new TransactionEventService(
-            transaction, {
-            meterNumber: powerUnit.meter.meterNumber,
-            disco: transaction.disco,
-            vendType: powerUnit.meter.vendType as IMeter['vendType'],
-        }, transaction.superagent, partner.email
-        )
-
-        await transactionEventService.addTokenSentToPartnerRetryEvent()
-        await VendorPublisher.publishEventForTokenSentToPartnerRetry({
-            meter: {
-                meterNumber: meter.meterNumber,
-                disco: transaction.disco,
-                vendType: meter.vendType as IMeter['vendType'],
-                id: meter.id,
-                token: powerUnit.token
-            },
-            user: {
-                name: user.name as string,
-                ...user.dataValues
-            },
-            partner: partner,
-            transactionId: transaction.id,
-        })
-    }
-
     static async validateMeter({ meterNumber, disco, vendType, transaction }: {
         meterNumber: string, disco: string, vendType: 'PREPAID' | 'POSTPAID', transaction: Transaction
     }) {
@@ -432,7 +302,6 @@ class VendorControllerUtil {
                 throw new InternalServerError('Irecharge vendor product not found')
             }
 
-
             console.log({
                 transactionId: transaction.id,
                 meterNumber,
@@ -462,37 +331,53 @@ class VendorControllerUtil {
         const transactionEventService = new EventService.transactionEventService(transaction, { meterNumber, disco, vendType }, superAgents[0], transaction.partner.email)
         let selectedVendor = superAgents[0]
         let returnedResponse: IResponses[keyof IResponses] | Error = new Error('No response')
-        for (const superAgent of superAgents) {
-            try {
-                console.log({ superAgent })
-                response = superAgent === "BUYPOWERNG" ? await validateWithBuypower() :
-                    superAgent === "BAXI" ? await validateWithBaxi() : await validateWithIrecharge()
-                if (response instanceof Error) {
-                    throw response
-                }
-                console.log({ superAgent })
-                const token = superAgent === 'IRECHARGE' ? (response as IResponses['IRECHARGE']).access_token : undefined
-                await transaction.update({ superagent: superAgent as any, irechargeAccessToken: token })
+        let continueValidation = true
+        const startTime = new Date()
 
-                selectedVendor = superAgent
-                returnedResponse = response
-                break
-            } catch (error) {
-                console.log(error)
-                logger.error(`Error validating meter with ${superAgent}`, { meta: { transactionId: transaction.id } })
+        while (continueValidation) {
+            const currentTime = new Date()
 
-                await transactionEventService.addMeterValidationFailedEvent(superAgent, {
-                    meterNumber: meterNumber,
-                    disco: disco,
-                    vendType: vendType
-                })
+            const timeDifference = currentTime.getTime() - startTime.getTime()
+            const timeDifferenceIsMoreThanOneMinute = timeDifference > 60000
+            if (timeDifferenceIsMoreThanOneMinute) {
+                await TransactionService.updateSingleTransaction(transaction.id, { status: Status.FAILED })
+                Logger.apiRequest.info(`Meter could not be validated`, { meta: { transactionId: transaction.id } })
+                throw new BadRequestError('Meter could not be validated')
+            }
 
-                console.log(superAgents.indexOf(superAgent))
-                const isLastSuperAgent = superAgents.indexOf(superAgent) === superAgents.length - 1
-                if (isLastSuperAgent) {
-                    throw error
-                } else {
-                    Logger.apiRequest.info(`Trying to validate meter with next super agent - ${superAgents[superAgents.indexOf(superAgent) + 1]}`, { meta: { transactionId: transaction.id } })
+            for (const superAgent of superAgents) {
+                try {
+                    console.log({ superAgent })
+                    response = superAgent === "BUYPOWERNG" ? await validateWithBuypower() :
+                        superAgent === "BAXI" ? await validateWithBaxi() : await validateWithIrecharge()
+                    if (response instanceof Error) {
+                        throw response
+                    }
+                    console.log({ superAgent })
+                    const token = superAgent === 'IRECHARGE' ? (response as IResponses['IRECHARGE']).access_token : undefined
+                    await transaction.update({ superagent: superAgent as any, irechargeAccessToken: token })
+
+                    selectedVendor = superAgent
+                    returnedResponse = response
+                    continueValidation = false
+                    break
+                } catch (error) {
+                    console.log(error)
+                    logger.error(`Error validating meter with ${superAgent}`, { meta: { transactionId: transaction.id } })
+
+                    await transactionEventService.addMeterValidationFailedEvent(superAgent, {
+                        meterNumber: meterNumber,
+                        disco: disco,
+                        vendType: vendType
+                    })
+
+                    console.log(superAgents.indexOf(superAgent))
+                    const isLastSuperAgent = superAgents.indexOf(superAgent) === superAgents.length - 1
+                    if (isLastSuperAgent) {
+                        continue
+                    } else {
+                        Logger.apiRequest.info(`Trying to validate meter with next super agent - ${superAgents[superAgents.indexOf(superAgent) + 1]}`, { meta: { transactionId: transaction.id } })
+                    }
                 }
             }
         }
@@ -514,7 +399,6 @@ class VendorControllerUtil {
         return returnedResponse
     }
 }
-
 
 export default class VendorController {
 
@@ -628,7 +512,7 @@ export default class VendorController {
 
         const vendorDiscoCode = (vendorProduct.schemaData as VendorProductSchemaData.BUYPOWERNG).code
         // We Check for Meter User *
-        const response = await VendorControllerUtil.validateMeter({ meterNumber, disco: vendorDiscoCode, vendType, transaction })
+        const response = await VendorControllerValdator.validateMeter({ meterNumber, disco: vendorDiscoCode, vendType, transaction })
         const userInfo = {
             name: (response as any).name,
             email: email,
@@ -746,7 +630,8 @@ export default class VendorController {
         // REMOVED !!!! BECAUSE WE SHOULD NEVER AUTOGENERATE THIS IN THE CODE
         const bankRefId = req.query.bankRefId as string;
         if (parseInt(amount.toString()) < 1000) {
-            throw new BadRequestError("Amount must be greater than 500", errorMeta);
+            logger.error('Amount must be greater than 1000', { meta: { transactionId } })
+            throw new BadRequestError("Amount must be greater than 100");
         }
 
         const transaction: Transaction | null =
@@ -757,6 +642,10 @@ export default class VendorController {
 
         if (transaction.status === Status.COMPLETE as any) {
             throw new BadRequestError("Transaction already completed");
+        }
+
+        if (transaction.status !== Status.PENDING) {
+            throw new BadRequestError("Transaction not in pending state");
         }
 
         Logger.apiRequest.info('Requesting token for transaction', { meta: { transactionId: transaction.id, ...req.query } })
@@ -901,145 +790,19 @@ export default class VendorController {
                         meter: { ...meterInfo, token: powerUnit.token }
                     }
                 })
-
+                
+                // TODO: Add Code to send response if token has been gotten from vendor
+                await transactionEventService.addTokenSentToPartnerEvent();
                 return
             }
+            
 
-            // TODO: Add Code to send response if token has been gotten from vendor
-
-            await transactionEventService.addTokenSentToPartnerEvent();
 
             return
         } catch (error) {
             logger.error('SuttingDown vendor token consumer of id')
             await vendorTokenConsumer.shutdown()
         }
-    }
-
-    private static getTransactionStage(events: Event[]) {
-        /**
-         * The events are in groups, if the last event in the group is not complete, then the transaction is still in that stage
-         * 
-         * METER_VALIDATION stage - METER_VALIDATION_REQUEST_SENT_TO_VENDOR, METER_VALIDATION_RECIEVED_FROM_VENDOR
-         * CREATE_USER stage - CREATE_USER_INITIATED, CREATE_USER_CONFIRMED
-         * POWER_PURCHASE stage - POWER_PURCHASE_INITIATED_BY_CUSTOMER, TOKEN_RECIEVED_FROM_VENDOR
-         *      Power purchase has other stages that may occur due to error
-         *      GET_TRANSACTION_TOKEN stage - GET_TRANSACTION_TOKEN_FROM_VENDOR_INITIATED, GET_TRANSACTION_TOKEN_FROM_VENDOR_RETRY, GET_TRANSACTION_TOKEN_REQUESTED_FROM_VENDOR
-         * 
-         * WEBHOOK_NOTIFICATION stage - WEBHOOK_NOTIFICATION_SENT_TO_PARTNER, WEBHOOK_NOTIFICATION_CONFIRMED_FROM_PARTNER
-         * TOKEN_SENT stage - TOKEN_SENT_TO_PARTNER, TOKEN_SENT_TO_EMAIL, TOKEN_SENT_TO_NUMBER
-         * PARTNER_TRANSACTION_COMPLETE stage - PARTNER_TRANSACTION_COMPLETE
-         */
-
-        /**
-         * Find the stage that the transaction is in, then continue from there
-         * 
-         * If transaction is in power purchase stage, check if it is in the GET_TRANSACTION_TOKEN stage
-         */
-
-        const stages = {
-            METER_VALIDATION: [
-                TOPICS.METER_VALIDATION_REQUEST_SENT_TO_VENDOR, TOPICS.METER_VALIDATION_RECIEVED_FROM_VENDOR, TOPICS.METER_VALIDATION_REQUEST_SENT_TO_VENDOR,
-            ],
-            CREATE_USER: [
-                TOPICS.CREATE_USER_INITIATED, TOPICS.CREATE_USER_CONFIRMED
-            ],
-            POWER_PURCHASE: [
-                TOPICS.POWER_PURCHASE_INITIATED_BY_CUSTOMER, TOPICS.TOKEN_RECIEVED_FROM_VENDOR
-            ],
-            GET_TRANSACTION_TOKEN: [
-                TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_INITIATED, TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_RETRY, TOPICS.GET_TRANSACTION_TOKEN_REQUESTED_FROM_VENDOR
-            ],
-            WEBHOOK_NOTIFICATION: [
-                TOPICS.WEBHOOK_NOTIFICATION_SENT_TO_PARTNER, TOPICS.WEBHOOK_NOTIFICATION_CONFIRMED_FROM_PARTNER
-            ],
-            TOKEN_SENT: [
-                TOPICS.TOKEN_SENT_TO_PARTNER, TOPICS.TOKEN_SENT_TO_EMAIL, TOPICS.TOKEN_SENT_TO_NUMBER
-            ],
-            PARTNER_TRANSACTION_COMPLETE: [
-                TOPICS.PARTNER_TRANSACTION_COMPLETE
-            ]
-        }
-
-        const stagesKeys = Object.keys(stages) as (keyof typeof stages)[]
-
-        // Sort events by timestamp
-        const sortedEvents = events.sort((a, b) => {
-            return a.createdAt.getTime() - b.createdAt.getTime()
-        })
-
-        // Get the last event for the transaction
-        const lastEventInTransaction = sortedEvents[sortedEvents.length - 1]
-
-        // Find the stage that the latest event belongs to
-        const stage = stagesKeys.find((stage) => {
-            const stageEvents = stages[stage]
-            return stageEvents.includes(lastEventInTransaction.eventType)
-        })
-
-        return { stage, lastEventInTransaction }
-    }
-
-    static async replayTransaction(req: Request, res: Response, next: NextFunction) {
-        const { eventId } = req.body
-
-        const event = await EventService.viewSingleEvent(eventId)
-        if (!event) {
-            throw new NotFoundError('Event not found')
-        }
-
-        const transaction = await TransactionService.viewSingleTransaction(event.transactionId)
-        if (!transaction) {
-            throw new NotFoundError('Transaction not found')
-        }
-
-        const { stage, lastEventInTransaction } = this.getTransactionStage(await transaction.$get('events'))
-
-        const meter = await transaction.$get('meter')
-        if (!meter) {
-            throw new InternalServerError('Meter not found for replayed transaction')
-        }
-
-        switch (stage) {
-            case 'GET_TRANSACTION_TOKEN':
-                await VendorControllerUtil.replayRequestToken({
-                    transaction,
-                    meterInfo: {
-                        meterNumber: meter.meterNumber,
-                        disco: transaction.disco,
-                        vendType: meter.vendType,
-                        id: meter.id,
-                    },
-                    previousRetryEvent: lastEventInTransaction
-                })
-                break
-            case 'WEBHOOK_NOTIFICATION':
-                await VendorControllerUtil.replayWebhookNotification({
-                    meterInfo: {
-                        meterNumber: meter.meterNumber,
-                        disco: transaction.disco,
-                        vendType: meter.vendType,
-                        id: meter.id,
-                    },
-                    transaction,
-                })
-                break
-            case 'TOKEN_SENT':
-                await VendorControllerUtil.replayTokenSent({
-                    transaction,
-                })
-            default:
-                throw new BadRequestError('Transaction cannot be replayed')
-        }
-
-        res.status(200).json({
-            status: 'success',
-            message: 'Transaction replayed successfully',
-            data: {
-                transaction: await TransactionService.viewSingleTransaction(transaction.id)
-            }
-        })
-
     }
 
     static async checkDisco(req: Request, res: Response) {

@@ -27,10 +27,10 @@ export class CyberPaySmsService implements SmsServiceHandler {
             password: CYBER_PAY_PASSWORD
         })
 
-        console.log({ data: response.data})
+        console.log({ data: response.data })
     }
 
-    sendSms(to: string, message: string): Promise<any> {
+    sendSms = async (to: string, message: string): Promise<any> => {
 
     }
 }
@@ -52,7 +52,7 @@ export class AfricasTalkingSmsService implements SmsServiceHandler {
 }
 
 new CyberPaySmsService().login().catch(e => {
-    console.log({ e: e.response})
+    console.log({ e: e.response })
 })
 
 export class SmsService {

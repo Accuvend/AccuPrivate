@@ -24,13 +24,15 @@ export default class VendorAdminController {
             throw new BadRequestError('Transaction ID is required')
         }
 
+        if (!token) throw new BadRequestError('Token is required')
+
         const transaction = await TransactionService.viewSingleTransaction(transactionId)
         if (!transaction) {
             throw new NotFoundError('Transaction not found')
         }
 
         if (transaction.status != Status.FLAGGED) {
-            // throw new BadRequestError('Transaction condition not met')
+            throw new BadRequestError('Transaction condition not met')
         }
         
         const logMeta = { meta: { transactionId } }
@@ -60,11 +62,10 @@ export default class VendorAdminController {
         if (!partner) {
             throw new InternalServerError('Partner not found')
         }
+        
 
-        if (meter.vendType === 'PREPAID') {
-            if (!token) throw new BadRequestError('Token is required')
-            
-            logger.info('Token from requery ', { meta: { ...logMeta, requeryToken: token } });
+        if (meter.vendType === 'PREPAID') {            
+            logger.info('Token from manual intervention ', { meta: { ...logMeta, requeryToken: token } });
             await TransactionService.updateSingleTransaction(transaction.id, { tokenFromRequery: token })
             powerUnit = powerUnit
                 ? await PowerUnitService.updateSinglePowerUnit(powerUnit.id, {

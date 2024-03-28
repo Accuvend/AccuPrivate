@@ -92,9 +92,11 @@ const TransactionErrorCodeAndCause = {
 export async function getCurrentWaitTimeForRequeryEvent(retryCount: number) {
     // Time in seconds
     // const defaultValues = [10, 20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 10240, 20480, 40960, 81920, 163840, 327680, 655360, 1310720, 2621440, 5242880]
-    const defaultValues = [0, 0, 120] // Default to 2mins because of buypowerng minimum wait time for requery
+    const defaultValues = [0, 120] // Default to 2mins because of buypowerng minimum wait time for requery
     const timesToRetry = defaultValues
     timesToRetry.unshift(1)
+
+    return 10
 
     if (retryCount >= timesToRetry.length) {
         return timesToRetry[timesToRetry.length - 1]
@@ -542,10 +544,10 @@ class ResponseValidationUtil {
         })
 
         function getFieldValueFromResponseObject(prop: string) {
-            let _prop = responseObject
+            let _prop: Record<string, any> | undefined = responseObject
             const path = prop.split('.')
             for (const p of path) {
-                if (_prop[p]) {
+                if (_prop && _prop[p]) {
                     _prop = _prop[p]
                 } else {
                     _prop = undefined
@@ -858,7 +860,7 @@ class TokenHandler extends Registry {
                 },
             );
 
-            const requeryResult = await TokenHandlerUtil.requeryTransactionFromVendor(transaction).catch(e => e.response);
+            const requeryResult = await TokenHandlerUtil.requeryTransactionFromVendor(transaction).catch(e => e.response ?? {});
 
             console.log({ requeryResult })
             const response = await ResponseValidationUtil.validateTransactionCondition({
@@ -888,7 +890,6 @@ class TokenHandler extends Registry {
             }
 
             console.log({ response })
-            // process.exit(1)
             switch (response.action) {
                 case -1:
                     logger.error('Transaction condition pending - Requery', logMeta)

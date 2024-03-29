@@ -1273,6 +1273,31 @@ export default class TransactionEventService {
         return await EventService.addEvent(event);
     }
 
+    public async addTokenReceivedFromRequery(token: string): Promise<Event> {
+        const event: ICreateEvent = {
+            transactionId: this.transaction.id,
+            eventType: TOPICS.TOKEN_RECIEVED_FROM_REQUERY,
+            eventText: TOPICS.TOKEN_RECIEVED_FROM_REQUERY,
+            payload: JSON.stringify({
+                token,
+                transactionId: this.transaction.id,
+                superAgent: this.transaction.superagent,
+                amount: this.transaction.amount,
+                disco: this.transaction.disco,
+                meterId: this.transaction.meterId,
+                meterNumber: this.meterInfo.meterNumber,
+                vendType: this.meterInfo.vendType,
+                superagent: this.superAgent,
+                partnerEmail: this.partner
+            }),
+            source: this.transaction.superagent.toUpperCase(),
+            eventTimestamp: new Date(),
+            id: uuidv4(),
+            status: Status.COMPLETE,
+        }
+
+        return await EventService.addEvent(event);
+    }
     public async addTokenReceivedEvent(token: string): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,

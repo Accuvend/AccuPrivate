@@ -51,6 +51,8 @@ export default class ProducerFactory {
                     },
                 },
             );
+
+            return error
         }
     }
 

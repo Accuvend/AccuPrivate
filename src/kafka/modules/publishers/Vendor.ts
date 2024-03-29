@@ -222,6 +222,34 @@ export class VendorPublisher extends ProducerFactory {
         })
     }
 
+    static async publishEventForTokenReceivedFromRequery(
+        data: PublisherEventAndParameters[TOPICS.TOKEN_RECIEVED_FROM_REQUERY],
+    ) {
+        return ProducerFactory.sendMessage({
+            topic: TOPICS.TOKEN_RECIEVED_FROM_REQUERY,
+            message: {
+                log: data.log,
+                meter: {
+                    meterNumber: data.meter.meterNumber,
+                    disco: data.meter.disco,
+                    vendType: data.meter.vendType,
+                    id: data.meter.id,
+                    token: data.meter.token,
+                },
+                user: {
+                    name: data.user.name,
+                    email: data.user.email,
+                    address: data.user.address,
+                    phoneNumber: data.user.phoneNumber,
+                },
+                partner: {
+                    email: data.partner.email,
+                },
+                transactionId: data.transactionId,
+            },
+        })
+    }
+
     static async publishEventForWebhookNotificationToPartnerRetry(
         data: PublisherEventAndParameters[TOPICS.WEBHOOK_NOTIFICATION_TO_PARTNER_RETRY],
     ) {

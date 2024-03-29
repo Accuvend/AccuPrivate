@@ -16,8 +16,69 @@ import MessageProcessor from "../util/MessageProcessor";
 import { v4 as uuidv4 } from 'uuid';
 import ProductService from "../../../services/Product.service";
 import { SmsService } from "../../../utils/Sms";
+import { VendorPublisher } from "../publishers/Vendor";
 
 class NotificationHandler extends Registry {
+    private static async handleTokenToSendToUser(data: PublisherEventAndParameters[TOPICS.TOKEN_RECIEVED_FROM_REQUERY]) {
+        logger.info('Inside notification handler')
+        const transaction = await TransactionService.viewSingleTransaction(data.transactionId)
+        if (!transaction) {
+            throw new Error(`Error fetching transaction with id ${data.transactionId}`)
+        }
+
+        const partnerEntity = await EntityService.viewSingleEntityByEmail(transaction.partner.email)
+        if (!partnerEntity) {
+            throw new Error(`Error fetching partner with email ${transaction.partner.email}`)
+        }
+
+        const transactionEventService = new TransactionEventService(transaction, {
+            meterNumber: data.meter.meterNumber,
+            vendType: transaction.meter.vendType,
+            disco: data.meter.disco,
+        }, transaction.superagent, transaction.partner.email)
+
+        const handlers = {
+            PREPAID: new EmailTemplate().receipt,
+            POSTPAID: new EmailTemplate().postpaid_receipt
+        }
+
+        const product = await ProductService.viewSingleProduct(transaction.productCodeId)
+        if (!product) {
+            throw new Error(`Error fetching product with id ${transaction.productCodeId}`)
+        }
+
+        transaction.disco = product.productName
+        console.log({ productName: transaction.disco })
+
+        // If you've not notified the user before, notify them
+        const meter = await transaction.$get('meter')
+        const user = await transaction.$get('user')
+        await EmailService.sendEmail({
+            to: transaction.user.email,
+            subject: "Token Purchase",
+            html: await handlers[transaction.meter.vendType]({
+                transaction: transaction,
+                meterNumber: data.meter.meterNumber,
+                token: data.meter.token,
+                address: meter?.address ?? '',
+                name: user?.dataValues.name ?? ''
+            }),
+        })
+
+        const msgTemplate = data.meter.vendType === 'POSTPAID' ? await SmsService.postpaidElectricityTemplate(transaction) : await SmsService.prepaidElectricityTemplate(transaction)
+        await SmsService.sendSms(data.user.phoneNumber, msgTemplate)
+            .then(async () => {
+                await transactionEventService.addSmsTokenSentToUserEvent()
+            })
+            .catch((error: AxiosError) => {
+                console.log(error.response?.data)
+                logger.error('Error sending sms', error)
+            })
+        await transactionEventService.addTokenSentToUserEmailEvent()
+
+        return
+    }
+
     private static async handleReceivedToken(data: PublisherEventAndParameters[TOPICS.TOKEN_RECIEVED_FROM_VENDOR]) {
         logger.info('Inside notification handler')
         const transaction = await TransactionService.viewSingleTransaction(data.transactionId)
@@ -49,7 +110,6 @@ class NotificationHandler extends Registry {
 
         // Check if notifiecations have been sent to partner and user
         const notifyPartnerEvent = await EventService.viewSingleEventByTransactionIdAndType(transaction.id, TOPICS.TOKEN_SENT_TO_PARTNER)
-        const notifyUserEvent = await EventService.viewSingleEventByTransactionIdAndType(transaction.id, TOPICS.TOKEN_SENT_TO_EMAIL)
 
         const transactionEventService = new TransactionEventService(transaction, {
             meterNumber: data.meter.meterNumber,
@@ -66,11 +126,6 @@ class NotificationHandler extends Registry {
             await transactionEventService.addTokenSentToPartnerEvent()
         }
 
-        const handlers = {
-            PREPAID: new EmailTemplate().receipt,
-            POSTPAID: new EmailTemplate().postpaid_receipt
-        }
-
         const product = await ProductService.viewSingleProduct(transaction.productCodeId)
         if (!product) {
             throw new Error(`Error fetching product with id ${transaction.productCodeId}`)
@@ -79,33 +134,6 @@ class NotificationHandler extends Registry {
         transaction.disco = product.productName
         console.log({ productName: transaction.disco })
 
-        // If you've not notified the user before, notify them
-        if (!notifyUserEvent) {
-            const meter = await transaction.$get('meter')
-            const user = await transaction.$get('user')
-            await EmailService.sendEmail({
-                to: transaction.user.email,
-                subject: "Token Purchase",
-                html: await handlers[transaction.meter.vendType]({
-                    transaction: transaction,
-                    meterNumber: data.meter.meterNumber,
-                    token: data.meter.token,
-                    address: meter?.address ?? '',
-                    name: user?.dataValues.name ?? ''
-                }),
-            })
-
-            const msgTemplate = data.meter.vendType === 'POSTPAID' ? await SmsService.postpaidElectricityTemplate(transaction) : await SmsService.prepaidElectricityTemplate(transaction)
-            await SmsService.sendSms(data.user.phoneNumber, msgTemplate)
-                .then(async () => {
-                    await transactionEventService.addSmsTokenSentToUserEvent()
-                })
-                .catch((error: AxiosError) => {
-                    console.log(error.response?.data)
-                    logger.error('Error sending sms', error)
-                })
-            await transactionEventService.addTokenSentToUserEmailEvent()
-        }
         return
     }
 
@@ -140,7 +168,6 @@ class NotificationHandler extends Registry {
 
         // Check if notifiecations have been sent to partner and user
         const notifyPartnerEvent = await EventService.viewSingleEventByTransactionIdAndType(transaction.id, TOPICS.TOKEN_SENT_TO_PARTNER)
-        const notifyUserEvent = await EventService.viewSingleEventByTransactionIdAndType(transaction.id, TOPICS.TOKEN_SENT_TO_EMAIL)
 
         const transactionEventService = new AirtimeTransactionEventService(transaction, transaction.superagent, transaction.partner.email, data.phone.phoneNumber)
 
@@ -160,24 +187,22 @@ class NotificationHandler extends Registry {
 
         transaction.disco = product.productName
 
-        // If you've not notified the user before, notify them
-        if (!notifyUserEvent) {
-            await EmailService.sendEmail({
-                to: transaction.user.email,
-                subject: "Token Purchase",
-                html: await new EmailTemplate().airTimeReceipt({
-                    transaction: transaction,
-                    phoneNumber: data.phone.phoneNumber,
-                }),
-            })
+        await EmailService.sendEmail({
+            to: transaction.partner.email,
+            subject: "Token Purchase",
+            html: await new EmailTemplate().airTimeReceipt({
+                transaction: transaction,
+                phoneNumber: data.phone.phoneNumber,
+            }),
+        })
 
-            const msgTemplate = await SmsService.airtimeTemplate(transaction)
-            await SmsService.sendSms(data.phone.phoneNumber, msgTemplate).catch((error: AxiosError) => {
-                console.log(error.response?.data)
-                logger.error('Error sending sms', error)
-            })
-            await transactionEventService.addAirtimeSentToUserEmail()
-        }
+        const msgTemplate = await SmsService.airtimeTemplate(transaction)
+        await SmsService.sendSms(data.phone.phoneNumber, msgTemplate).catch((error: AxiosError) => {
+            console.log(error.response?.data)
+            logger.error('Error sending sms', error)
+        })
+        await transactionEventService.addAirtimeSentToUserEmail()
+
         return
     }
 
@@ -245,6 +270,7 @@ class NotificationHandler extends Registry {
     static registry = {
         [TOPICS.TOKEN_SENT_TO_PARTNER_RETRY]: this.handleReceivedToken,
         [TOPICS.TOKEN_RECIEVED_FROM_VENDOR]: this.handleReceivedToken,
+        [TOPICS.TOKEN_RECIEVED_FROM_REQUERY]: this.handleTokenToSendToUser,
         [TOPICS.TOKEN_REQUEST_FAILED]: this.failedTokenRequest,
         [TOPICS.AIRTIME_RECEIVED_FROM_VENDOR]: this.handleReceivedAirtime,
     }

@@ -950,8 +950,8 @@ class TokenHandler extends Registry {
                         status: Status.COMPLETE,
                         powerUnitId: powerUnit?.id,
                     });
-                    await transactionEventService.addTokenReceivedEvent(tokenInResponse ?? '');
-                    return await VendorPublisher.publishEventForTokenReceivedFromVendor({
+                    await transactionEventService.addTokenReceivedFromRequery(tokenInResponse ?? '');
+                    return await VendorPublisher.publishEventForTokenReceivedFromRequery({
                         transactionId: transaction!.id,
                         user: {
                             name: user.name as string,
@@ -1012,7 +1012,7 @@ class TokenHandler extends Registry {
 
         console.log({ timeDifference, timeStamp, currentTime: new Date(), delayInSeconds, timeInSecondsSinceInit })
 
-        if (timeDifference < 0) {
+        if (timeDifference <= 0) {
             return await VendorPublisher.publishEventForGetTransactionTokenRequestedFromVendorRetry(data.scheduledMessagePayload)
         }
 
@@ -1043,7 +1043,7 @@ class TokenHandler extends Registry {
         console.log({ timeDifference, timeStamp, currentTime: new Date(), delayInSeconds, timeInSecondsSinceInit })
 
         // Check if current time is greater than the timeStamp + delayInSeconds
-        if (timeDifference < 0) {
+        if (timeDifference <= 0) {
             const existingTransaction = await TransactionService.viewSingleTransaction(data.scheduledMessagePayload.transactionId)
             if (!existingTransaction) {
                 throw new CustomError('Transaction not found')

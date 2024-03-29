@@ -65,7 +65,7 @@ class NotificationHandler extends Registry {
             }),
         })
 
-        const msgTemplate = data.meter.vendType === 'POSTPAID' ? await SmsService.postpaidElectricityTemplate(transaction) : await SmsService.prepaidElectricityTemplate(transaction)
+        const msgTemplate = data.meter.vendType.toUpperCase() === 'POSTPAID' ? await SmsService.postpaidElectricityTemplate(transaction) : await SmsService.prepaidElectricityTemplate(transaction)
         await SmsService.sendSms(data.user.phoneNumber, msgTemplate)
             .then(async () => {
                 await transactionEventService.addSmsTokenSentToUserEvent()

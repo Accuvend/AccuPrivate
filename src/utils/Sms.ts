@@ -22,12 +22,12 @@ export class CyberPaySmsService implements SmsServiceHandler {
         }
     })
     login = async () => {
-        const response = await this.client.post('/auth/login', {
+        const response = await this.client.post<{ token: string }>('/auth/login', {
             username: CYBER_PAY_USERNAME,
             password: CYBER_PAY_PASSWORD
         })
 
-        console.log({ data: response.data })
+        return response.data
     }
 
     sendSms = async (to: string, message: string): Promise<any> => {
@@ -50,10 +50,6 @@ export class AfricasTalkingSmsService implements SmsServiceHandler {
         }
     }
 }
-
-new CyberPaySmsService().login().catch(e => {
-    console.log({ e: e.response })
-})
 
 export class SmsService {
     private static smsHost = new CyberPaySmsService()

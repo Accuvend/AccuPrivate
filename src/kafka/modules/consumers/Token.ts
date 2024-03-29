@@ -736,6 +736,7 @@ class TokenHandler extends Registry {
                 transactionId: transaction.id
             })
 
+
             switch (response.action) {
                 case -1:
                     logger.error('Transaction condition pending - Requery', logMeta)
@@ -768,7 +769,35 @@ class TokenHandler extends Registry {
                                 tokenFromVend: response.token
                             }
                         })
+
+                        const powerUnit = await transaction.$get('powerUnit')
+                        if (!powerUnit) throw new CustomError('Power unit not found')
+
+                        await TransactionService.updateSingleTransaction(data.transactionId, {
+                            powerUnitId: powerUnit?.id,
+                        });
+                        await transactionEventService.addTokenReceivedEvent(response.token ?? '');
+                        await VendorPublisher.publishEventForTokenReceivedFromVendor({
+                            transactionId: transaction!.id,
+                            user: {
+                                name: user.name as string,
+                                email: user.email,
+                                address: user.address,
+                                phoneNumber: user.phoneNumber,
+                            },
+                            partner: {
+                                email: partner.email,
+                            },
+                            meter: {
+                                id: meter.id,
+                                meterNumber: meter.meterNumber,
+                                disco: transaction!.disco,
+                                vendType: meter.vendType,
+                                token: response.token ?? '',
+                            },
+                        });
                     }
+
 
                     await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor({
                         eventData: { ...eventMessage, error: { ...eventMessage.error, cause: TransactionErrorCause.UNEXPECTED_ERROR } },

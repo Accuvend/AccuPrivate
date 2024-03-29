@@ -1012,7 +1012,6 @@ class TokenHandler extends Registry {
 
         console.log({ timeDifference, timeStamp, currentTime: new Date(), delayInSeconds, waitTimeInMilliSeconds, timeInMIlliSecondsSinceInit })
 
-        // Check if current time is greater than the timeStamp + delayInSeconds
         if (timeDifference < 0) {
             return await VendorPublisher.publishEventForGetTransactionTokenRequestedFromVendorRetry(data.scheduledMessagePayload)
         }
@@ -1020,12 +1019,13 @@ class TokenHandler extends Registry {
         // Change error cause to RESCHEDULED_BEFORE_WAIT_TIME
         data.scheduledMessagePayload.error.cause = TransactionErrorCause.RESCHEDULED_BEFORE_WAIT_TIME
 
-        logger.info("Rescheduling requery for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
+        // logger.info("Rescheduling requery for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
         // Else, schedule a new event to requery transaction from vendor
         return await VendorPublisher.publishEventToScheduleRequery({
             scheduledMessagePayload: data.scheduledMessagePayload,
             timeStamp: data.timeStamp,
             delayInSeconds: data.delayInSeconds,
+            log: 0
         })
     }
 
@@ -1085,12 +1085,13 @@ class TokenHandler extends Registry {
             return await VendorPublisher.publishEventForInitiatedPowerPurchase(data.scheduledMessagePayload)
         }
 
-        logger.info("Rescheduling retry for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
+        // logger.info("Rescheduling retry for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
         // Else, schedule a new event to requery transaction from vendor
         return await VendorPublisher.publishEventToScheduleRetry({
             scheduledMessagePayload: data.scheduledMessagePayload,
             timeStamp: data.timeStamp,
             delayInSeconds: data.delayInSeconds,
+            log: 0
         })
     }
 

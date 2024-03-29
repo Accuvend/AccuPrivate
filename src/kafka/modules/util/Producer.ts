@@ -25,11 +25,14 @@ export default class ProducerFactory {
     }
 
     static async sendMessage({ topic, message }: PublisherParamsUnion) {
-        Logger.kafkaPublisher.info("Sending message to topic: " + topic, {
-            meta: {
-                transactionId: message.transactionId,
-            },
-        });
+        if (message.log === undefined ? 1 : message.log) {
+            Logger.kafkaPublisher.info("Sending message to topic: " + topic, {
+                meta: {
+                    transactionId: message.transactionId,
+                },
+            });
+        }
+
         try {
             await this.producer.send({
                 topic: topic,

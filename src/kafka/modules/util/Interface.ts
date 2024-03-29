@@ -30,6 +30,7 @@ interface MeterValidationRequested {
     user: User;
     meter: MeterInfo;
     transactionId: string;
+    log?: 1 | 0
 }
 
 interface Partner {
@@ -50,13 +51,15 @@ export interface VendorRetryRecord {
     retryCount: number;
 }
 
-export interface PublisherEventAndParameters extends Record<TOPICS, any> {
+export interface PublisherEventAndParameters extends Record<TOPICS, { log?: 1 | 0 } & any> {
     [TOPICS.SCHEDULE_REQUERY_FOR_TRANSACTION]: {
+        log?: 1 | 0,
         timeStamp: string,
         delayInSeconds: number,
         scheduledMessagePayload: PublisherEventAndParameters[TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_REQUERY]
     }
     [TOPICS.SCHEDULE_RETRY_FOR_TRANSACTION]: {
+        log?: 1 | 0,
         timeStamp: string,
         delayInSeconds: number,
         scheduledMessagePayload: PublisherEventAndParameters[TOPICS.POWER_PURCHASE_INITIATED_BY_CUSTOMER] & {
@@ -68,12 +71,14 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
         }
     }
     [TOPICS.METER_VALIDATION_REQUEST_SENT_TO_VENDOR]: {
+        log?: 1 | 0,
         meter: MeterInfo;
         transactionId: string;
         superAgent: Transaction['superagent']
     };
     [TOPICS.METER_VALIDATION_RECIEVED_FROM_VENDOR]: MeterValidationRequested;
     [TOPICS.POWER_PURCHASE_INITIATED_BY_CUSTOMER]: {
+        log?: 1 | 0,
         meter: MeterInfo & { id: string };
         user: User;
         partner: Partner;
@@ -82,6 +87,7 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
         vendorRetryRecord: VendorRetryRecord
     };
     [TOPICS.RETRY_PURCHASE_FROM_NEW_VENDOR]: {
+        log?: 1 | 0,
         meter: MeterInfo & { id: string };
         user: User;
         partner: Partner;
@@ -90,17 +96,20 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
         newVendor: Transaction['superagent'],
     };
     [TOPICS.VEND_ELECTRICITY_REQUESTED_FROM_VENDOR]: {
+        log?: 1 | 0,
         meter: MeterInfo & { id: string };
         transactionId: string;
         superAgent: Transaction['superagent'],
     };
     [TOPICS.TOKEN_RECIEVED_FROM_VENDOR]: {
+        log?: 1 | 0,
         meter: MeterInfo & { id: string; token: string };
         user: User;
         partner: Partner;
         transactionId: string;
     };
     [TOPICS.WEBHOOK_NOTIFICATION_TO_PARTNER_RETRY]: {
+        log?: 1 | 0,
         meter: MeterInfo & { id: string; token: string };
         user: User;
         partner: Partner;
@@ -109,6 +118,7 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
         superAgent: Transaction['superagent'],
     };
     [TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_REQUERY]: {
+        log?: 1 | 0,
         meter: MeterInfo & { id: string };
         transactionId: string;
         timeStamp: Date;
@@ -119,42 +129,50 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
         vendorRetryRecord: VendorRetryRecord
     };
     [TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_INITIATED]: {
+        log?: 1 | 0,
         meter: MeterInfo & { id: string };
         transactionId: string;
         timeStamp: Date;
         superAgent: Transaction['superagent']
     };
     [TOPICS.PARTNER_TRANSACTION_COMPLETE]: {
+        log?: 1 | 0,
         meter: MeterInfo & { id: string };
         user: User;
         partner: Partner;
         transactionId: string;
     };
     [TOPICS.TOKEN_SENT_TO_PARTNER]: {
+        log?: 1 | 0,
         meter: MeterInfo & { id: string };
         partner: Partner;
         transactionId: string;
     };
     [TOPICS.TOKEN_SENT_TO_EMAIL]: {
+        log?: 1 | 0,
         meter: MeterInfo & { id: string };
         user: User & { id: string };
         transactionId: string;
     };
     [TOPICS.TOKEN_SENT_TO_PARTNER_RETRY]: {
+        log?: 1 | 0,
         meter: MeterInfo & { id: string; token: string };
         user: User;
         partner: Partner;
         transactionId: string;
     };
     [TOPICS.CREATE_USER_INITIATED]: {
+        log?: 1 | 0,
         user: User;
         transactionId: string;
     };
     [TOPICS.CREATE_USER_CONFIRMED]: {
+        log?: 1 | 0,
         user: User & { id: string };
         transactionId: string;
     };
     [TOPICS.TOKEN_REQUEST_FAILED]: {
+        log?: 1 | 0,
         transactionId: string;
         meter: MeterInfo;
     };
@@ -162,6 +180,7 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
 
     // Airtime
     [TOPICS.AIRTIME_PURCHASE_INITIATED_BY_CUSTOMER]: {
+        log?: 1 | 0,
         phone: {
             phoneNumber: string;
             amount: number;
@@ -172,6 +191,7 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
         superAgent: Transaction['superagent']
     };
     [TOPICS.AIRTIME_TRANSACTION_COMPLETE]: {
+        log?: 1 | 0,
         phone: {
             phoneNumber: string;
             amount: number;
@@ -182,6 +202,7 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
         transactionId: string;
     };
     [TOPICS.RETRY_AIRTIME_PURCHASE_FROM_NEW_VENDOR]: {
+        log?: 1 | 0,
         phone: { phoneNumber: string; amount: number; },
         user: User;
         partner: Partner;
@@ -190,6 +211,7 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
         newVendor: Transaction['superagent'],
     };
     [TOPICS.AIRTIME_PURCHASE_INITIATED_BY_CUSTOMER]: {
+        log?: 1 | 0,
         phone: { phoneNumber: string; amount: number; },
         user: User;
         partner: Partner;
@@ -197,12 +219,14 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
         superAgent: Transaction['superagent']
     };
     [TOPICS.AIRTIME_RECEIVED_FROM_VENDOR]: {
+        log?: 1 | 0,
         phone: { phoneNumber: string; amount: number; },
         user: User;
         partner: Partner;
         transactionId: string;
     };
     [TOPICS.GET_AIRTIME_FROM_VENDOR_RETRY]: {
+        log?: 1 | 0,
         phone: {
             phoneNumber: string;
             amount: number;
@@ -215,6 +239,7 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
         waitTime: number,
     };
     [TOPICS.AIRTIME_PURCHASE_RETRY_FROM_NEW_VENDOR]: {
+        log?: 1 | 0,
         phone: {
             phoneNumber: string;
             amount: number;
@@ -228,6 +253,7 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
 
     // Data
     [TOPICS.DATA_PURCHASE_INITIATED_BY_CUSTOMER]: {
+        log?: 1 | 0,
         phone: {
             phoneNumber: string;
             amount: number;
@@ -239,6 +265,7 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
         vendorRetryRecord: VendorRetryRecord
     };
     [TOPICS.DATA_TRANSACTION_COMPLETE]: {
+        log?: 1 | 0,
         phone: {
             phoneNumber: string;
             amount: number;
@@ -249,6 +276,7 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
         transactionId: string;
     };
     [TOPICS.RETRY_DATA_PURCHASE_FROM_NEW_VENDOR]: {
+        log?: 1 | 0,
         phone: { phoneNumber: string; amount: number; },
         user: User;
         partner: Partner;
@@ -257,6 +285,7 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
         newVendor: Transaction['superagent'],
     };
     [TOPICS.DATA_PURCHASE_INITIATED_BY_CUSTOMER]: {
+        log?: 1 | 0,
         phone: { phoneNumber: string; amount: number; },
         user: User;
         partner: Partner;
@@ -265,12 +294,14 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
         vendorRetryRecord: VendorRetryRecord
     };
     [TOPICS.DATA_RECEIVED_FROM_VENDOR]: {
+        log?: 1 | 0,
         phone: { phoneNumber: string; amount: number; },
         user: User;
         partner: Partner;
         transactionId: string;
     };
     [TOPICS.GET_DATA_FROM_VENDOR_RETRY]: {
+        log?: 1 | 0,
         phone: {
             phoneNumber: string;
             amount: number;
@@ -284,6 +315,7 @@ export interface PublisherEventAndParameters extends Record<TOPICS, any> {
         vendorRetryRecord: VendorRetryRecord
     };
     [TOPICS.DATA_PURCHASE_RETRY_FROM_NEW_VENDOR]: {
+        log?: 1 | 0,
         phone: {
             phoneNumber: string;
             amount: number;

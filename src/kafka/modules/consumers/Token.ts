@@ -92,16 +92,15 @@ const TransactionErrorCodeAndCause = {
 export async function getCurrentWaitTimeForRequeryEvent(retryCount: number) {
     // Time in seconds
     // const defaultValues = [10, 20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 10240, 20480, 40960, 81920, 163840, 327680, 655360, 1310720, 2621440, 5242880]
-    // const defaultValues = [120] // Default to 2mins because of buypowerng minimum wait time for requery
-    // const timesToRetry = defaultValues
-    // timesToRetry.unshift(1)
+    const defaultValues = [10, 120] // Default to 2mins because of buypowerng minimum wait time for requery
+    const timesToRetry = defaultValues
+    timesToRetry.unshift(1)
 
-    // if (retryCount >= timesToRetry.length) {
-    //     return timesToRetry[timesToRetry.length - 1]
-    // }
+    if (retryCount >= timesToRetry.length) {
+        return timesToRetry[timesToRetry.length - 1]
+    }
 
-    // return timesToRetry[retryCount]
-    return 120
+    return timesToRetry[retryCount]
 }
 
 
@@ -1006,11 +1005,12 @@ class TokenHandler extends Registry {
         // Check the timeStamp, and the delayInSeconds
         const { timeStamp, delayInSeconds } = data;
 
-        const timeInMIlliSecondsSinceInit = new Date().getTime() - new Date(timeStamp).getTime()
-        const waitTimeInMilliSeconds = parseInt(delayInSeconds.toString(), 10) * 1000
-        const timeDifference = waitTimeInMilliSeconds - timeInMIlliSecondsSinceInit
+        const currentTimeInSeconds = Math.floor(Date.now() / 1000);
+        const timeStampInSeconds = Math.floor(new Date(timeStamp).getTime() / 1000);
+        const timeInSecondsSinceInit = currentTimeInSeconds - timeStampInSeconds;
+        const timeDifference = delayInSeconds - timeInSecondsSinceInit
 
-        console.log({ timeDifference, timeStamp, currentTime: new Date(), delayInSeconds, waitTimeInMilliSeconds, timeInMIlliSecondsSinceInit })
+        console.log({ timeDifference, timeStamp, currentTime: new Date(), delayInSeconds, timeInSecondsSinceInit })
 
         if (timeDifference < 0) {
             return await VendorPublisher.publishEventForGetTransactionTokenRequestedFromVendorRetry(data.scheduledMessagePayload)
@@ -1035,11 +1035,12 @@ class TokenHandler extends Registry {
         // Check the timeStamp, and the delayInSeconds
         const { timeStamp, delayInSeconds } = data;
 
-        const timeInMIlliSecondsSinceInit = new Date().getTime() - new Date(timeStamp).getTime()
-        const waitTimeInMilliSeconds = parseInt(delayInSeconds.toString(), 10) * 1000
-        const timeDifference = waitTimeInMilliSeconds - timeInMIlliSecondsSinceInit
+        const currentTimeInSeconds = Math.floor(Date.now() / 1000);
+        const timeStampInSeconds = Math.floor(new Date(timeStamp).getTime() / 1000);
+        const timeInSecondsSinceInit = currentTimeInSeconds - timeStampInSeconds;
+        const timeDifference = delayInSeconds - timeInSecondsSinceInit
 
-        // console.log({ timeDifference, timeStamp, currentTime: new Date(), delayInSeconds, waitTimeInMilliSeconds, timeInMIlliSecondsSinceInit })
+        console.log({ timeDifference, timeStamp, currentTime: new Date(), delayInSeconds, timeInSecondsSinceInit })
 
         // Check if current time is greater than the timeStamp + delayInSeconds
         if (timeDifference < 0) {

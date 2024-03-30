@@ -12,7 +12,7 @@ router
     .get('/check/meter',MockExternalControllerAPI.validateMeterBuyPower )
     .get('/discos/status', MockExternalControllerAPI.checkDiscoUpBuyPower)
     .get('/electricity/billers' , MockExternalControllerAPI.checkDiscoUpBaxi)
-    .get('/transaction',MockExternalControllerAPI.requeryBuyPower)
+    .get('/transaction/:order_id',MockExternalControllerAPI.requeryBuyPower)
     .get('/superagent/transaction/requery',MockExternalControllerAPI.requeryBaxi)
     .get('/vend_status.php',MockExternalControllerAPI.requeryIrecharge)
     .post('/set-request/',MockExternalControllerAPI.setVendorActiveRequest)

@@ -37,7 +37,7 @@ export default class AuthController {
             throw new BadRequestError('Role not found')
         }
 
-        if (role.name === RoleEnum.SuperAdmin) {
+        if (role.name.toUpperCase() === RoleEnum.SuperAdmin.toUpperCase()) {
             throw new ForbiddenError('Unauthorized access')
         }
 
@@ -76,7 +76,7 @@ export default class AuthController {
             throw new BadRequestError('Role not found')
         }
 
-        if (role.name === RoleEnum.SuperAdmin) {
+        if (role.name.toUpperCase() === RoleEnum.SuperAdmin.toUpperCase()) {
             throw new ForbiddenError('Unauthorized access')
         }
 
@@ -114,7 +114,7 @@ export default class AuthController {
             throw new BadRequestError('Role not found')
         }
 
-        if (role.name !== RoleEnum.SuperAdmin) {
+        if (role.name.toUpperCase() !== RoleEnum.SuperAdmin.toUpperCase()) {
             throw new ForbiddenError('Unauthorized access')
         }
 
@@ -247,7 +247,7 @@ export default class AuthController {
             throw new BadRequestError('Role not found')
         }
 
-        if (role.name !== RoleEnum.SuperAdmin) {
+        if (role.name.toUpperCase() !== RoleEnum.SuperAdmin.toUpperCase()) {
             throw new ForbiddenError('Unauthorized access')
         }
 

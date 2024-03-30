@@ -99,7 +99,7 @@ export class AirtimeVendController {
         const partnerId = (req as any).key
 
         // TODO: I'm using this for now to allow the schema validation since product code hasn't been created for airtime
-        if (existingProductCodeForDisco.category !== 'AIRTIME') {
+        if (existingProductCodeForDisco.category.toUpperCase() !== 'AIRTIME') {
             throw new BadRequestError('Invalid product code for airtime')
         }
 
@@ -119,7 +119,7 @@ export class AirtimeVendController {
                 reference,
                 networkProvider: networkProvider,
                 productType: existingProductCodeForDisco.category,
-                vendorReferenceId: superAgent === 'IRECHARGE' ? generateRandonNumbers(10) : reference,
+                vendorReferenceId: superAgent.toUpperCase() === 'IRECHARGE' ? generateRandonNumbers(10) : reference,
                 transactionType: TransactionType.AIRTIME,
                 productCodeId: existingProductCodeForDisco.id,
                 previousVendors: [superAgent],
@@ -495,7 +495,7 @@ export class AirtimeVendController {
                         productCode: product.masterProductCode,
                         schemaData: {
                             bundleName: (bundleInfo as any).bundle,
-                            code: vendorName === 'IRECHARGE' ? IRECHARGEDATACODE[networkProvider] : networkProvider,
+                            code: vendorName.toUpperCase() === 'IRECHARGE' ? IRECHARGEDATACODE[networkProvider] : networkProvider,
                             datacode: bundleInfo.dataCodes[vendorName],
                         },
                         bundleCode: bundleInfo.bundleCode,
@@ -540,7 +540,7 @@ export class AirtimeVendController {
         }
 
         // Check if transaction is already completed    
-        if (transaction.status === Status.COMPLETE) {
+        if (transaction.status.toUpperCase() === Status.COMPLETE.toUpperCase()) {
             throw new BadRequestError("Transaction already completed");
         }
 

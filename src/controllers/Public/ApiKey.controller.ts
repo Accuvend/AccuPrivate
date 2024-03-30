@@ -14,11 +14,11 @@ export default class ApiController {
     static async getActiveAPIKey(req: AuthenticatedRequest, res: Response, next: NextFunction) {
         const { entity, profile } = req.user.user
 
-        if (entity.role !== 'PARTNER' && entity.role !== 'TEAMMEMBER' ) {
+        if (entity.role.toUpperCase() !== 'PARTNER' && entity.role.toUpperCase() !== 'TEAMMEMBER' ) {
             throw new ForbiddenError('Only partners or partner\'s members can access this resource')
         }
         let partner_ : PartnerProfile | null
-        if(entity.role === 'PARTNER'){
+        if(entity.role.toUpperCase() === 'PARTNER'){
             partner_ = await PartnerService.viewSinglePartnerByEmail(entity.email)
             
         }else{

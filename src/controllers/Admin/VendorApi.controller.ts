@@ -64,7 +64,7 @@ export default class VendorAdminController {
         }
         
 
-        if (meter.vendType === 'PREPAID') {            
+        if (meter.vendType.toUpperCase() === 'PREPAID') {            
             logger.info('Token from manual intervention ', { meta: { ...logMeta, requeryToken: token } });
             await TransactionService.updateSingleTransaction(transaction.id, { tokenFromRequery: token })
             powerUnit = powerUnit

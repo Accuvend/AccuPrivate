@@ -1,4 +1,5 @@
 // Import necessary modules and dependencies
+import { Op } from "sequelize";
 import ErrorCode, { ICreateErrorCode, IErrorCode } from "../models/ErrorCodes.model";
 
 // ErrorCodeService class for handling ErrorCode-related operations
@@ -56,10 +57,14 @@ export default class ErrorCodeService {
                 }
             }
 
-            console.log({ queryParms, keysInErrorCode })
+            // Modify the query so it will be case insensitive
+            const caseInsensitiveQuery = {} as Record<string, any>;
+            for (const key in queryParms) {
+                caseInsensitiveQuery[key] = { [Op.iLike]: queryParms[key] }
+            }
 
             // Find and retrieve an ErrorCode by its UUID
-            const errorCodes: ErrorCode | null = await ErrorCode.findOne({ where: queryParms });
+            const errorCodes: ErrorCode | null = await ErrorCode.findOne({ where: caseInsensitiveQuery });
             return errorCodes;
         } catch (error) {
             console.error("Error reading ErrorCodes");

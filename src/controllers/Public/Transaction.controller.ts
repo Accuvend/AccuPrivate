@@ -134,7 +134,7 @@ export default class TransactionController {
         };
 
         const response = {
-            transactions: transactions.map((transaction) => ({ ...transaction.dataValues, disco: transaction.productType == 'AIRTIME' ? undefined : transaction.disco })),
+            transactions: transactions.map((transaction) => ({ ...transaction.dataValues, disco: transaction.productType.toUpperCase() == 'AIRTIME' ? undefined : transaction.disco })),
             totalAmount,
         } as any;
 

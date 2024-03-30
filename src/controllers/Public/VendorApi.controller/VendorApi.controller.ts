@@ -168,6 +168,7 @@ class VendorTokenHandler implements Registry {
 
     public registry = {
         [TOPICS.TOKEN_RECIEVED_FROM_VENDOR]: this.handleTokenReceived.bind(this)
+        // [TOPICS.TOKEN_RECIEVED_FROM_REQUERY]: this.handleTokenReceived.bind(this),
     }
 }
 
@@ -225,7 +226,7 @@ class VendorControllerValdator {
         // if (!checKDisco && transactionRecord.superagent === 'BUYPOWERNG') throw new BadRequestError("Disco is currently down");
 
         const transactionHasCompleted =
-            transactionRecord.status === Status.COMPLETE;
+            transactionRecord.status.toUpperCase() === Status.COMPLETE.toUpperCase();
         if (transactionHasCompleted) {
             throw new BadRequestError("Transaction has been completed before");
         }
@@ -355,13 +356,13 @@ class VendorControllerValdator {
             for (const superAgent of superAgents) {
                 try {
                     console.log({ superAgent })
-                    response = superAgent === "BUYPOWERNG" ? await validateWithBuypower() :
-                        superAgent === "BAXI" ? await validateWithBaxi() : await validateWithIrecharge()
+                    response = superAgent.toUpperCase() === "BUYPOWERNG" ? await validateWithBuypower() :
+                        superAgent.toUpperCase() === "BAXI" ? await validateWithBaxi() : await validateWithIrecharge()
                     if (response instanceof Error) {
                         throw response
                     }
                     console.log({ superAgent })
-                    const token = superAgent === 'IRECHARGE' ? (response as IResponses['IRECHARGE']).access_token : undefined
+                    const token = superAgent.toUpperCase() === 'IRECHARGE' ? (response as IResponses['IRECHARGE']).access_token : undefined
                     await transaction.update({ superagent: superAgent as any, irechargeAccessToken: token })
 
                     selectedVendor = superAgent
@@ -488,7 +489,7 @@ export default class VendorController {
 
         disco = existingProductCodeForDisco.masterProductCode
 
-        if (existingProductCodeForDisco.category !== 'ELECTRICITY') {
+        if (existingProductCodeForDisco.category.toUpperCase() !== 'ELECTRICITY') {
             throw new BadRequestError('Invalid product code for electricity', errorMeta)
         }
 
@@ -590,7 +591,7 @@ export default class VendorController {
 
         // Check if disco is up
         const discoUp =
-            superagent === "BUYPOWERNG"
+            superagent.toUpperCase() === "BUYPOWERNG"
                 ? await VendorService.buyPowerCheckDiscoUp(vendorDiscoCode).catch((e) => e)
                 : await VendorService.baxiCheckDiscoUp(vendorDiscoCode).catch((e) => e);
 
@@ -681,11 +682,11 @@ export default class VendorController {
 
         const amount = transaction.amount
 
-        if (transaction.status === Status.COMPLETE as any) {
+        if (transaction.status.toUpperCase() === Status.COMPLETE.toUpperCase() as any) {
             throw new BadRequestError("Transaction already completed");
         }
 
-        if (transaction.status !== Status.PENDING) {
+        if (transaction.status.toUpperCase() !== Status.PENDING.toUpperCase()) {
             throw new BadRequestError("Transaction not in pending state");
         }
 
@@ -889,7 +890,7 @@ export default class VendorController {
             await TransactionService.viewSingleTransactionByBankRefID(bankRefId);
         if (!transaction) throw new NotFoundError("Transaction not found");
 
-        if (transaction.transactionType === TransactionType.AIRTIME) {
+        if (transaction.transactionType.toUpperCase() === TransactionType.AIRTIME.toUpperCase()) {
             return await AirtimeVendController.confirmPayment(req, res, next)
         }
 

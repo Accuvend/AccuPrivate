@@ -92,11 +92,9 @@ const TransactionErrorCodeAndCause = {
 export async function getCurrentWaitTimeForRequeryEvent(retryCount: number) {
     // Time in seconds
     // const defaultValues = [10, 20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 10240, 20480, 40960, 81920, 163840, 327680, 655360, 1310720, 2621440, 5242880]
-    const defaultValues = [0, 120] // Default to 2mins because of buypowerng minimum wait time for requery
+    const defaultValues = [10, 120] // Default to 2mins because of buypowerng minimum wait time for requery
     const timesToRetry = defaultValues
     timesToRetry.unshift(1)
-
-    return 10
 
     if (retryCount >= timesToRetry.length) {
         return timesToRetry[timesToRetry.length - 1]
@@ -537,7 +535,7 @@ class ResponseValidationUtil {
         const dbQueryParams = { request: requestType, vendor } as Record<string, string | number>
 
         const propertiesToConsider: [string, string][] = [] // [[path, refCode]]
-        
+
         // Get the values to consider
         Array.from(responsePath).forEach(path => {
             propertiesToConsider.push([path.path, path.accuvendRefCode])
@@ -738,6 +736,7 @@ class TokenHandler extends Registry {
                 transactionId: transaction.id
             })
 
+
             switch (response.action) {
                 case -1:
                     logger.error('Transaction condition pending - Requery', logMeta)
@@ -770,7 +769,35 @@ class TokenHandler extends Registry {
                                 tokenFromVend: response.token
                             }
                         })
+
+                        const powerUnit = await transaction.$get('powerUnit')
+                        if (!powerUnit) throw new CustomError('Power unit not found')
+
+                        await TransactionService.updateSingleTransaction(data.transactionId, {
+                            powerUnitId: powerUnit?.id,
+                        });
+                        await transactionEventService.addTokenReceivedEvent(response.token ?? '');
+                        await VendorPublisher.publishEventForTokenReceivedFromVendor({
+                            transactionId: transaction!.id,
+                            user: {
+                                name: user.name as string,
+                                email: user.email,
+                                address: user.address,
+                                phoneNumber: user.phoneNumber,
+                            },
+                            partner: {
+                                email: partner.email,
+                            },
+                            meter: {
+                                id: meter.id,
+                                meterNumber: meter.meterNumber,
+                                disco: transaction!.disco,
+                                vendType: meter.vendType,
+                                token: response.token ?? '',
+                            },
+                        });
                     }
+
 
                     await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor({
                         eventData: { ...eventMessage, error: { ...eventMessage.error, cause: TransactionErrorCause.UNEXPECTED_ERROR } },
@@ -952,8 +979,8 @@ class TokenHandler extends Registry {
                         status: Status.COMPLETE,
                         powerUnitId: powerUnit?.id,
                     });
-                    await transactionEventService.addTokenReceivedEvent(tokenInResponse ?? '');
-                    return await VendorPublisher.publishEventForTokenReceivedFromVendor({
+                    await transactionEventService.addTokenReceivedFromRequery(tokenInResponse ?? '');
+                    return await VendorPublisher.publishEventForTokenReceivedFromRequery({
                         transactionId: transaction!.id,
                         user: {
                             name: user.name as string,
@@ -1007,23 +1034,27 @@ class TokenHandler extends Registry {
         // Check the timeStamp, and the delayInSeconds
         const { timeStamp, delayInSeconds } = data;
 
-        const timeInMIlliSecondsSinceInit = new Date().getTime() - new Date(timeStamp).getTime()
-        const waitTimeInMilliSeconds = parseInt(delayInSeconds.toString(), 10) * 1000
-        const timeDifference = waitTimeInMilliSeconds - timeInMIlliSecondsSinceInit
+        const currentTimeInSeconds = Math.floor(Date.now() / 1000);
+        const timeStampInSeconds = Math.floor(new Date(timeStamp).getTime() / 1000);
+        const timeInSecondsSinceInit = currentTimeInSeconds - timeStampInSeconds;
+        const timeDifference = delayInSeconds - timeInSecondsSinceInit
 
-        console.log({ timeDifference, timeStamp, currentTime: new Date(), delayInSeconds, waitTimeInMilliSeconds, timeInMIlliSecondsSinceInit })
+        console.log({ timeDifference, timeStamp, currentTime: new Date(), delayInSeconds, timeInSecondsSinceInit })
 
-        // Check if current time is greater than the timeStamp + delayInSeconds
-        if (timeDifference < 0) {
+        if (timeDifference <= 0) {
             return await VendorPublisher.publishEventForGetTransactionTokenRequestedFromVendorRetry(data.scheduledMessagePayload)
         }
 
-        logger.info("Rescheduling requery for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
+        // Change error cause to RESCHEDULED_BEFORE_WAIT_TIME
+        data.scheduledMessagePayload.error.cause = TransactionErrorCause.RESCHEDULED_BEFORE_WAIT_TIME
+
+        // logger.info("Rescheduling requery for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
         // Else, schedule a new event to requery transaction from vendor
         return await VendorPublisher.publishEventToScheduleRequery({
             scheduledMessagePayload: data.scheduledMessagePayload,
             timeStamp: data.timeStamp,
             delayInSeconds: data.delayInSeconds,
+            log: 0
         })
     }
 
@@ -1033,14 +1064,15 @@ class TokenHandler extends Registry {
         // Check the timeStamp, and the delayInSeconds
         const { timeStamp, delayInSeconds } = data;
 
-        const timeInMIlliSecondsSinceInit = new Date().getTime() - new Date(timeStamp).getTime()
-        const waitTimeInMilliSeconds = parseInt(delayInSeconds.toString(), 10) * 1000
-        const timeDifference = waitTimeInMilliSeconds - timeInMIlliSecondsSinceInit
+        const currentTimeInSeconds = Math.floor(Date.now() / 1000);
+        const timeStampInSeconds = Math.floor(new Date(timeStamp).getTime() / 1000);
+        const timeInSecondsSinceInit = currentTimeInSeconds - timeStampInSeconds;
+        const timeDifference = delayInSeconds - timeInSecondsSinceInit
 
-        // console.log({ timeDifference, timeStamp, currentTime: new Date(), delayInSeconds, waitTimeInMilliSeconds, timeInMIlliSecondsSinceInit })
+        console.log({ timeDifference, timeStamp, currentTime: new Date(), delayInSeconds, timeInSecondsSinceInit })
 
         // Check if current time is greater than the timeStamp + delayInSeconds
-        if (timeDifference < 0) {
+        if (timeDifference <= 0) {
             const existingTransaction = await TransactionService.viewSingleTransaction(data.scheduledMessagePayload.transactionId)
             if (!existingTransaction) {
                 throw new CustomError('Transaction not found')
@@ -1083,12 +1115,13 @@ class TokenHandler extends Registry {
             return await VendorPublisher.publishEventForInitiatedPowerPurchase(data.scheduledMessagePayload)
         }
 
-        logger.info("Rescheduling retry for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
+        // logger.info("Rescheduling retry for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
         // Else, schedule a new event to requery transaction from vendor
         return await VendorPublisher.publishEventToScheduleRetry({
             scheduledMessagePayload: data.scheduledMessagePayload,
             timeStamp: data.timeStamp,
             delayInSeconds: data.delayInSeconds,
+            log: 0
         })
     }
 

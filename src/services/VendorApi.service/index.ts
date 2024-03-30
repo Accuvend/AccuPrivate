@@ -468,6 +468,8 @@ export default class VendorService {
                 agentReference: reference,
             });
 
+            console.log({ responseFromBaxi: response })
+
             console.log({
                 info: "Vend response from baxi",
                 data: response.data,
@@ -517,6 +519,7 @@ export default class VendorService {
             >(`/superagent/transaction/requery?agentReference=${reference}`);
 
             const responseData = response.data;
+            console.log({ responseFromBaxi: response })
 
             console.log({
                 info: "Requery response from baxi",
@@ -782,6 +785,7 @@ export default class VendorService {
             logger.info("Requery response from buypower", {
                 meta: { responseData: response.data, transactionId },
             });
+
             const successResponse =
                 response.data as _RequeryBuypowerSuccessResponse;
             console.log({

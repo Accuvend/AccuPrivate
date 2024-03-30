@@ -518,7 +518,7 @@ export default class AuthController {
         }
 
         const profile = await EntityService.getAssociatedProfile(entity)
-        if (!profile && req.user.user.entity.role !== RoleEnum.EndUser) {
+        if (!profile && req.user.user.entity.role.toUpperCase() !== RoleEnum.EndUser.toUpperCase()) {
             throw new InternalServerError('Entity not found for authenticated user')
         }
 
@@ -551,7 +551,7 @@ export default class AuthController {
             throw new InternalServerError('Entity record not found for Authenticated user')
         }
 
-        const requestMadeByPartner = req.user.user.entity.role === RoleEnum.Partner
+        const requestMadeByPartner = req.user.user.entity.role.toUpperCase() === RoleEnum.Partner.toUpperCase()
         if (requestMadeByPartner && entityId && entity?.id !== entityId) {
             const userEntity = await EntityService.viewSingleEntity(entityId)
             if (!userEntity) {
@@ -572,7 +572,7 @@ export default class AuthController {
 
         await EntityService.updateEntity(entity, { requireOTPOnLogin: requireOtp })
 
-        if (entity.role.name === RoleEnum.Partner) {
+        if (entity.role.name.toUpperCase() === RoleEnum.Partner.toUpperCase()) {
             // Update the same for all teammembers under partner
             const partner = await entity.$get('partnerProfile')
             if (!partner) {
@@ -628,11 +628,11 @@ export default class AuthController {
 
         const partner = await entity.$get('partnerProfile')
         const role = entity.role.name
-        if (partner === null && role === 'PARTNER') {
+        if (partner === null && role.toUpperCase() === 'PARTNER') {
             throw new InternalServerError('Partner not found')
         }
 
-        const returnData = role === 'PARTNER'
+        const returnData = role.toUpperCase() === 'PARTNER'
             ? { entity: entity.dataValues, partner: ResponseTrimmer.trimPartner({ ...partner!.dataValues, entity }) }
             : { entity: entity.dataValues }
 

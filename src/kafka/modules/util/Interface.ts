@@ -51,7 +51,7 @@ export interface VendorRetryRecord {
     retryCount: number;
 }
 
-export interface PublisherEventAndParameters extends Record<TOPICS, { log?: 1 | 0, [k in typeof TOPICS]: PublisherEventAndParameters[k]  }> {
+export interface PublisherEventAndParameters extends Record<TOPICS, { log?: 1 | 0  } & any> {
     [TOPICS.SCHEDULE_REQUERY_FOR_TRANSACTION]: {
         log?: 1 | 0,
         timeStamp: string,

@@ -770,9 +770,34 @@ class TokenHandler extends Registry {
                             }
                         })
 
-                        const powerUnit = await transaction.$get('powerUnit')
-                        if (!powerUnit) throw new CustomError('Power unit not found')
+                        logger.info('Transaction condition met - Successful', logMeta)
+                        const _product = await ProductService.viewSingleProduct(transaction.productCodeId)
+                        if (!_product) throw new CustomError('Product not found')
 
+                        const discoLogo = DISCO_LOGO[_product.productName as keyof typeof DISCO_LOGO] ?? LOGO_URL
+                        let powerUnit =
+                            await PowerUnitService.viewSinglePowerUnitByTransactionId(
+                                data.transactionId,
+                            );
+
+                        powerUnit = powerUnit
+                            ? await PowerUnitService.updateSinglePowerUnit(powerUnit.id, {
+                                token: response.token,
+                                transactionId: data.transactionId,
+                            })
+                            : await PowerUnitService.addPowerUnit({
+                                id: uuidv4(),
+                                transactionId: data.transactionId,
+                                disco: data.meter.disco,
+                                discoLogo,
+                                amount: transaction.amount,
+                                meterId: data.meter.id,
+                                superagent: data.superAgent as ITransaction['superagent'],
+                                token: response.token,
+                                tokenNumber: 0,
+                                tokenUnits: "0",
+                                address: transaction.meter.address,
+                            });
                         await TransactionService.updateSingleTransaction(data.transactionId, {
                             powerUnitId: powerUnit?.id,
                         });

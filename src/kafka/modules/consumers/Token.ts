@@ -794,12 +794,13 @@ class TokenHandler extends Registry {
                                 meterId: data.meter.id,
                                 superagent: data.superAgent as ITransaction['superagent'],
                                 token: response.token,
+                                tokenFromVend: response.token,
                                 tokenNumber: 0,
                                 tokenUnits: "0",
                                 address: transaction.meter.address,
                             });
                         await TransactionService.updateSingleTransaction(data.transactionId, {
-                            powerUnitId: powerUnit?.id,
+                            powerUnitId: powerUnit?.id, tokenFromVend: response.token
                         });
                         await transactionEventService.addTokenReceivedEvent(response.token ?? '');
                         await VendorPublisher.publishEventForTokenReceivedFromVendor({

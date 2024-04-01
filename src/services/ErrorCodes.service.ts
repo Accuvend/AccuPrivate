@@ -60,7 +60,12 @@ export default class ErrorCodeService {
             // Modify the query so it will be case insensitive
             const caseInsensitiveQuery = {} as Record<string, any>;
             for (const key in queryParms) {
-                caseInsensitiveQuery[key] = { [Op.iLike]: queryParms[key] }
+                // Check if value is boolean then don't use the case insensitive query
+                if (typeof queryParms[key] === 'boolean') {
+                    caseInsensitiveQuery[key] = queryParms[key]
+                } else {
+                    caseInsensitiveQuery[key] = { [Op.iLike]: queryParms[key] }
+                }
             }
 
             // Find and retrieve an ErrorCode by its UUID

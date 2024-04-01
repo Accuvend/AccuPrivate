@@ -61,10 +61,10 @@ export default class ErrorCodeService {
             const caseInsensitiveQuery = {} as Record<string, any>;
             for (const key in queryParms) {
                 // Check if value is boolean then don't use the case insensitive query
-                if (typeof queryParms[key] === 'boolean') {
-                    caseInsensitiveQuery[key] = queryParms[key]
-                } else {
+                if (typeof queryParms[key] == 'string') {
                     caseInsensitiveQuery[key] = { [Op.iLike]: queryParms[key] }
+                } else {
+                    caseInsensitiveQuery[key] = queryParms[key]
                 }
             }
 

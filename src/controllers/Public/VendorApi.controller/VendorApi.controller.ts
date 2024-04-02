@@ -811,7 +811,9 @@ export default class VendorController {
                         return
                     }
 
-                    await transactionEventService.addTokenSentToPartnerEvent();
+                    const existingEvent = await EventService.viewSingleEventByTransactionIdAndType(transactionId, TOPICS.TOKEN_SENT_TO_PARTNER)
+                    if (!existingEvent) await transactionEventService.addTokenSentToPartnerEvent();
+
                     return
                 }, 60000)
 
@@ -920,6 +922,101 @@ export default class VendorController {
         res.status(200).json({
             status: "success",
             message: "Payment confirmed successfully",
+            data: {
+                transaction: {
+                    transactionId: transaction.id,
+                    status: transaction.status,
+                },
+                meter: {
+                    disco: meter.disco,
+                    number: meter.meterNumber,
+                    address: meter.address,
+                    phone: meter.userId,
+                    vendType: meter.vendType,
+                    name: meter.userId,
+                },
+            },
+        });
+    }
+
+    static async initManualRequeryTransaction(
+        req: AuthenticatedRequest,
+        res: Response,
+        next: NextFunction
+    ) {
+        const { transactionId } = req.body
+
+        if (!transactionId) {
+            throw new BadRequestError('Transaction ID is required')
+        }
+
+        const transaction = await TransactionService.viewSingleTransaction(transactionId)
+        if (!transaction) {
+            throw new NotFoundError('Transaction not found')
+        }
+
+        if (transaction.status != Status.INPROGRESS) {
+            throw new BadRequestError('Transaction condition not met')
+        }
+
+        const logMeta = { meta: { transactionId } }
+
+        logger.info('Transaction condition met - Successful', logMeta)
+        const _product = await ProductService.viewSingleProduct(transaction.productCodeId)
+        if (!_product) throw new InternalServerError('Product not found')
+
+        const discoLogo = DISCO_LOGO[_product.productName as keyof typeof DISCO_LOGO] ?? LOGO_URL
+        let tokenInResponse: string | null = null
+        const meter = await transaction.$get('meter')
+        if (!meter) {
+            throw new InternalServerError('Meter not found')
+        }
+
+        const user = await transaction.$get('user')
+        if (!user) {
+            throw new InternalServerError('User not found')
+        }
+
+        const partner = await transaction.$get('partner')
+        if (!partner) {
+            throw new InternalServerError('Partner not found')
+        }
+
+        const transactionEventService = new TransactionEventService(
+            transaction,
+            meter,
+            transaction.superagent,
+            partner.email
+        );
+        await transactionEventService.addTokenReceivedEvent(tokenInResponse ?? '');
+        logger.info('Initiated manual requery', {
+            meta: {
+                transactionId,
+                admin: req.user.user,
+            }
+        })
+        await VendorPublisher.publishEventForGetTransactionTokenRequestedFromVendorRetry({
+            transactionId: transaction.id,
+            meter: {
+                id: meter.id,
+                meterNumber: meter.meterNumber,
+                disco: transaction!.disco,
+                vendType: meter.vendType,
+            },
+            error: {
+                cause: TransactionErrorCause.MANUAL_REQUERY_TRIGGERED,
+                code: 500,
+            },
+            retryCount: 1,
+            superAgent: transaction.superagent,
+            timeStamp: new Date(),
+            vendorRetryRecord: { ...transaction.retryRecord, retryCount: 1 },
+            waitTime: 0,
+        });
+
+        res.status(200).json({
+            status: "success",
+            message: "Manual requery initiated successfully",
             data: {
                 transaction: {
                     transactionId: transaction.id,

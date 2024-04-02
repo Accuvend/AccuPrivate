@@ -134,7 +134,7 @@ export default class TransactionController {
         };
 
         const response = {
-            transactions: transactions.map((transaction) => ({ ...transaction.dataValues, disco: transaction.productType?.toUpperCase() == 'AIRTIME' ? undefined : transaction.disco })),
+            transactions: transactions.map((transaction) => ({ ...transaction.dataValues, disco: transaction?.productType?.toUpperCase() == 'AIRTIME' ? undefined : transaction.disco })),
             totalAmount,
         } as any;
 
@@ -162,7 +162,13 @@ export default class TransactionController {
         } = req.query as any as getTransactionsRequestBody;
 
         const query = { where: {} } as any;
-
+        // query.where[Op.and] = [
+        //     {amount: ""},
+        //     {amount: " "}
+        // ]
+        query.where.amount = {
+            [Op.notIn]: ["", " "],  
+        }
         if (status) query.where.status = status.toUpperCase();
         if (startDate && endDate)
             query.where.transactionTimestamp = {

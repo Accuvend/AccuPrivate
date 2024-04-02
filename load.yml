@@ -27,7 +27,7 @@ scenarios:
           capture:
             - json: "$.data.transaction.id"
               as: "transactionId"
-      - think: 2
+      # - think: 2
 
       - get:
           url: "/token/?transactionId={{ transactionId }}&amount=1500&bankComment=test%20comment&vendType=PREPAID&bankRefId=ASSBK0000{{ transactionId }}"

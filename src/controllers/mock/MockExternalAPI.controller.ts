@@ -7,14 +7,48 @@ import MockApiService from "../../services/MockApiData.service";
 
 export default class MockExternalControllerAPI {
 
-     // Maps data to the response object
+    /**
+     * Maps data to the response object.
+     * @param mockEndpointData MockEndpointData object containing response data.
+     * @param response Express Response object.
+     * @returns Express Response object with mapped data.
+     */
     static mapDataToResponse(mockEndpointData: MockEndpointData , response: Response):Response<any, Record<string, any>>{
-        return response.status(mockEndpointData.httpCode).json(mockEndpointData.vendorResponse)
+        let code: number = 500
+        if(mockEndpointData.httpCode) code = mockEndpointData.httpCode
+        return response.status(code).json(mockEndpointData.vendorResponse)
+    }
+
+
+    /**
+     * Sets Vendor active Request response
+     * @param req Express Request object.
+     * @param res Express Response object.
+     * @param next Express NextFunction object.
+     */
+    static async setVendorActiveRequest(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { id, vendor, endpoint } = req.body;
+            console.log(id, vendor, endpoint )
+            await MockApiService.setMockEndpointActive(id, vendor, endpoint);
+            return res.status(200).json({
+                message : 'updated message to default response'
+            })
+        } catch (err) {
+            // Catch and handle errors
+            console.log(err);
+            return res.status(500).json({ message: 'Server Error' });
+        }
     }
 
     
 
-    // Validates meter for Irecharge
+    /**
+     * Validates meter for Irecharge vendor.
+     * @param req Express Request object.
+     * @param res Express Response object.
+     * @param next Express NextFunction object.
+     */
     static async validateMeterIrecharge(req: Request, res: Response, next: NextFunction){
         try{
             // Retrieve mock data for meter validation from the MockApiService
@@ -41,7 +75,12 @@ export default class MockExternalControllerAPI {
             })
         }
     }
-    // Validates meter for Buypower
+     /**
+     * Validates meter for Buypower
+     * @param req Express Request object.
+     * @param res Express Response object.
+     * @param next Express NextFunction object.
+     */
     static async validateMeterBuyPower(req: Request, res: Response, next: NextFunction){
         try{
             // Retrieve mock data for meter validation from the MockApiService
@@ -69,7 +108,12 @@ export default class MockExternalControllerAPI {
         }
     }
 
-    // Validates meter for Baxi 
+     /**
+     * Validates meter for Baxi 
+     * @param req Express Request object.
+     * @param res Express Response object.
+     * @param next Express NextFunction object.
+     */
     static async validateMeterBaxi(req: Request, res: Response, next: NextFunction){
         try{
             // Retrieve mock data for meter validation from the MockApiService
@@ -97,7 +141,12 @@ export default class MockExternalControllerAPI {
         }
     }
 
-    // Validates meter for Irecharge
+     /**
+     * Vend Power for Irecharge
+     * @param req Express Request object.
+     * @param res Express Response object.
+     * @param next Express NextFunction object.
+     */
     static async vendPowerIrecharge(req: Request, res: Response, next: NextFunction){
         try{
             // Retrieve mock data for meter validation from the MockApiService
@@ -124,7 +173,12 @@ export default class MockExternalControllerAPI {
             })
         }
     }
-    // Validates meter for BuyPower
+     /**
+     * Vend Power for BuyPower
+     * @param req Express Request object.
+     * @param res Express Response object.
+     * @param next Express NextFunction object.
+     */
     static async vendPowerBuyPower(req: Request, res: Response, next: NextFunction){
         try{
             // Retrieve mock data for meter validation from the MockApiService
@@ -151,7 +205,12 @@ export default class MockExternalControllerAPI {
             })
         }
     }
-    // Validates meter for Baxi
+     /**
+     * Vend Power for Baxi
+     * @param req Express Request object.
+     * @param res Express Response object.
+     * @param next Express NextFunction object.
+     */
     static async vendPowerBaxi(req: Request, res: Response, next: NextFunction){
         try{
             // Retrieve mock data for meter validation from the MockApiService
@@ -180,7 +239,12 @@ export default class MockExternalControllerAPI {
     }
 
 
-     // Requery for Irecharge
+     /**
+     *Requery for Irecharge
+      * @param req Express Request object.
+     * @param res Express Response object.
+     * @param next Express NextFunction object.
+     */
      static async requeryIrecharge(req: Request, res: Response, next: NextFunction){
         try{
             // Retrieve mock data for meter validation from the MockApiService
@@ -207,7 +271,12 @@ export default class MockExternalControllerAPI {
             })
         }
     }
-    // Requery for BuyPower
+     /**
+     * Requery for BuyPower
+     * @param req Express Request object.
+     * @param res Express Response object.
+     * @param next Express NextFunction object.
+     */
     static async requeryBuyPower(req: Request, res: Response, next: NextFunction){
         try{
             // Retrieve mock data for meter validation from the MockApiService
@@ -234,7 +303,12 @@ export default class MockExternalControllerAPI {
             })
         }
     }
-    // Requery for Baxi
+     /**
+     * Requery for Baxi
+     * @param req Express Request object.
+     * @param res Express Response object.
+     * @param next Express NextFunction object.
+     */
     static async requeryBaxi(req: Request, res: Response, next: NextFunction){
         try{
             // Retrieve mock data for meter validation from the MockApiService
@@ -263,7 +337,12 @@ export default class MockExternalControllerAPI {
     }
 
 
-    // Check Disco up for BuyPower
+     /**
+     * Check Disco up for BuyPower
+     * @param req Express Request object.
+     * @param res Express Response object.
+     * @param next Express NextFunction object.
+     */
     static async checkDiscoUpBuyPower(req: Request, res: Response, next: NextFunction){
         try{
             // Retrieve mock data for meter validation from the MockApiService
@@ -290,7 +369,12 @@ export default class MockExternalControllerAPI {
             })
         }
     }
-    // Check Disco up for Baxi
+     /**
+     * Check Disco up for Baxi
+     * @param req Express Request object.
+     * @param res Express Response object.
+     * @param next Express NextFunction object.
+     */
     static async checkDiscoUpBaxi(req: Request, res: Response, next: NextFunction){
         try{
             // Retrieve mock data for meter validation from the MockApiService

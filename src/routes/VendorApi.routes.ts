@@ -26,9 +26,7 @@ router
     .post('/validate/meter/mock', validateApiKey, VendorController.validateMeterMock)
     .get('/data/bundles', validateApiKey, DataVendController.getDataBundles)
 
-    // .post('/intervene', basicAuth('access'), RBACMiddelware.validateRole([RoleEnum.SuperAdmin, RoleEnum.Admin]), AuthenticatedController(VendorController.initManualIntervention))
-    .post('/intervene', basicAuth('access'), AuthenticatedController(VendorAdminController.initManualIntervention))
-
-
+    .post('/intervene', basicAuth('access'), RBACMiddelware.validateRole([RoleEnum.SuperAdmin, RoleEnum.Admin]), AuthenticatedController(VendorAdminController.initManualIntervention))
+    .post('/requery', basicAuth('access'), RBACMiddelware.validateRole([RoleEnum.SuperAdmin, RoleEnum.Admin, RoleEnum.Partner]), AuthenticatedController(VendorController.initManualRequeryTransaction))
 
 export default router

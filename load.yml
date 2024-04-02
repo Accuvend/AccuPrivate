@@ -1,11 +1,13 @@
 config:
   target: "http://localhost:3000/api/v0/vendor"
+  http: 
+    timeout: 30000
 
   phases:
     - duration: 1
-      arrivalCount: 1
+      arrivalCount: 25
       name: "Warm up"
-  
+
 scenarios:
   - flow:
       - post:
@@ -13,22 +15,22 @@ scenarios:
           json:
             meterNumber: "12345678910"
             venderType: "ELECTRICITY"
-            disco: "ECABEPS"
+            disco: "ABUJA"
             partnerName: "ZENITH BANK"
-            phoneNumber: "084567834568"
-            email: "neilkwdfghj4@test.com"
+            phoneNumber: "0801234517"
+            email: "utoprids1@e.com"
             vendType: "PREPAID"
+            amount: "1000"
           headers:
-            x-api-key: "d5eea9197c60cac50f8c1f302caa788372937b272c4d821c7be2cc07e968e1e6155d6403a1cab6ae34a0413c218807559856cfcea905354cab8dd215cdb8e481"
-            x-api-secret: "d6dde56cf6e6eb678af6525f3da0ddeb5071d15936459c96e9452b69c2d118e112b8243ac0ee0116b1c225201fc1cf49"
+            x-api-key: "10802a9581cec34578db982006d2b31643a46b3a8987fbe6e270c3412cad6a439791357149f7d5cd265229ccf11985123ea96430165e794227e07d02c22e5ef4"
+            x-api-secret: "1f34345d612b18346b907a900a96be7ff1c3e0adf5b22a8b02c625d4e0601e265552fefd9f3eb601489cc90c62c27de2"
           capture:
-            - json: "$.data.transaction.transactionId"
+            - json: "$.data.transaction.id"
               as: "transactionId"
-      - think: 2
+      # - think: 2
 
       - get:
-          url: "/token/?transactionId={{ transactionId }}&amount=1500&bankComment=test%20comment&vendType=PREPAID"
+          url: "/token/?transactionId={{ transactionId }}&amount=1500&bankComment=test%20comment&vendType=PREPAID&bankRefId=GRI001-{{ transactionId }}"
           headers:
-            x-api-key: "d5eea9197c60cac50f8c1f302caa788372937b272c4d821c7be2cc07e968e1e6155d6403a1cab6ae34a0413c218807559856cfcea905354cab8dd215cdb8e481"
-            x-api-secret: "d6dde56cf6e6eb678af6525f3da0ddeb5071d15936459c96e9452b69c2d118e112b8243ac0ee0116b1c225201fc1cf49"
-       
+            x-api-key: "10802a9581cec34578db982006d2b31643a46b3a8987fbe6e270c3412cad6a439791357149f7d5cd265229ccf11985123ea96430165e794227e07d02c22e5ef4"
+            x-api-secret: "1f34345d612b18346b907a900a96be7ff1c3e0adf5b22a8b02c625d4e0601e265552fefd9f3eb601489cc90c62c27de2"

@@ -93,10 +93,10 @@ export default class MessageProcessorFactory {
 
                 shouldLogToDB && logger.info('Message processed successfully')
                 eachBatchPayload.resolveOffset(message.offset)  // Commit offset
+                await eachBatchPayload.commitOffsetsIfNecessary()
+                await eachBatchPayload.heartbeat()
             }
 
-            await eachBatchPayload.commitOffsetsIfNecessary()
-            await eachBatchPayload.heartbeat()
 
             shouldLogToDB && logger.info('Committing offsets...')
         } catch (error) {

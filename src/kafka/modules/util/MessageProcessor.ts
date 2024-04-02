@@ -36,19 +36,31 @@ export default class MessageProcessorFactory {
         const { topic, partition, message } = messagePayload;
         const prefix = `[${topic}][${partition} | ${message.offset}] / ${message.timestamp}`;
 
-        const data: CustomMessageFormat = {
-            topic,
-            partition,
-            offset: message.offset,
-            value: JSON.parse(message.value?.toString() ?? '{}') as PublisherEventAndParameters[keyof PublisherEventAndParameters],
-            timestamp: message.timestamp,
-            headers: message.headers,
+        try {
+            const data: CustomMessageFormat = {
+                topic,
+                partition,
+                offset: message.offset,
+                value: JSON.parse(message.value?.toString() ?? '{}') as PublisherEventAndParameters[keyof PublisherEventAndParameters],
+                timestamp: message.timestamp,
+                headers: message.headers,
+            }
+            const shouldLogToDB = data.value.log == undefined ? 1 : data.value.log
+
+            shouldLogToDB && logger.info(`Received message => [${this.consumerName}]: ` + prefix)
+
+            await this.processMessage(data)
+
+            // Commit offset
+            messagePayload.heartbeat()
+        } catch (error) {
+            console.log(error)
+            if (error instanceof CustomError) {
+                logger.error(error.message, error.meta)
+            } else {
+                logger.error((error as Error).message)
+            }
         }
-        const shouldLogToDB = data.value.log == undefined ? 1 : data.value.log
-       
-        shouldLogToDB && logger.info(`Received message => [${this.consumerName}]: ` + prefix)
-       
-        return await this.processMessage(data)
     }
 
     public async processEachBatch(eachBatchPayload: EachBatchPayload): Promise<void> {
@@ -87,7 +99,6 @@ export default class MessageProcessorFactory {
             await eachBatchPayload.heartbeat()
 
             shouldLogToDB && logger.info('Committing offsets...')
-
         } catch (error) {
             console.log(error)
             if (error instanceof CustomError) {

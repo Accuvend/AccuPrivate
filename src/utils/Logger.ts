@@ -42,11 +42,15 @@ const logFormat = printf((info) => {
         message = util.inspect(message, { depth: null });
     }
 
-    return info.meta
-        ? `${info.timestamp} [${
-              info.level
-          }][${info.meta?.logType ?? "default"}]: ${message} | meta: ${JSON.stringify(info.meta)}`
-        : `${info.timestamp} [${info.level}]: ${message}`;
+    try {
+        return info.meta
+            ? `${info.timestamp} [${info.level
+            }][${info.meta?.logType ?? "default"}]: ${message} | meta: ${JSON.stringify(info.meta)}`
+            : `${info.timestamp} [${info.level}]: ${message}`;
+    } catch (error) {
+        // Check for circular references
+        return `${info.timestamp} [${info.level}]: ${message} | meta: "${info.meta}"`;
+    }
 });
 
 const enumerateErrorFormat = format((info) => {
@@ -87,33 +91,33 @@ const fileTransports = [
 const transports =
     NODE_ENV === "development"
         ? [
-              new winston.transports.Console({
-                  level: "info",
-                  format: combine(
-                      timestamp(),
-                      colorize({
-                          colors: { info: "cyan", error: "red" },
-                      }),
-                      logFormat,
-                      enumerateErrorFormat(),
-                  ),
-              }),
-              ...fileTransports,
-              new YourCustomPostgresTransport(), // Replace this with your custom transport
-          ]
+            new winston.transports.Console({
+                level: "info",
+                format: combine(
+                    timestamp(),
+                    colorize({
+                        colors: { info: "cyan", error: "red" },
+                    }),
+                    logFormat,
+                    enumerateErrorFormat(),
+                ),
+            }),
+            ...fileTransports,
+            new YourCustomPostgresTransport(), // Replace this with your custom transport
+        ]
         : [
-              new winston.transports.Console({
-                  level: "info",
-                  format: combine(
-                      timestamp(),
-                      colorize({
-                          colors: { info: "cyan", error: "red" },
-                      }),
-                      logFormat,
-                      enumerateErrorFormat(),
-                  ),
-              }),
-          ];
+            new winston.transports.Console({
+                level: "info",
+                format: combine(
+                    timestamp(),
+                    colorize({
+                        colors: { info: "cyan", error: "red" },
+                    }),
+                    logFormat,
+                    enumerateErrorFormat(),
+                ),
+            }),
+        ];
 
 const productionLogger = winston.createLogger({
     level: "info",

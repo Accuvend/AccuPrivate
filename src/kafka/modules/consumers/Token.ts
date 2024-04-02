@@ -150,8 +150,8 @@ export class TokenHandlerUtil {
          * 501 - Maintenance error
          * 500 - Unexpected CustomError
          */
-        transactionTimedOutFromBuypower && (await eventService.addTokenRequestTimedOutEvent());
-        !tokenInResponse && (await eventService.addTokenRequestFailedNotificationToPartnerEvent());
+        // transactionTimedOutFromBuypower && (await eventService.addTokenRequestTimedOutEvent());
+        // !tokenInResponse && (await eventService.addTokenRequestFailedNotificationToPartnerEvent());
 
         const _eventMessage = {
             ...eventData,
@@ -164,7 +164,7 @@ export class TokenHandlerUtil {
         };
 
         logger.info(
-            `Retrying transaction with id ${eventData.transactionId} from vendor`,
+            `Requerying transaction with id ${eventData.transactionId} from vendor`,
             {
                 meta: { transactionId: eventData.transactionId }
             });
@@ -194,7 +194,7 @@ export class TokenHandlerUtil {
             eventData.meter,
             superAgent,
             partner.email
-        ).addScheduleRetryEvent({
+        ).addScheduleRequeryEvent({
             timeStamp: new Date().toString(), waitTime: eventMetaData.waitTime
         })
 
@@ -311,6 +311,7 @@ export class TokenHandlerUtil {
 
         logger.info('Scheduled retry event', meta)
 
+        await TransactionService.updateSingleTransaction(transaction.id, { retryRecord, reference: newTransactionReference })
         await VendorPublisher.publishEventToScheduleRetry({
             scheduledMessagePayload: {
                 meter: meter,
@@ -531,6 +532,7 @@ class ResponseValidationUtil {
             return { action: -1, vendType: vendType }
         }
 
+        console.log({ responsePath: responsePath.map(res => res.dataValues) })
         // Create map of refCode and values of responseObject[path]  -- (path will be gotten from responsePath.path values)
         const dbQueryParams = { request: requestType, vendor } as Record<string, string | number>
 
@@ -736,6 +738,7 @@ class TokenHandler extends Registry {
                 transactionId: transaction.id
             })
 
+            console.log({ response })
 
             switch (response.action) {
                 case -1:
@@ -919,7 +922,7 @@ class TokenHandler extends Registry {
             const response = await ResponseValidationUtil.validateTransactionCondition({
                 requestType: 'REQUERY',
                 vendor: vendor.name,
-                httpCode: requeryResult.httpStatusCode,
+                httpCode: requeryResult instanceof AxiosError ? requeryResult.status : requeryResult.httpStatusCode,
                 responseObject: requeryResult,
                 vendType: meter.vendType,
                 disco: discoCode,
@@ -1026,6 +1029,7 @@ class TokenHandler extends Registry {
                         },
                     });
                 default:
+                    logger.error('Transaction condition were not met', { meta: { transactionId: data.transactionId, response } })
                     return await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
                         {
                             eventData: {
@@ -1068,6 +1072,30 @@ class TokenHandler extends Registry {
         console.log({ timeDifference, timeStamp, currentTime: new Date(), delayInSeconds, timeInSecondsSinceInit })
 
         if (timeDifference <= 0) {
+            const existingTransaction = await TransactionService.viewSingleTransaction(data.scheduledMessagePayload.transactionId)
+            if (!existingTransaction) {
+                throw new CustomError('Transaction not found')
+            }
+
+            // Check if transaction has been requeried successfuly before
+            const tokenReceivedFromRequery = await EventService.viewSingleEventByTransactionIdAndType(data.scheduledMessagePayload.transactionId, TOPICS.TOKEN_RECIEVED_FROM_REQUERY)
+            if (tokenReceivedFromRequery) {
+                logger.warn('Transaction has been requeried successfully before', {
+                    meta: { transactionId: data.scheduledMessagePayload.transactionId, currentMessagePayload: data }
+                })
+                return
+            }
+
+            const transactionEventService = new TransactionEventService(
+                existingTransaction,
+                data.scheduledMessagePayload.meter,
+                existingTransaction.superagent,
+                data.scheduledMessagePayload.superAgent,
+            )
+            await transactionEventService.addScheduleRequeryEvent({
+                timeStamp: new Date().toString(),
+                waitTime: delayInSeconds
+            })
             return await VendorPublisher.publishEventForGetTransactionTokenRequestedFromVendorRetry(data.scheduledMessagePayload)
         }
 
@@ -1130,14 +1158,6 @@ class TokenHandler extends Registry {
             })
 
             await transactionEventService.addPowerPurchaseInitiatedEvent(data.scheduledMessagePayload.newTransactionReference, existingTransaction.amount);
-            await VendorPublisher.publishEventForInitiatedPowerPurchase({
-                meter: data.scheduledMessagePayload.meter,
-                user: data.scheduledMessagePayload.user,
-                partner: data.scheduledMessagePayload.partner,
-                transactionId: existingTransaction.id,
-                superAgent: data.scheduledMessagePayload.newVendor,
-                vendorRetryRecord: data.scheduledMessagePayload.vendorRetryRecord
-            })
             return await VendorPublisher.publishEventForInitiatedPowerPurchase(data.scheduledMessagePayload)
         }
 

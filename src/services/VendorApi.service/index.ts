@@ -369,6 +369,8 @@ export class IRechargeVendorService {
             },
         );
 
+        console.log({ response })
+
         logger.info("Vend response from irecharge", {
             meta: { responseData: response.data, transactionId, ...mainMeta },
         });
@@ -514,6 +516,8 @@ export default class VendorService {
             logger.info("Requerying transaction with baxi", {
                 meta: { reference, transactionId },
             });
+
+            console.log({ reference, transactionId, pos: 'Requerying transaction with baxi' })
             const response = await this.baxiAxios().get<
                 BaxiRequeryResultForPurchase[T]
             >(`/superagent/transaction/requery?agentReference=${reference}`);

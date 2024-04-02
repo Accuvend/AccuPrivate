@@ -15,7 +15,7 @@ export default class EventService {
             // const newEvent: Event = await Event.create(event);
             const newEvent: Event = Event.build(event);
 
-            logger.info("EventService.addEvent", {
+            logger.info(`EventService.addEvent for ${event.eventType}`, {
                 meta: { transactionId: event.transactionId, eventData: event },
             });
             await newEvent.save();

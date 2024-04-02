@@ -870,6 +870,27 @@ export default class TransactionEventService {
         return await EventService.addEvent(event);
     }
 
+    public async addScheduleRequeryEventTriggered(): Promise<Event> {
+        const event: ICreateEvent = {
+            transactionId: this.transaction.id,
+            eventType: TOPICS.SCHEDULE_REQUERY_FOR_TRANSACTION_INITIATED,
+            eventText: TOPICS.SCHEDULE_REQUERY_FOR_TRANSACTION_INITIATED,
+            payload: JSON.stringify({
+                meterNumber: this.meterInfo.meterNumber,
+                disco: this.meterInfo.disco,
+                vendType: this.meterInfo.vendType,
+                superagent: this.superAgent,
+                partnerEmail: this.partner,
+            }),
+            source: 'API',
+            eventTimestamp: new Date(),
+            id: uuidv4(),
+            status: Status.PENDING,
+        }
+
+        return await EventService.addEvent(event);
+    }
+
     public async addScheduleRequeryEvent({ timeStamp, waitTime }: { timeStamp: string, waitTime: number }): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,

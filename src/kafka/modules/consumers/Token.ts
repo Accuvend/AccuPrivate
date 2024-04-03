@@ -952,7 +952,7 @@ class TokenHandler extends Registry {
                     await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor({
                         eventData: { ...eventMessage, error: { ...eventMessage.error, cause: TransactionErrorCause.UNEXPECTED_ERROR } },
                         eventService: transactionEventService,
-                        retryCount: 1,
+                        retryCount: data.retryCount + 1,
                         superAgent: data.superAgent,
                         tokenInResponse: null,
                         transactionTimedOutFromBuypower: false,

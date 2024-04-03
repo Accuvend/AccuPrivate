@@ -44,6 +44,12 @@ export default class Transaction extends Model<ITransaction | Transaction> {
     @Column({ type: DataType.STRING, allowNull: false, defaultValue: '0' })
     amount: string;
 
+    @Column({ type: DataType.STRING, allowNull: true })
+    tokenFromVend: string;
+    
+    @Column({ type: DataType.STRING, allowNull: true })
+    tokenFromRequery: string;
+
     // Status of the transaction (complete, pending, or failed)
     @Column({ type: DataType.ENUM, values: Object.values(Status), defaultValue: Status.PENDING, allowNull: false })
     status: Status;
@@ -233,6 +239,8 @@ export interface ITransaction {
     irechargeAccessToken?: string;
     vendorReferenceId: string;
     previousVendors: string[];
+    tokenFromVend?: string
+    tokenFromRequery?: string;
     retryRecord: {
         vendor: ITransaction['superagent'],
         reference: string[],

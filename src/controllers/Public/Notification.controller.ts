@@ -29,7 +29,7 @@ export default class NotificationController {
         if (!requestWasMadeByAnAdmin) {
             query.where['entityId'] = id
         }
-        query.where = status === 'read' ? { ...query.where, read: true } : status === 'unread' ? { read: false, ...query.where } : query.where
+        query.where = status.toLowerCase() === 'read' ? { ...query.where, read: true } : status.toLowerCase() === 'unread' ? { read: false, ...query.where } : query.where
 
         if (limit) query.limit = parseInt(limit)
         if (page && page != '0' && limit) {

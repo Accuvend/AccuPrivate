@@ -13,17 +13,17 @@ require('newrelic');
 
 export default class ConsumerRouter {
     static async init() {
-        new CrmConsumer().startBatchConsumer();
-        new InventoryConsumer().startBatchConsumer();
-        new NotificationConsumer().startBatchConsumer();
-        new PartnerConsumer().startBatchConsumer();
-        new TokenConsumer().startBatchConsumer();
-        new TransactionConsumer().startBatchConsumer();
-        new UserConsumer().startBatchConsumer();
-        new VendorConsumer().startBatchConsumer();
-        new WebhookConsumer().startBatchConsumer();
-        new AirtimeConsumer().startBatchConsumer();
-        new DataConsumer().startBatchConsumer();
+        new CrmConsumer().start();
+        new InventoryConsumer().start();
+        new NotificationConsumer().start();
+        new PartnerConsumer().start();
+        new TokenConsumer().start();
+        new TransactionConsumer().start();
+        new UserConsumer().start();
+        new VendorConsumer().start();
+        new WebhookConsumer().start();
+        new AirtimeConsumer().start();
+        new DataConsumer().start();
     }
 }
 

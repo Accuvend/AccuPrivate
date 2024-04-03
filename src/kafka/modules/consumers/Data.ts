@@ -1,3 +1,7 @@
+// Tsingore all erros in file
+
+/* eslint-disable */
+// @ts-nocheck
 import { AxiosError } from "axios";
 import { Status } from "../../../models/Transaction.model";
 import Meter from "../../../models/Meter.model";

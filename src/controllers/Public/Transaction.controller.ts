@@ -134,7 +134,7 @@ export default class TransactionController {
         };
 
         const response = {
-            transactions: transactions.map((transaction) => ({ ...transaction.dataValues, disco: transaction.productType == 'AIRTIME' ? undefined : transaction.disco })),
+            transactions: transactions.map((transaction) => ({ ...transaction.dataValues, disco: transaction?.productType?.toUpperCase() == 'AIRTIME' ? undefined : transaction.disco })),
             totalAmount,
         } as any;
 
@@ -162,7 +162,13 @@ export default class TransactionController {
         } = req.query as any as getTransactionsRequestBody;
 
         const query = { where: {} } as any;
-
+        // query.where[Op.and] = [
+        //     {amount: ""},
+        //     {amount: " "}
+        // ]
+        query.where.amount = {
+            [Op.notIn]: ["", " "],  
+        }
         if (status) query.where.status = status.toUpperCase();
         if (startDate && endDate)
             query.where.transactionTimestamp = {
@@ -225,114 +231,114 @@ export default class TransactionController {
         });
     }
 
-    static async requeryTimedOutTransaction(
-        req: AuthenticatedRequest,
-        res: Response
-    ) {
-        const { bankRefId }: { bankRefId: string } = req.query as any;
+    // static async requeryTimedOutTransaction(
+    //     req: AuthenticatedRequest,
+    //     res: Response
+    // ) {
+    //     const { bankRefId }: { bankRefId: string } = req.query as any;
 
-        let transactionRecord =
-            await TransactionService.viewSingleTransactionByBankRefID(
-                bankRefId
-            );
-        if (!transactionRecord) {
-            throw new NotFoundError("Transaction record not found");
-        }
+    //     let transactionRecord =
+    //         await TransactionService.viewSingleTransactionByBankRefID(
+    //             bankRefId
+    //         );
+    //     if (!transactionRecord) {
+    //         throw new NotFoundError("Transaction record not found");
+    //     }
 
-        if (transactionRecord.superagent !== "BUYPOWERNG") {
-            throw new BadRequestError(
-                "Transaction cannot be requery for this superagent"
-            );
-        }
+    //     if (transactionRecord.superagent !== "BUYPOWERNG") {
+    //         throw new BadRequestError(
+    //             "Transaction cannot be requery for this superagent"
+    //         );
+    //     }
 
-        let powerUnit = await transactionRecord.$get("powerUnit");
-        const response = await VendorService.buyPowerRequeryTransaction({
-            reference: transactionRecord.reference,
-            transactionId: transactionRecord.id,
-        });
-        if (response.status === false) {
-            const transactionFailed = response.responseCode === 202;
-            const transactionIsPending = response.responseCode === 201;
+    //     let powerUnit = await transactionRecord.$get("powerUnit");
+    //     const response = await VendorService.buyPowerRequeryTransaction({
+    //         reference: transactionRecord.reference,
+    //         transactionId: transactionRecord.id,
+    //     });
+    //     if (response.status === false) {
+    //         const transactionFailed = response.responseCode === 202;
+    //         const transactionIsPending = response.responseCode === 201;
 
-            if (transactionFailed)
-                await TransactionService.updateSingleTransaction(
-                    transactionRecord.id,
-                    {
-                        status: Status.FAILED,
-                    }
-                );
-            else if (transactionIsPending)
-                await TransactionService.updateSingleTransaction(
-                    transactionRecord.id,
-                    {
-                        status: Status.PENDING,
-                    }
-                );
+    //         if (transactionFailed)
+    //             await TransactionService.updateSingleTransaction(
+    //                 transactionRecord.id,
+    //                 {
+    //                     status: Status.FAILED,
+    //                 }
+    //             );
+    //         else if (transactionIsPending)
+    //             await TransactionService.updateSingleTransaction(
+    //                 transactionRecord.id,
+    //                 {
+    //                     status: Status.PENDING,
+    //                 }
+    //             );
 
-            res.status(200).json({
-                status: "success",
-                message: "Requery request successful",
-                data: {
-                    requeryStatusCode: transactionFailed ? 400 : 202,
-                    requeryStatusMessage: transactionFailed
-                        ? "Transaction failed"
-                        : "Transaction pending",
-                    transaction:
-                        ResponseTrimmer.trimTransaction(transactionRecord),
-                },
-            });
+    //         res.status(200).json({
+    //             status: "success",
+    //             message: "Requery request successful",
+    //             data: {
+    //                 requeryStatusCode: transactionFailed ? 400 : 202,
+    //                 requeryStatusMessage: transactionFailed
+    //                     ? "Transaction failed"
+    //                     : "Transaction pending",
+    //                 transaction:
+    //                     ResponseTrimmer.trimTransaction(transactionRecord),
+    //             },
+    //         });
 
-            return;
-        }
+    //         return;
+    //     }
 
-        const partner = await transactionRecord.$get("partner");
-        if (!partner) {
-            throw new InternalServerError("Partner not found");
-        }
+    //     const partner = await transactionRecord.$get("partner");
+    //     if (!partner) {
+    //         throw new InternalServerError("Partner not found");
+    //     }
 
-        const transactionEventService = new TransactionEventService(
-            transactionRecord,
-            {
-                meterNumber: transactionRecord.meter.meterNumber,
-                disco: transactionRecord.disco,
-                vendType: transactionRecord.meter.vendType,
-            },
-            transactionRecord.superagent,
-            partner.email
-        );
-        await transactionEventService.addTokenReceivedEvent(
-            response.data.token
-        );
-        await VendorPublisher.publishEventForTokenReceivedFromVendor({
-            meter: {
-                id: transactionRecord.meter.id,
-                meterNumber: transactionRecord.meter.meterNumber,
-                disco: transactionRecord.disco,
-                vendType: transactionRecord.meter.vendType,
-                token: response.data.token,
-            },
-            user: {
-                name: transactionRecord.user.name as string,
-                email: transactionRecord.user.email,
-                address: transactionRecord.user.address,
-                phoneNumber: transactionRecord.user.phoneNumber,
-            },
-            partner: {
-                email: transactionRecord.partner.email,
-            },
-            transactionId: transactionRecord.id,
-        });
+    //     const transactionEventService = new TransactionEventService(
+    //         transactionRecord,
+    //         {
+    //             meterNumber: transactionRecord.meter.meterNumber,
+    //             disco: transactionRecord.disco,
+    //             vendType: transactionRecord.meter.vendType,
+    //         },
+    //         transactionRecord.superagent,
+    //         partner.email
+    //     );
+    //     await transactionEventService.addTokenReceivedEvent(
+    //         response.data.token
+    //     );
+    //     await VendorPublisher.publishEventForTokenReceivedFromVendor({
+    //         meter: {
+    //             id: transactionRecord.meter.id,
+    //             meterNumber: transactionRecord.meter.meterNumber,
+    //             disco: transactionRecord.disco,
+    //             vendType: transactionRecord.meter.vendType,
+    //             token: response.data.token,
+    //         },
+    //         user: {
+    //             name: transactionRecord.user.name as string,
+    //             email: transactionRecord.user.email,
+    //             address: transactionRecord.user.address,
+    //             phoneNumber: transactionRecord.user.phoneNumber,
+    //         },
+    //         partner: {
+    //             email: transactionRecord.partner.email,
+    //         },
+    //         transactionId: transactionRecord.id,
+    //     });
 
-        res.status(200).json({
-            status: "success",
-            message: "Requery request successful",
-            data: {
-                requeryStatusCode: 200,
-                requeryStatusMessage: "Transaction successful",
-                transaction: ResponseTrimmer.trimTransaction(transactionRecord),
-            },
-        });
-    }
+    //     res.status(200).json({
+    //         status: "success",
+    //         message: "Requery request successful",
+    //         data: {
+    //             requeryStatusCode: 200,
+    //             requeryStatusMessage: "Transaction successful",
+    //             transaction: ResponseTrimmer.trimTransaction(transactionRecord),
+    //         },
+    //     });
+    // }
 
     static async getYesterdaysTransactions(
         req: AuthenticatedRequest,

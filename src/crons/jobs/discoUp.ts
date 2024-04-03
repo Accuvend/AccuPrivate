@@ -23,23 +23,6 @@ export default class DiscoUpCron {
         Logger.cronJob.info("Running cron job for checking if disco is up");
         try {
             for (const disco of DISCOS) {
-                let discoStatus: DiscoStatus | null =
-                    await DiscoStatusService.viewSingleDiscoStatusByDiscoName(
-                        disco,
-                    );
-
-                if (!discoStatus) {
-                    Logger.cronJob.info(
-                        `No status for ${disco} found, adding new status`,
-                    );
-                    discoStatus = await DiscoStatusService.addDiscoStatus({
-                        disco,
-                        status: "unavailable",
-                        id: randomUUID(),
-                    });
-                    Logger.cronJob.info(`Added new status for ${disco}`);
-                }
-
                 Logger.cronJob.info(`Checking if ${disco} is up`);
                 const discoIsUp =
                     await VendorService.buyPowerCheckDiscoUp(disco);
@@ -52,13 +35,15 @@ export default class DiscoUpCron {
                     : ("unavailable" as const);
 
                 Logger.cronJob.info(
-                    `Updating status for ${disco} to ${status}`,
+                    `Logging status for ${disco} to ${status}`,
                 );
-                await DiscoStatusService.updateSingleDiscoStatus(
-                    discoStatus.id,
-                    status,
-                );
-                Logger.cronJob.info(`Updated status for ${disco} to ${status}`);
+                await DiscoStatusService.addDiscoStatus({
+                    disco: disco,
+                    id: randomUUID(),
+                    status
+                });
+
+                Logger.cronJob.info(`Logged status for ${disco} to ${status}`);
             }
         } catch (error) {
             Logger.cronJob.error(

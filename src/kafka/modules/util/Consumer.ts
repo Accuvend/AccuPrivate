@@ -15,7 +15,7 @@ export default class ConsumerFactory {
         this.kafkaConsumer = this.createKafkaConsumer()
     }
 
-    public async start(): Promise<ConsumerFactory> {
+    public async start(): Promise<void> {
         const subscription: KafkaTopics = {
             topics: this.messageProcessor.getTopics(),
             fromBeginning: false,
@@ -36,8 +36,6 @@ export default class ConsumerFactory {
                 logger.error((error as Error).message)
             }
             console.error(error)
-        } finally {
-            return this
         }
     }
 

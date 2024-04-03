@@ -68,6 +68,7 @@ router
     )
     .patch(
         "/product",
+        basicAuth("access"),
         rbac.validateRole([RoleEnum.SuperAdmin]),
         AuthenticatedController(ProductController.updateProduct),
     )

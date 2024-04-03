@@ -22,14 +22,14 @@ export default class ProductController {
             throw new BadRequestError('Product with same master product code already exists');
         }
 
-        if (category === 'DATA' || category === 'AIRTIME') {
+        if (category.toUpperCase() === 'DATA' || category.toUpperCase() === 'AIRTIME') {
             if (!['MTN', 'GLO', 'AIRTEL', '9MOBILE'].includes(masterProductCode)) {
                 throw new BadRequestError(`Master code for data must contain either MTN, GLO, AIRTEL, or 9MOBILE`);
             }
         }
 
         const data = { masterProductCode, category, type, id: randomUUID(), productName } as { masterProductCode: string, category: 'AIRTIME' | 'ELECTRICITY' | 'DATA' | 'CABLE', type?: 'POSTPAID' | 'PREPAID', id: string, productName: string}
-        ['DATA', 'AIRTIME'].includes(category) && delete data.type;
+        ['DATA', 'AIRTIME'].includes(category.toUpperCase()) && delete data.type;
 
         const product = await ProductService.addProduct(data);
 

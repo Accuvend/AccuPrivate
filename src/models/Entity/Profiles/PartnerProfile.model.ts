@@ -41,6 +41,9 @@ export default class PartnerProfile extends Model<PartnerProfile | IPartnerProfi
     apiKeys: ApiKey[];
 
 
+    @Column({ type: DataType.STRING, allowNull: true })
+    partnerCode?: string;
+
     @Column({ type: DataType.STRING, allowNull: false })
     key: string;
 
@@ -57,6 +60,7 @@ export interface IPartnerProfile {
     address?: string;
     key: string;
     sec: string;
+    partnerCode?: string;
 }
 
 export interface IPartnerStatsProfile  extends IPartnerProfile {

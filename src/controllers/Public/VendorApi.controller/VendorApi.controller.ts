@@ -14,7 +14,9 @@ import Meter, { IMeter } from "../../../models/Meter.model";
 import VendorService from "../../../services/VendorApi.service";
 import {
     DEFAULT_ELECTRICITY_PROVIDER,
+    DISCO_LOGO,
     discoProductMapping,
+    LOGO_URL,
 } from "../../../utils/Constants";
 import {
     BadRequestError,
@@ -57,7 +59,8 @@ interface valideMeterRequestBody {
     phoneNumber: string;
     partnerName: string;
     email: string;
-    channel: ITransaction['channel']
+    channel: ITransaction['channel'];
+    amount: number
 }
 
 interface vendTokenRequestBody {
@@ -165,6 +168,7 @@ class VendorTokenHandler implements Registry {
 
     public registry = {
         [TOPICS.TOKEN_RECIEVED_FROM_VENDOR]: this.handleTokenReceived.bind(this)
+        // [TOPICS.TOKEN_RECIEVED_FROM_REQUERY]: this.handleTokenReceived.bind(this),
     }
 }
 
@@ -193,31 +197,36 @@ class VendorControllerValdator {
     static async requestToken({
         bankRefId,
         transactionId,
+        transaction: transactionRecord,
         vendorDiscoCode
-    }: RequestTokenValidatorParams): Promise<RequestTokenValidatorResponse> {
+    }: RequestTokenValidatorParams & { transaction: Transaction }): Promise<RequestTokenValidatorResponse> {
         if (!bankRefId)
-            throw new BadRequestError("Transaction reference is required");
+            throw new BadRequestError("No bankRefId found");
 
-        const transactionRecord: Transaction | null =
-            await TransactionService.viewSingleTransaction(transactionId);
-        if (!transactionRecord) {
-            throw new BadRequestError("Transaction does not exist");
+        // TODO: Automatically Append partner code to bankRefId
+
+        const partner = await transactionRecord.$get("partner");
+        if (!partner) {
+            throw new InternalServerError(
+                `Transaction ${transactionRecord.id} does not have a partner`
+            );
         }
+
+        if (!partner.partnerCode) {
+            throw new InternalServerError("Partner code not found");
+        }
+
+        console.log({ bankRefId, partnerCode: partner.partnerCode })
+        const bankRefIdStartsWithPartnerCode = bankRefId.startsWith(partner.partnerCode);
+        if (!bankRefIdStartsWithPartnerCode) throw new BadRequestError("BankRefId must start with partner code");
 
         // Check if Disco is Up
-        const checKDisco: boolean | Error =
-            await VendorService.buyPowerCheckDiscoUp(vendorDiscoCode);
-        if (!checKDisco && transactionRecord.superagent === 'BUYPOWERNG') throw new BadRequestError("Disco is currently down");
-
-        // Check if bankRefId has been used before
-        const existingTransaction: Transaction | null =
-            await TransactionService.viewSingleTransactionByBankRefID(bankRefId);
-        if (existingTransaction instanceof Transaction) {
-            throw new BadRequestError("Bank reference has been used before");
-        }
+        // const checKDisco: boolean | Error =
+        //     await VendorService.buyPowerCheckDiscoUp(vendorDiscoCode);
+        // if (!checKDisco && transactionRecord.superagent === 'BUYPOWERNG') throw new BadRequestError("Disco is currently down");
 
         const transactionHasCompleted =
-            transactionRecord.status === Status.COMPLETE;
+            transactionRecord.status.toUpperCase() === Status.COMPLETE.toUpperCase();
         if (transactionHasCompleted) {
             throw new BadRequestError("Transaction has been completed before");
         }
@@ -237,7 +246,6 @@ class VendorControllerValdator {
             );
         }
 
-        const partner = await transactionRecord.$get("partner");
         const entity = await partner?.$get("entity");
         if (!entity) {
             throw new InternalServerError("Entity not found");
@@ -348,13 +356,13 @@ class VendorControllerValdator {
             for (const superAgent of superAgents) {
                 try {
                     console.log({ superAgent })
-                    response = superAgent === "BUYPOWERNG" ? await validateWithBuypower() :
-                        superAgent === "BAXI" ? await validateWithBaxi() : await validateWithIrecharge()
+                    response = superAgent.toUpperCase() === "BUYPOWERNG" ? await validateWithBuypower() :
+                        superAgent.toUpperCase() === "BAXI" ? await validateWithBaxi() : await validateWithIrecharge()
                     if (response instanceof Error) {
                         throw response
                     }
                     console.log({ superAgent })
-                    const token = superAgent === 'IRECHARGE' ? (response as IResponses['IRECHARGE']).access_token : undefined
+                    const token = superAgent.toUpperCase() === 'IRECHARGE' ? (response as IResponses['IRECHARGE']).access_token : undefined
                     await transaction.update({ superagent: superAgent as any, irechargeAccessToken: token })
 
                     selectedVendor = superAgent
@@ -400,6 +408,21 @@ class VendorControllerValdator {
     }
 }
 
+function transformPhoneNumber(phoneNumber: string) {
+    // It could be 09xxxxxxxx initially
+    // or it could be +23409xxxxxxxx
+    // Convert phone number to +2349xxxxxxxx
+    if (phoneNumber.startsWith("0") || phoneNumber.startsWith('0')) {
+        return "+234" + phoneNumber.slice(1);
+    } else if (phoneNumber.startsWith("+23409") || phoneNumber.startsWith('+23408')) {
+        return "+234" + phoneNumber.slice(4);
+    } else if (!phoneNumber.startsWith('+234')) {
+        return "+234" + phoneNumber
+    } else {
+        return phoneNumber;
+    }
+}
+
 export default class VendorController {
 
     static async validateMeterMock(req: Request, res: Response, next: NextFunction) {
@@ -436,13 +459,21 @@ export default class VendorController {
     static async validateMeter(req: Request, res: Response, next: NextFunction) {
         const {
             meterNumber,
-            phoneNumber,
             email,
             vendType,
-            channel
+            channel,
+            amount
         }: valideMeterRequestBody = req.body;
         let { disco } = req.body;
         const partnerId = (req as any).key;
+
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (!emailRegex.test(email)) {
+            throw new BadRequestError("Invalid email address");
+        }
+
+        let phoneNumber = req.body.phoneNumber
+        phoneNumber = transformPhoneNumber(phoneNumber)
 
         const transactionId = uuidv4()
         const errorMeta = { transactionId: transactionId }
@@ -451,9 +482,14 @@ export default class VendorController {
             throw new NotFoundError('Product code not found for disco', errorMeta)
         }
 
+        if (parseInt(amount.toString()) < 1000) {
+            logger.error('Mininum vend amount is 1000', { meta: { transactionId } })
+            throw new BadRequestError("Mininum vend amount is 1000");
+        }
+
         disco = existingProductCodeForDisco.masterProductCode
 
-        if (existingProductCodeForDisco.category !== 'ELECTRICITY') {
+        if (existingProductCodeForDisco.category.toUpperCase() !== 'ELECTRICITY') {
             throw new BadRequestError('Invalid product code for electricity', errorMeta)
         }
 
@@ -468,7 +504,7 @@ export default class VendorController {
         const transaction: Transaction =
             await TransactionService.addTransactionWithoutValidatingUserRelationship({
                 id: transactionId,
-                amount: "",
+                amount: amount.toString(),
                 status: Status.PENDING,
                 superagent: superagent,
                 paymentType: PaymentType.PAYMENT,
@@ -483,7 +519,7 @@ export default class VendorController {
                 vendorReferenceId: generateRandonNumbers(12),
                 productType: transactionTypes[existingProductCodeForDisco.category],
                 channel
-            });
+            })
 
         Logger.apiRequest.info("Validate meter requested", { meta: { transactionId: transaction.id, ...req.body } })
         const transactionEventService = new EventService.transactionEventService(
@@ -555,7 +591,7 @@ export default class VendorController {
 
         // Check if disco is up
         const discoUp =
-            superagent === "BUYPOWERNG"
+            superagent.toUpperCase() === "BUYPOWERNG"
                 ? await VendorService.buyPowerCheckDiscoUp(vendorDiscoCode).catch((e) => e)
                 : await VendorService.baxiCheckDiscoUp(vendorDiscoCode).catch((e) => e);
 
@@ -586,6 +622,16 @@ export default class VendorController {
             vendType,
         });
 
+        logger.info('Meter validation info', {
+            meta: {
+                transactionId: transaction.id,
+                user: {
+                    phoneNumber,
+                    email,
+                },
+                meter: meter
+            }
+        })
         const update = await TransactionService.updateSingleTransaction(transaction.id, { meterId: meter.id })
         console.log({ update: update?.superagent })
         const successful =
@@ -622,17 +668,11 @@ export default class VendorController {
     }
 
     static async requestToken(req: Request, res: Response, next: NextFunction) {
-        const { transactionId, bankComment, amount, vendType } =
+        const { transactionId, bankComment, vendType, bankRefId } =
             req.query as Record<string, any>;
-        console.log({ transactionId, bankComment, amount, vendType })
+        console.log({ transactionId, bankComment, vendType })
 
         const errorMeta = { transactionId: transactionId };
-        // REMOVED !!!! BECAUSE WE SHOULD NEVER AUTOGENERATE THIS IN THE CODE
-        const bankRefId = req.query.bankRefId as string;
-        if (parseInt(amount.toString()) < 1000) {
-            logger.error('Amount must be greater than 1000', { meta: { transactionId } })
-            throw new BadRequestError("Amount must be greater than 100");
-        }
 
         const transaction: Transaction | null =
             await TransactionService.viewSingleTransaction(transactionId);
@@ -640,11 +680,13 @@ export default class VendorController {
             throw new NotFoundError("Transaction not found", errorMeta);
         }
 
-        if (transaction.status === Status.COMPLETE as any) {
+        const amount = transaction.amount
+
+        if (transaction.status.toUpperCase() === Status.COMPLETE.toUpperCase() as any) {
             throw new BadRequestError("Transaction already completed");
         }
 
-        if (transaction.status !== Status.PENDING) {
+        if (transaction.status.toUpperCase() !== Status.PENDING.toUpperCase()) {
             throw new BadRequestError("Transaction not in pending state");
         }
 
@@ -682,13 +724,23 @@ export default class VendorController {
         const transactionEventService = new EventService.transactionEventService(updatedTransaction, meterInfo, transaction.superagent, transaction.partner.email);
         await transactionEventService.addPowerPurchaseInitiatedEvent(bankRefId, amount);
 
-        const { user, partnerEntity } = await VendorControllerValdator.requestToken({ bankRefId, transactionId, vendorDiscoCode });
+        const { user, partnerEntity } = await VendorControllerValdator.requestToken({ bankRefId, transactionId, vendorDiscoCode, transaction });
         await transaction.update({
             bankRefId: bankRefId,
             bankComment,
             amount,
-            status: Status.PENDING,
+            status: Status.INPROGRESS,
+        }).catch(e => {
+            if (e.name === 'SequelizeUniqueConstraintError') {
+                // Check if the key is the bankRefId
+                if (e.errors[0].message.includes('bankRefId')) {
+                    throw new BadRequestError('BankRefId should be a unique id')
+                }
+            }
+
+            throw e
         });
+
 
         const vendorTokenConsumer = new VendorTokenReceivedSubscriber(transaction, res)
         await vendorTokenConsumer.start()
@@ -712,8 +764,6 @@ export default class VendorController {
                     retryCount: 1,
                 }
             })
-
-            await TransactionService.updateSingleTransaction(transaction.id, { status: Status.INPROGRESS })
 
             if (response instanceof Error) {
                 throw error
@@ -761,7 +811,9 @@ export default class VendorController {
                         return
                     }
 
-                    await transactionEventService.addTokenSentToPartnerEvent();
+                    const existingEvent = await EventService.viewSingleEventByTransactionIdAndType(transactionId, TOPICS.TOKEN_SENT_TO_PARTNER)
+                    if (!existingEvent) await transactionEventService.addTokenSentToPartnerEvent();
+
                     return
                 }, 60000)
 
@@ -790,12 +842,12 @@ export default class VendorController {
                         meter: { ...meterInfo, token: powerUnit.token }
                     }
                 })
-                
+
                 // TODO: Add Code to send response if token has been gotten from vendor
                 await transactionEventService.addTokenSentToPartnerEvent();
                 return
             }
-            
+
 
 
             return
@@ -840,7 +892,7 @@ export default class VendorController {
             await TransactionService.viewSingleTransactionByBankRefID(bankRefId);
         if (!transaction) throw new NotFoundError("Transaction not found");
 
-        if (transaction.transactionType === TransactionType.AIRTIME) {
+        if (transaction.transactionType.toUpperCase() === TransactionType.AIRTIME.toUpperCase()) {
             return await AirtimeVendController.confirmPayment(req, res, next)
         }
 
@@ -886,4 +938,100 @@ export default class VendorController {
             },
         });
     }
+
+    static async initManualRequeryTransaction(
+        req: AuthenticatedRequest,
+        res: Response,
+        next: NextFunction
+    ) {
+        const { transactionId } = req.body
+
+        if (!transactionId) {
+            throw new BadRequestError('Transaction ID is required')
+        }
+
+        const transaction = await TransactionService.viewSingleTransaction(transactionId)
+        if (!transaction) {
+            throw new NotFoundError('Transaction not found')
+        }
+
+        if (transaction.status != Status.INPROGRESS) {
+            throw new BadRequestError('Transaction condition not met')
+        }
+
+        const logMeta = { meta: { transactionId } }
+
+        logger.info('Transaction condition met - Successful', logMeta)
+        const _product = await ProductService.viewSingleProduct(transaction.productCodeId)
+        if (!_product) throw new InternalServerError('Product not found')
+
+        const discoLogo = DISCO_LOGO[_product.productName as keyof typeof DISCO_LOGO] ?? LOGO_URL
+        let tokenInResponse: string | null = null
+        const meter = await transaction.$get('meter')
+        if (!meter) {
+            throw new InternalServerError('Meter not found')
+        }
+
+        const user = await transaction.$get('user')
+        if (!user) {
+            throw new InternalServerError('User not found')
+        }
+
+        const partner = await transaction.$get('partner')
+        if (!partner) {
+            throw new InternalServerError('Partner not found')
+        }
+
+        const transactionEventService = new TransactionEventService(
+            transaction,
+            meter,
+            transaction.superagent,
+            partner.email
+        );
+        await transactionEventService.addTokenReceivedEvent(tokenInResponse ?? '');
+        logger.info('Initiated manual requery', {
+            meta: {
+                transactionId,
+                admin: req.user.user,
+            }
+        })
+        await VendorPublisher.publishEventForGetTransactionTokenRequestedFromVendorRetry({
+            transactionId: transaction.id,
+            meter: {
+                id: meter.id,
+                meterNumber: meter.meterNumber,
+                disco: transaction!.disco,
+                vendType: meter.vendType,
+            },
+            error: {
+                cause: TransactionErrorCause.MANUAL_REQUERY_TRIGGERED,
+                code: 500,
+            },
+            retryCount: 1,
+            superAgent: transaction.superagent,
+            timeStamp: new Date(),
+            vendorRetryRecord: { ...transaction.retryRecord, retryCount: 1 },
+            waitTime: 0,
+        });
+
+        res.status(200).json({
+            status: "success",
+            message: "Manual requery initiated successfully",
+            data: {
+                transaction: {
+                    transactionId: transaction.id,
+                    status: transaction.status,
+                },
+                meter: {
+                    disco: meter.disco,
+                    number: meter.meterNumber,
+                    address: meter.address,
+                    phone: meter.userId,
+                    vendType: meter.vendType,
+                    name: meter.userId,
+                },
+            },
+        });
+    }
+
 }

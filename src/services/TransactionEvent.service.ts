@@ -232,8 +232,8 @@ export class AirtimeTransactionEventService {
     public async addGetAirtimeFromVendorRetryEvent(error: { cause: TransactionErrorCause, code: number, }, retryCount: number): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
-            eventType: TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_RETRY,
-            eventText: TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_RETRY,
+            eventType: TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_REQUERY,
+            eventText: TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_REQUERY,
             payload: JSON.stringify({
                 transactionId: this.transaction.id,
                 phoneNumber: this.phoneNumber,
@@ -619,8 +619,8 @@ export class DataTransactionEventService {
     public async addGetDataFromVendorRetryEvent(error: { cause: TransactionErrorCause, code: number, }, retryCount: number): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
-            eventType: TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_RETRY,
-            eventText: TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_RETRY,
+            eventType: TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_REQUERY,
+            eventText: TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_REQUERY,
             payload: JSON.stringify({
                 transactionId: this.transaction.id,
                 phoneNumber: this.phoneNumber,
@@ -847,7 +847,7 @@ export default class TransactionEventService {
         return this.transaction
     }
 
-    public async addScheduleRetryEvent({ timeStamp, waitTime}: { timeStamp: string, waitTime: number}): Promise<Event> {
+    public async addScheduleRetryEvent({ timeStamp, waitTime }: { timeStamp: string, waitTime: number }): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.SCHEDULE_RETRY_FOR_TRANSACTION,
@@ -870,7 +870,28 @@ export default class TransactionEventService {
         return await EventService.addEvent(event);
     }
 
-    public async addScheduleRequeryEvent({ timeStamp, waitTime}: { timeStamp: string, waitTime: number}): Promise<Event> {
+    public async addScheduleRequeryEventTriggered(): Promise<Event> {
+        const event: ICreateEvent = {
+            transactionId: this.transaction.id,
+            eventType: TOPICS.SCHEDULE_REQUERY_FOR_TRANSACTION_INITIATED,
+            eventText: TOPICS.SCHEDULE_REQUERY_FOR_TRANSACTION_INITIATED,
+            payload: JSON.stringify({
+                meterNumber: this.meterInfo.meterNumber,
+                disco: this.meterInfo.disco,
+                vendType: this.meterInfo.vendType,
+                superagent: this.superAgent,
+                partnerEmail: this.partner,
+            }),
+            source: 'API',
+            eventTimestamp: new Date(),
+            id: uuidv4(),
+            status: Status.PENDING,
+        }
+
+        return await EventService.addEvent(event);
+    }
+
+    public async addScheduleRequeryEvent({ timeStamp, waitTime }: { timeStamp: string, waitTime: number }): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.SCHEDULE_REQUERY_FOR_TRANSACTION,
@@ -1198,8 +1219,8 @@ export default class TransactionEventService {
     public async addGetTransactionTokenRequestedFromVendorRetryEvent(error: { cause: TransactionErrorCause, code: number, }, retryCount: number): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
-            eventType: TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_RETRY,
-            eventText: TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_RETRY,
+            eventType: TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_REQUERY,
+            eventText: TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_REQUERY,
             payload: JSON.stringify({
                 transactionId: this.transaction.id,
                 superAgent: this.transaction.superagent,
@@ -1273,6 +1294,31 @@ export default class TransactionEventService {
         return await EventService.addEvent(event);
     }
 
+    public async addTokenReceivedFromRequery(token: string): Promise<Event> {
+        const event: ICreateEvent = {
+            transactionId: this.transaction.id,
+            eventType: TOPICS.TOKEN_RECIEVED_FROM_REQUERY,
+            eventText: TOPICS.TOKEN_RECIEVED_FROM_REQUERY,
+            payload: JSON.stringify({
+                token,
+                transactionId: this.transaction.id,
+                superAgent: this.transaction.superagent,
+                amount: this.transaction.amount,
+                disco: this.transaction.disco,
+                meterId: this.transaction.meterId,
+                meterNumber: this.meterInfo.meterNumber,
+                vendType: this.meterInfo.vendType,
+                superagent: this.superAgent,
+                partnerEmail: this.partner
+            }),
+            source: this.transaction.superagent.toUpperCase(),
+            eventTimestamp: new Date(),
+            id: uuidv4(),
+            status: Status.COMPLETE,
+        }
+
+        return await EventService.addEvent(event);
+    }
     public async addTokenReceivedEvent(token: string): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,

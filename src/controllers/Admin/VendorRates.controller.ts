@@ -20,7 +20,7 @@ export default class VendorRatesController {
             throw new NotFoundError('Product code not found');
         }
 
-        if (productCode.type === 'DATA' && !(title || validity)) {
+        if (productCode.type.toUpperCase() === 'DATA' && !(title || validity)) {
             throw new BadRequestError('Title and validity are required for data products');
         }
         

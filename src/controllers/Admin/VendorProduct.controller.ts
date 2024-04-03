@@ -45,11 +45,11 @@ export default class VendorProductController {
             if (!bundle) {
                 throw new NotFoundError('Bundle not found');
             }
-        } else if (product.category === 'DATA') {
+        } else if (product.category.toUpperCase() === 'DATA') {
             throw new BadRequestError('Bundle ID is required for Data product');
         }
 
-        if (product.category === 'DATA' && !amount) {
+        if (product.category.toUpperCase() === 'DATA' && !amount) {
             throw new BadRequestError('Amount is required for Data product');
         }
 

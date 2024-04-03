@@ -1,0 +1,28 @@
+id,Path,Vendor,AccuvendRefCode,RequestType,description
+db5f15a9-d2b6-485a-992b-f5a48f3dff7d,status,IRECHARGE,VR_STATUS_CODE,VENDREQUEST,Vendor Request Status Code for VendRequest.
+46fd6e5e-3d67-4093-a73a-d794944bb824,,IRECHARGE,VR_CODE,VENDREQUEST,Vendor Request Code for VendRequest.
+facbff6e-b7d8-47ba-8202-f86471fcd41e,message,IRECHARGE,VR_MSG,VENDREQUEST,Vendor Request Message for VendRequest.
+ca9a7307-b942-4885-a014-aa00a61334ee,meter_token,IRECHARGE,VR_TK,VENDREQUEST,Vendor Request Token for VendRequest.
+7ee1dd13-95cf-4707-9362-b180d8e1c0d3,status,IRECHARGE,RQ_STATUS,REQUERY,Request Status for Requery.
+1eb173ea-3283-46c7-ab2e-a15fdbd3ff28,vend_status,IRECHARGE,RQ_STATUS_CODE,REQUERY,Request Status Code for Requery.
+b65edd51-9fb7-4f63-99fd-160035da46a9,vend_code,IRECHARGE,RQ_CODE,REQUERY,Request Code for Requery.
+02f103f8-a2f5-438d-96f4-bdeecc962958,token,IRECHARGE,RQ_TK,REQUERY,Request Token for Requery.
+e9e3bb90-f6ea-467e-b2f7-dfeca687d30a,,IRECHARGE,,VALIDATEMETER,
+66bc180b-a1a2-43f1-b73f-8b2b5fbde9aa,status,BUYPOWERNG,VR_STATUS_BOOLEAN,VENDREQUEST,Boolean status for Vendor Request in VendRequest.
+a2af7bf7-0981-4418-a431-631d4933233d,responseCode,BUYPOWERNG,VR_CODE,VENDREQUEST,Vendor Request Code for VendRequest.
+41a4564f-7e7b-4d36-9b04-acee5233d7ee,message,BUYPOWERNG,VR_MSG,VENDREQUEST,Vendor Request Message for VendRequest.
+c8fcfa04-1545-4ba5-9511-3e5d7947a406,data.token,BUYPOWERNG,VR_TK,VENDREQUEST,Vendor Request Token for VendRequest.
+75fdb321-4e19-4054-8fd9-41b418760394,result.status,BUYPOWERNG,RQ_STATUS,REQUERY,Request Status for Requery.
+7504b5db-413d-465f-98ad-731f3060607e,result.message,BUYPOWERNG,RQ_MSG,REQUERY,Request Message for Requery.
+e2955f91-a865-44de-9d07-c6380e991e8b,result.responseCode,BUYPOWERNG,RQ_CODE,REQUERY,Request Code for Requery.
+2a0e2d28-1827-4779-a519-c001f88b61a0,result.data.token,BUYPOWERNG,RQ_TK,REQUERY,Request Token for Requery.
+0a318ba5-8121-4f84-85cd-071417c0a682,,BUYPOWERNG,,VALIDATEMETER,
+10c7a2ed-1cb4-42c2-918a-58b0f8f530b7,status,BAXI,VR_STATUS_MSG,VENDREQUEST,Vendor Request Status Message for VendRequest.
+b7ba9846-ad42-44a7-9984-b6138209ec30,message,BAXI,VR_MSG,VENDREQUEST,Vendor Request Message for VendRequest.
+6f316c6a-f678-4788-ba9b-21f93b2f3450,code,BAXI,VR_CODE,VENDREQUEST,Vendor Request Code for VendRequest.
+ae9a15fc-cb36-48e6-ba33-00d1e0e9665e,data.tokenCode,BAXI,VR_TK,VENDREQUEST,Vendor Request Token for VendRequest.
+b25146c6-7e69-40ac-b089-ca8af4d4a45f,status,BAXI,RQ_STATUS_BOOLEAN,REQUERY,Boolean status for Request in Requery.
+cefcc4f2-bafc-4316-a787-b5ff68b83d79,message,BAXI,RQ_MSG,REQUERY,Request Message for Requery.
+6251ab42-9223-4789-aa96-53d52a096a5b,code,BAXI,RQ_CODE,REQUERY,Request Code for Requery.
+a0116d3d-f412-47c1-8214-9374778d7b75,data.tokenCode,BAXI,RQ_TK,REQUERY,Request Token for Requery.
+896d25d3-10fe-4ced-ac5d-6a3515bc6f60,,BAXI,,VALIDATEMETER,

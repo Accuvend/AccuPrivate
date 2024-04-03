@@ -23,11 +23,11 @@ router
             TransactionController.getYesterdaysTransactions,
         ),
     )
-    .get(
-        "/requery-transaction",
-        AuthenticatedController(
-            TransactionController.requeryTimedOutTransaction,
-        ),
-    );
+    // .get(
+    //     "/requery-transaction",
+    //     AuthenticatedController(
+    //         TransactionController.requeryTimedOutTransaction,
+    //     ),
+    // );
 
 export default router;

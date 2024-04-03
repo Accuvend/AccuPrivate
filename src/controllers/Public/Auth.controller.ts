@@ -23,9 +23,19 @@ import WebhookService from "../../services/Webhook.service";
 import RoleService from "../../services/Role.service";
 require('newrelic');
 
+async function getUniquePartnerCode (partnerName: string, count = 0) {
+    partnerName = partnerName.toUpperCase()
+    const partnerCode = partnerName.slice(0, 1) + partnerName.slice(-2) + 'BK' + '000' + count.toString()
+    const partner = await PartnerService.viewSinglePartnerByPartnerCode(partnerCode)
+    if (partner) {
+        return getUniquePartnerCode(partnerName, count + 1)
+    }
+    return partnerCode
+
+}
 export default class AuthController {
     static async signup(req: Request, res: Response, next: NextFunction) {
-        const { email, password } = req.body
+        const { email, password, companyName } = req.body
 
         const validEmail = Validator.validateEmail(email)
         if (!validEmail) {
@@ -52,6 +62,8 @@ export default class AuthController {
             const newPartner = await PartnerService.addPartner({
                 id: uuidv4(),
                 email,
+                companyName,
+                partnerCode: await getUniquePartnerCode(companyName.split('@')[0]), // TODO: Use companyName instead of email
             }, transaction)
 
             const entity = await EntityService.addEntity({
@@ -506,7 +518,7 @@ export default class AuthController {
         }
 
         const profile = await EntityService.getAssociatedProfile(entity)
-        if (!profile && req.user.user.entity.role !== RoleEnum.EndUser) {
+        if (!profile && req.user.user.entity.role.toUpperCase() !== RoleEnum.EndUser.toUpperCase()) {
             throw new InternalServerError('Entity not found for authenticated user')
         }
 
@@ -539,7 +551,7 @@ export default class AuthController {
             throw new InternalServerError('Entity record not found for Authenticated user')
         }
 
-        const requestMadeByPartner = req.user.user.entity.role === RoleEnum.Partner
+        const requestMadeByPartner = req.user.user.entity.role.toUpperCase() === RoleEnum.Partner.toUpperCase()
         if (requestMadeByPartner && entityId && entity?.id !== entityId) {
             const userEntity = await EntityService.viewSingleEntity(entityId)
             if (!userEntity) {
@@ -560,7 +572,7 @@ export default class AuthController {
 
         await EntityService.updateEntity(entity, { requireOTPOnLogin: requireOtp })
 
-        if (entity.role.name === RoleEnum.Partner) {
+        if (entity.role.name.toUpperCase() === RoleEnum.Partner.toUpperCase()) {
             // Update the same for all teammembers under partner
             const partner = await entity.$get('partnerProfile')
             if (!partner) {
@@ -616,11 +628,11 @@ export default class AuthController {
 
         const partner = await entity.$get('partnerProfile')
         const role = entity.role.name
-        if (partner === null && role === 'PARTNER') {
+        if (partner === null && role.toUpperCase() === 'PARTNER') {
             throw new InternalServerError('Partner not found')
         }
 
-        const returnData = role === 'PARTNER'
+        const returnData = role.toUpperCase() === 'PARTNER'
             ? { entity: entity.dataValues, partner: ResponseTrimmer.trimPartner({ ...partner!.dataValues, entity }) }
             : { entity: entity.dataValues }
 

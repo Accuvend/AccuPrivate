@@ -41,6 +41,10 @@ export default class MockEndpointData extends Model<MockEndpointData | IMockEndp
     // Column for activation status
     @Column({type: DataType.BOOLEAN , allowNull: false , defaultValue: false})
     activated: boolean;
+
+    // Column for description
+    @Column({type: DataType.STRING, allowNull: true})
+    description: string;
 }
 
 // Interface for MockEndpointData structure
@@ -50,4 +54,7 @@ export interface IMockEndpointData {
     vendorCode: string;
     vendorResponse: Record<string,any>;
     httpCode: number;
+    activated: boolean;
+    desccription: string ;
+    apiType: string;
 }

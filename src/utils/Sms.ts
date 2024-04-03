@@ -1,5 +1,5 @@
 import AfricasTalking from 'africastalking'
-import { AFRICASTALKING_API_KEY, AFRICASTALKING_USERNAME, NODE_ENV } from './Constants';
+import { AFRICASTALKING_API_KEY, AFRICASTALKING_USERNAME, CYBER_PAY_API_KEY, CYBER_PAY_BASE_URL, CYBER_PAY_PASSWORD, CYBER_PAY_SENDER_ID, CYBER_PAY_USERNAME, NODE_ENV } from './Constants';
 import axios from 'axios'
 import Transaction from '../models/Transaction.model';
 
@@ -11,24 +11,101 @@ const client = axios.create({
     }
 })
 
+abstract class SmsServiceHandler {
+    abstract sendSms(to: string, message: string): Promise<any>
+}
+export class CyberPaySmsService implements SmsServiceHandler {
+    private client = axios.create({
+        baseURL: CYBER_PAY_BASE_URL,
+        headers: {
+            "Content-Type": "application/json",
+        }
+    })
+    private apiKey = CYBER_PAY_API_KEY
+    private senderId = CYBER_PAY_SENDER_ID
+    private token = ''
+
+    private login = async () => {
+        const response = await this.client.post<{ token: string }>('/auth/login', {
+            username: CYBER_PAY_USERNAME,
+            password: CYBER_PAY_PASSWORD
+        })
+
+        this.token = response.data.token
+        return this
+    }
+
+    private lookUp = async (phoneNumber: string) => {
+        const response = await this.client.get(`/messages/network-lookup/${phoneNumber}`, {
+            headers: {
+                Authorization: `Bearer ${this.token}`,
+                ApiKey: this.apiKey
+            },
+            data: {
+                "SenderId": "{{SenderId}}",
+                "Msisdn": phoneNumber.replace("+", ""),
+                "MsgBody": "",
+                "MessageType": "PROMOTIONAL" //Can either be PROMOTIONAL OR TRANSACTIONAL
+            }
+        })
+
+        console.log({ response })
+        return response.data as { network: string }
+    }
+
+    public sendSms = async (to: string, message: string): Promise<any> => {
+        if (this.token === '') await this.login()
+
+        const lookUpInfo = await this.lookUp(to)
+
+        const requestBody = {
+            "NetworkID": lookUpInfo.network,
+            "SenderId": this.senderId,
+            "Msisdn": to,
+            "MsgBody": message,
+            "MessageType": "PROMOTIONAL"
+        }
+
+        const response = await this.client.post('/messages/send', requestBody, {
+            headers: {
+                Authorization: `Bearer ${this.token}`,
+                ApiKey: this.apiKey
+            }
+        })
+
+        return response.data
+    }
+}
+
+
+export class AfricasTalkingSmsService implements SmsServiceHandler {
+    public sendSms = async (to: string, message: string) => {
+        try {
+            const result = await client.post("", {
+                username: AFRICASTALKING_USERNAME,
+                to: (to),
+                message: message,
+                from: "32345"
+            })
+            return result;
+        } catch (ex) {
+            throw ex;
+        }
+    }
+}
 
 export class SmsService {
+    private static smsHost = new CyberPaySmsService()
     private static formatPhoneNumber = (phoneNumber: string) => {
         if (phoneNumber.startsWith("0")) {
             return `+234${phoneNumber.slice(1)}`
         }
         return phoneNumber
     }
-    
+
     static sendSms = async (to: string, message: string) => {
         try {
-            const result = await client.post("", {
-                username: AFRICASTALKING_USERNAME,
-                to: this.formatPhoneNumber(to),
-                message: message,
-                from: "32345"
-            })
-            return result;
+            return await this.smsHost.sendSms(this.formatPhoneNumber(to), message)
         } catch (ex) {
             throw ex;
         }

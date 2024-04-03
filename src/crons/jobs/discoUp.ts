@@ -11,8 +11,9 @@ export default class DiscoUpCron {
     private cron: CronJob;
 
     constructor(schedule?: string) {
-        const scheduleForEveryOneMinute = "* * * * *";
-        this.cron = new CronJob(schedule ?? scheduleForEveryOneMinute, () => {
+        // Schedule to run at 5 mins interval
+        const scheduleForEveryFiveMinutes = "*/5 * * * *";
+        this.cron = new CronJob(schedule ?? scheduleForEveryFiveMinutes, () => {
             this.start();
         });
         this.cron.start();
@@ -20,30 +21,22 @@ export default class DiscoUpCron {
     }
 
     async start() {
-        Logger.cronJob.info("Running cron job for checking if disco is up");
         try {
             for (const disco of DISCOS) {
-                Logger.cronJob.info(`Checking if ${disco} is up`);
                 const discoIsUp =
                     await VendorService.buyPowerCheckDiscoUp(disco);
 
-                Logger.cronJob.info(
-                    `Disco ${disco} is ${discoIsUp ? "up" : "down"}`,
-                );
                 const status = discoIsUp
                     ? ("available" as const)
                     : ("unavailable" as const);
 
-                Logger.cronJob.info(
-                    `Logging status for ${disco} to ${status}`,
-                );
                 await DiscoStatusService.addDiscoStatus({
                     disco: disco,
                     id: randomUUID(),
-                    status
+                    status,
+                    createdAt: new Date()
                 });
 
-                Logger.cronJob.info(`Logged status for ${disco} to ${status}`);
             }
         } catch (error) {
             Logger.cronJob.error(

@@ -716,7 +716,7 @@ export default class VendorService {
                 paymentType: "B2B",
                 vendType: body.vendType.toUpperCase(),
                 amount: body.amount,
-                phone: body.phone,
+                phone: body.phone.replace('+', ''),
             };
     
             const mainMeta = {

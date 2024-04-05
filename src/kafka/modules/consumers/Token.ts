@@ -345,71 +345,110 @@ export class TokenHandlerUtil {
     }
 
     static async processVendRequest<T extends Vendor>(data: TokenPurchaseData) {
-        const user = await data.transaction.$get('user')
-        if (!user) throw new CustomError('User not found for transaction', {
-            transactionId: data.transaction.id
-        })
-
-        const _data = {
-            reference: data.transaction.superagent === 'IRECHARGE' ? data.transaction.vendorReferenceId : data.transaction.reference,
-            meterNumber: data.meterNumber,
-            disco: data.disco,
-            vendType: data.vendType,
-            amount: data.transaction.amount,
-            phone: data.phone,
-            email: user.email,
-            accessToken: data.transaction.irechargeAccessToken,
-            transactionId: data.transaction.id
-        }
-
-        if (!_data.accessToken && data.transaction.superagent === 'IRECHARGE') {
-            logger.warn('No access token found for irecharge meter validation', {
+        try {
+            const user = await data.transaction.$get('user')
+            if (!user) throw new CustomError('User not found for transaction', {
                 transactionId: data.transaction.id
             })
 
-            logger.info('Validating meter', { transactionId: data.transaction.id })
-            const meterValidationResult = await VendorService.irechargeValidateMeter(_data.disco, _data.meterNumber, data.transaction.vendorReferenceId, _data.transactionId).catch((error) => {
-                throw new CustomError('Error validating meter', {
+            const _data = {
+                reference: data.transaction.superagent === 'IRECHARGE' ? data.transaction.vendorReferenceId : data.transaction.reference,
+                meterNumber: data.meterNumber,
+                disco: data.disco,
+                vendType: data.vendType,
+                amount: data.transaction.amount,
+                phone: data.phone,
+                email: user.email,
+                accessToken: data.transaction.irechargeAccessToken,
+                transactionId: data.transaction.id
+            }
+
+            if (!_data.accessToken && data.transaction.superagent === 'IRECHARGE') {
+                logger.warn('No access token found for irecharge meter validation', {
+                    transactionId: data.transaction.id
+                })
+
+                logger.info('Validating meter', { transactionId: data.transaction.id })
+                const meterValidationResult = await VendorService.irechargeValidateMeter(_data.disco, _data.meterNumber, data.transaction.vendorReferenceId, _data.transactionId).catch((error) => {
+                    throw new CustomError('Error validating meter', {
+                        transactionId: data.transaction.id,
+                    })
+                })
+
+                if (!meterValidationResult) throw new CustomError('Error validating meter', {
                     transactionId: data.transaction.id,
                 })
-            })
 
-            if (!meterValidationResult) throw new CustomError('Error validating meter', {
-                transactionId: data.transaction.id,
-            })
+                _data.accessToken = meterValidationResult.access_token
+                console.log({ meterValidationResult, info: 'New meter validation result' })
+                await TransactionService.updateSingleTransaction(data.transaction.id, { irechargeAccessToken: meterValidationResult.access_token })
+                logger.info('Generated access token for irecharge meter validation', { transactionId: data.transaction.id })
+            }
 
-            _data.accessToken = meterValidationResult.access_token
-            console.log({ meterValidationResult, info: 'New meter validation result' })
-            await TransactionService.updateSingleTransaction(data.transaction.id, { irechargeAccessToken: meterValidationResult.access_token })
-            logger.info('Generated access token for irecharge meter validation', { transactionId: data.transaction.id })
-        }
+            switch (data.transaction.superagent) {
+                case "BAXI":
+                    return await VendorService.purchaseElectricity({ data: _data, vendor: 'BAXI' })
+                case "BUYPOWERNG":
+                    return await VendorService.purchaseElectricity({ data: _data, vendor: 'BUYPOWERNG' }).catch((e) => {
+                        logger.error(
+                            'An error occured while vending from ' + data.transaction.superagent,
+                            {
+                                meta: {
+                                    transactionId: data.transaction.id,
+                                    error: error
+                                }
+                            }
+                        )
+                        return e
+                    })
+                case "IRECHARGE":
+                    return await VendorService.purchaseElectricity({ data: _data, vendor: 'IRECHARGE' })
+                default:
+                    throw new CustomError("Invalid superagent", {
+                        transactionId: data.transaction.id
+                    });
+            }
+        } catch (error) {
+            logger.error(
+                'An error occured while vending from ' + data.transaction.superagent,
+                {
+                    meta: {
+                        transactionId: data.transaction.id,
+                        error: error
+                    }
+                }
+            )
 
-        switch (data.transaction.superagent) {
-            case "BAXI":
-                return await VendorService.purchaseElectricity({ data: _data, vendor: 'BAXI' })
-            case "BUYPOWERNG":
-                return await VendorService.purchaseElectricity({ data: _data, vendor: 'BUYPOWERNG' }).catch((e) => e)
-            case "IRECHARGE":
-                return await VendorService.purchaseElectricity({ data: _data, vendor: 'IRECHARGE' })
-            default:
-                throw new CustomError("Invalid superagent", {
-                    transactionId: data.transaction.id
-                });
+            throw error
         }
     }
 
     static async requeryTransactionFromVendor(transaction: Transaction) {
-        switch (transaction.superagent) {
-            case 'BAXI':
-                return await VendorService.baxiRequeryTransaction({ reference: transaction.reference, transactionId: transaction.id })
-            case 'BUYPOWERNG':
-                return await VendorService.buyPowerRequeryTransaction({ reference: transaction.reference, transactionId: transaction.id })
-            case 'IRECHARGE':
-                return await VendorService.irechargeRequeryTransaction({ accessToken: transaction.irechargeAccessToken, serviceType: 'power', transactionId: transaction.id })
-            default:
-                throw new CustomError('Unsupported superagent', {
-                    transactionId: transaction.id
-                })
+        try {
+            switch (transaction.superagent) {
+                case 'BAXI':
+                    return await VendorService.baxiRequeryTransaction({ reference: transaction.reference, transactionId: transaction.id })
+                case 'BUYPOWERNG':
+                    return await VendorService.buyPowerRequeryTransaction({ reference: transaction.reference, transactionId: transaction.id })
+                case 'IRECHARGE':
+                    return await VendorService.irechargeRequeryTransaction({ accessToken: transaction.irechargeAccessToken, serviceType: 'power', transactionId: transaction.id })
+                default:
+                    throw new CustomError('Unsupported superagent', {
+                        transactionId: transaction.id
+                    })
+            }
+        } catch (error) {
+            logger.error(
+                'An error occured while requerying from ' + transaction.superagent,
+                {
+                    meta: {
+                        transactionId: transaction.id,
+                        error: error
+                    }
+                }
+            )
+
+            throw error
         }
     }
 

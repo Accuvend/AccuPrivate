@@ -33,6 +33,8 @@ import WaitTimeService from "../../../services/Waittime.service";
 import ResponsePathService from "../../../services/ResponsePath.service";
 import ErrorCodeService from "../../../services/ErrorCodes.service";
 import ErrorCode from "../../../models/ErrorCodes.model";
+const newrelic = require('newrelic')
+import { TokenUtil } from "../../../utils/Auth/Token";
 
 interface EventMessage {
     meter: {
@@ -92,7 +94,7 @@ const TransactionErrorCodeAndCause = {
 export async function getCurrentWaitTimeForRequeryEvent(retryCount: number) {
     // Time in seconds
     // const defaultValues = [10, 20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 10240, 20480, 40960, 81920, 163840, 327680, 655360, 1310720, 2621440, 5242880]
-    const defaultValues = [10, 120] // Default to 2mins because of buypowerng minimum wait time for requery
+    const defaultValues = [10, 10] // Default to 2mins because of buypowerng minimum wait time for requery
     const timesToRetry = defaultValues
     timesToRetry.unshift(1)
 
@@ -119,6 +121,12 @@ export async function getCurrentWaitTimeForSwitchEvent(retryCount: number) {
 type TransactionWithProductId = Exclude<Transaction, 'productCodeId'> & { productCodeId: NonNullable<Transaction['productCodeId']> }
 export class TokenHandlerUtil {
     static async flaggTransaction(transactionId: string) {
+        logger.warn(
+            'Flagging transaction after hitting requery limit',
+            {
+                meta: { transactionId }
+            }
+        )
         return await TransactionService.updateSingleTransaction(transactionId, { status: Status.FLAGGED })
     }
 
@@ -517,6 +525,8 @@ class ResponseValidationUtil {
     }): Promise<TxnValidationResponse> {
         vendor = vendor === 'BUYPOWERNG' ? 'BUYPOWER' : vendor
 
+        return newrelic.startBackgroundTransaction('UtilityFunction:ValidateTransactionCondition',async function(){
+
         console.log({
             requestType, vendor, responseObject, httpCode
         })
@@ -532,7 +542,16 @@ class ResponseValidationUtil {
             return { action: -1, vendType: vendType }
         }
 
-        console.log({ responsePath: responsePath.map(res => res.dataValues) })
+        const responsePathToCheck = responsePath.map(res => res.dataValues)
+
+        logger.info(
+            'ERROR_CODE_VALIDATION: Response paths to validate from request object', 
+            {
+                meta: {
+                    transactionId
+                }
+            }
+        )
         // Create map of refCode and values of responseObject[path]  -- (path will be gotten from responsePath.path values)
         const dbQueryParams = { request: requestType, vendor } as Record<string, string | number>
 
@@ -574,12 +593,21 @@ class ResponseValidationUtil {
             dbQueryParams[property[1]] = value
         })
 
+        logger.info(
+            'ERROR_CODE_VALIDATION: Properties to consider in request object', 
+            {
+                meta: {
+                    transactionId,
+                    propertiesToConsider
+                }
+            }
+        )
         console.log({ missingPropertiesInResponse, propertiesToConsider, propValue, dbQueryParams })
 
         // Requery transaction if some required properties are missing in the response object
         if (missingPropertiesInResponse.length > 0) {
-            logger.error('Missing properties in response', {
-                meta: { missingPropertiesInResponse, responseObject, expectedProperties: propertiesToConsider }
+            logger.error('ERROR_CODE_VALIDATION: Missing properties in response', {
+                meta: { missingPropertiesInResponse, responseObject, expectedProperties: propertiesToConsider, transactionId }
             })
             return { action: -1, vendType }
         }
@@ -589,7 +617,7 @@ class ResponseValidationUtil {
             dbQueryParams.CODE = dbQueryParams.CODE.toString()
         }
 
-        logger.info('Properties from response object', {
+        logger.info('ERROR_CODE_VALIDATION: Properties from response object', {
             meta: {
                 transactionId: responseObject.transactionId,
                 properties: propValue
@@ -600,9 +628,9 @@ class ResponseValidationUtil {
         const errorCode = await ErrorCodeService.getErrorCodesForValidation(dbQueryParams)
 
         console.log({ errorCode: errorCode?.dataValues })
-        logger.info('Error code for transaction validation', {
+        logger.info('ERROR_CODE_VALIDATION: Error code for transaction validation', {
             meta: {
-                transactionId: responseObject.transactionId,
+                transactionId: transactionId,
                 errorCodeData: errorCode?.dataValues
             }
         })
@@ -610,7 +638,7 @@ class ResponseValidationUtil {
         // Requery transaction if no error code was found
         if (!errorCode) {
             logger.error('Error code not found', {
-                meta: { requestType, vendor, httpCode }
+                meta: { requestType, vendor, httpCode, transactionId }
             })
             return { action: -1, vendType }
         }
@@ -620,7 +648,7 @@ class ResponseValidationUtil {
             // Check if disco is down
             const discoUp = await VendorService.buyPowerCheckDiscoUp(disco)
             if (!discoUp) {
-                logger.error(`Disco ${disco} is down`, {
+                logger.error(`ERROR_CODE_VALIDATION: Disco ${disco} is down`, {
                     meta: { transactionId: transactionId, disco: disco, }
                 })
             }
@@ -630,6 +658,7 @@ class ResponseValidationUtil {
 
         // If no masterResponseCode was set requery transaction
         return { action: (errorCode.accuvendMasterResponseCode as -1 | 0 | 1) ?? -1, token: dbQueryParams['TK'] as string, vendType: vendType } as TxnValidationResponse
+        })
     }
 }
 
@@ -637,142 +666,368 @@ class TokenHandler extends Registry {
     private static async handleTokenRequest(
         data: PublisherEventAndParameters[TOPICS.POWER_PURCHASE_INITIATED_BY_CUSTOMER],
     ) {
-        try {
-            console.log({ log: 'New token request', currentVendor: data.superAgent, retry: data.vendorRetryRecord })
 
-            const transaction = await TransactionService.viewSingleTransaction(
-                data.transactionId,
-            );
-            if (!transaction) {
-                logger.error(
-                    `CustomError fetching transaction with id ${data.transactionId}`,
-                    {
-                        meta: {
-                            transactionId: data.transactionId
+        return newrelic.startBackgroundTransaction('ConsumerFunction:PowerPurchaseIntiated',async function(){
+        
+            try {
+                console.log({ log: 'New token request', currentVendor: data.superAgent, retry: data.vendorRetryRecord })
+
+                const transaction = await TransactionService.viewSingleTransaction(
+                    data.transactionId,
+                );
+                if (!transaction) {
+                    logger.error(
+                        `CustomError fetching transaction with id ${data.transactionId}`,
+                        {
+                            meta: {
+                                transactionId: data.transactionId
+                            }
                         }
-                    }
-                );
-                return;
-            }
+                    );
+                    return;
+                }
 
-            const _transactionEventService = new TransactionEventService(
-                transaction, data.meter, data.superAgent, data.partner.email
-            )
-            await _transactionEventService.addVendElectricityRequestedFromVendorEvent()
-            await VendorPublisher.publishEvnetForVendElectricityRequestedFromVendor({
-                meter: data.meter,
-                transactionId: data.transactionId,
-                superAgent: data.superAgent
-            })
-            console.log({ vendorRecord: data.vendorRetryRecord, transaction: transaction.retryRecord })
-            const { user, meter, partner } = transaction;
+                const _transactionEventService = new TransactionEventService(
+                    transaction, data.meter, data.superAgent, data.partner.email
+                )
+                await _transactionEventService.addVendElectricityRequestedFromVendorEvent()
+                await VendorPublisher.publishEvnetForVendElectricityRequestedFromVendor({
+                    meter: data.meter,
+                    transactionId: data.transactionId,
+                    superAgent: data.superAgent
+                })
+                console.log({ vendorRecord: data.vendorRetryRecord, transaction: transaction.retryRecord })
+                const { user, meter, partner } = transaction;
 
-            const vendor = await VendorModelService.viewSingleVendorByName(data.superAgent)
-            if (!vendor) throw new CustomError('Vendor not found')
+                const vendor = await VendorModelService.viewSingleVendorByName(data.superAgent)
+                if (!vendor) throw new CustomError('Vendor not found')
 
-            const product = await ProductService.viewSingleProductByMasterProductCode(transaction.disco)
-            if (!product) throw new CustomError('Product not found')
+                const product = await ProductService.viewSingleProductByMasterProductCode(transaction.disco)
+                if (!product) throw new CustomError('Product not found')
 
-            const vendorProduct = await VendorProductService.viewSingleVendorProductByVendorIdAndProductId(vendor.id, product.id)
-            if (!vendorProduct) throw new CustomError('Vendor product not found')
+                const vendorProduct = await VendorProductService.viewSingleVendorProductByVendorIdAndProductId(vendor.id, product.id)
+                if (!vendorProduct) throw new CustomError('Vendor product not found')
 
-            const disco = vendorProduct.schemaData.code
-            const logMeta = { meta: { transactionId: data.transactionId } }
-            logger.info('Processing token request', logMeta);
+                const disco = vendorProduct.schemaData.code
+                const logMeta = { meta: { transactionId: data.transactionId } }
+                logger.info('Processing token request', logMeta);
 
-            // Purchase token from vendor
-            const tokenInfo = await TokenHandlerUtil.processVendRequest({
-                transaction: transaction as TokenPurchaseData['transaction'],
-                meterNumber: meter.meterNumber,
-                disco: disco,
-                vendType: meter.vendType,
-                phone: user.phoneNumber,
-                accessToken: transaction.irechargeAccessToken
-            }).catch(e => e.response);
-
-            console.log({
-                point: 'power purchase initiated',
-                tokenInfo
-            })
-            logger.info('Token request processed', logMeta);
-            const updatedTransaction = await TransactionService.viewSingleTransaction(data.transactionId);
-            if (!updatedTransaction) {
-                throw new CustomError(
-                    `CustomError fetching transaction with id ${data.transactionId}`,
-                    {
-                        transactionId: data.transactionId
-                    }
-                );
-            }
-
-            const eventMessage = {
-                meter: {
+                // Purchase token from vendor
+                const tokenInfo = await TokenHandlerUtil.processVendRequest({
+                    transaction: transaction as TokenPurchaseData['transaction'],
                     meterNumber: meter.meterNumber,
                     disco: disco,
                     vendType: meter.vendType,
-                    id: meter.id,
-                },
-                transactionId: transaction.id,
-                error: {
-                    code: (tokenInfo instanceof AxiosError
-                        ? tokenInfo.response?.data?.responseCode
-                        : undefined) as number | 0,
-                    cause: TransactionErrorCause.UNKNOWN,
-                },
-            };
+                    phone: user.phoneNumber,
+                    accessToken: transaction.irechargeAccessToken
+                }).catch(e => e.response);
 
-            const transactionEventService = new TransactionEventService(
-                transaction,
-                eventMessage.meter,
-                data.superAgent,
-                partner.email
-            );
+                console.log({
+                    point: 'power purchase initiated',
+                    tokenInfo
+                })
+                logger.info('Token request processed', logMeta);
+                const updatedTransaction = await TransactionService.viewSingleTransaction(data.transactionId);
+                if (!updatedTransaction) {
+                    throw new CustomError(
+                        `CustomError fetching transaction with id ${data.transactionId}`,
+                        {
+                            transactionId: data.transactionId
+                        }
+                    );
+                }
 
-            const response = await ResponseValidationUtil.validateTransactionCondition({
-                requestType: 'VENDREQUEST',
-                vendor: vendor.name,
-                httpCode: tokenInfo?.httpStatusCode,
-                responseObject: tokenInfo,
-                vendType: meter.vendType,
-                disco: disco,
-                transactionId: transaction.id
-            })
+                const eventMessage = {
+                    meter: {
+                        meterNumber: meter.meterNumber,
+                        disco: disco,
+                        vendType: meter.vendType,
+                        id: meter.id,
+                    },
+                    transactionId: transaction.id,
+                    error: {
+                        code: (tokenInfo instanceof AxiosError
+                            ? tokenInfo.response?.data?.responseCode
+                            : undefined) as number | 0,
+                        cause: TransactionErrorCause.UNKNOWN,
+                    },
+                };
 
-            console.log({ response })
+                const transactionEventService = new TransactionEventService(
+                    transaction,
+                    eventMessage.meter,
+                    data.superAgent,
+                    partner.email
+                );
 
-            switch (response.action) {
-                case -1:
-                    logger.error('Transaction condition pending - Requery', logMeta)
-                    await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor({
-                        eventData: { ...eventMessage, error: { ...eventMessage.error, cause: TransactionErrorCause.UNEXPECTED_ERROR } },
-                        eventService: transactionEventService,
-                        retryCount: 1,
-                        superAgent: data.superAgent,
-                        tokenInResponse: null,
-                        transactionTimedOutFromBuypower: false,
-                        vendorRetryRecord: data.vendorRetryRecord
-                    })
-                    break;
-                case 0:
-                    logger.error('Transaction condition not met - Retry', logMeta)
-                    await TokenHandlerUtil.triggerEventToRetryTransactionWithNewVendor({
-                        transaction: updatedTransaction,
-                        transactionEventService: transactionEventService,
-                        meter: eventMessage.meter,
-                        vendorRetryRecord: data.vendorRetryRecord
-                    })
-                    break;
-                case 1:
-                    logger.info('Transaction condition met - Successful', logMeta)
+                const response = await ResponseValidationUtil.validateTransactionCondition({
+                    requestType: 'VENDREQUEST',
+                    vendor: vendor.name,
+                    httpCode: tokenInfo?.httpStatusCode,
+                    responseObject: tokenInfo,
+                    vendType: meter.vendType,
+                    disco: disco,
+                    transactionId: transaction.id
+                })
 
-                    if (response.vendType === 'PREPAID') {
-                        logger.info('Token from vend', {
-                            meta: {
-                                transactionId: transaction.id,
-                                tokenFromVend: response.token
-                            }
+                console.log({ response })
+
+                switch (response.action) {
+                    case -1:
+                        logger.error('Transaction condition pending - Requery', logMeta)
+                        await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor({
+                            eventData: { ...eventMessage, error: { ...eventMessage.error, cause: TransactionErrorCause.UNEXPECTED_ERROR } },
+                            eventService: transactionEventService,
+                            retryCount: 1,
+                            superAgent: data.superAgent,
+                            tokenInResponse: null,
+                            transactionTimedOutFromBuypower: false,
+                            vendorRetryRecord: data.vendorRetryRecord
                         })
+                        break;
+                    case 0:
+                        logger.error('Transaction condition not met - Retry', logMeta)
+                        await TokenHandlerUtil.triggerEventToRetryTransactionWithNewVendor({
+                            transaction: updatedTransaction,
+                            transactionEventService: transactionEventService,
+                            meter: eventMessage.meter,
+                            vendorRetryRecord: data.vendorRetryRecord
+                        })
+                        break;
+                    case 1:
+                        logger.info('Transaction condition met - Successful', logMeta)
 
+                        if (response.vendType === 'PREPAID') {
+                            logger.info('Token from vend', {
+                                meta: {
+                                    transactionId: transaction.id,
+                                    tokenFromVend: response.token
+                                }
+                            })
+
+                            logger.info('Transaction condition met - Successful', logMeta)
+                            const _product = await ProductService.viewSingleProduct(transaction.productCodeId)
+                            if (!_product) throw new CustomError('Product not found')
+
+                            const discoLogo = DISCO_LOGO[_product.productName as keyof typeof DISCO_LOGO] ?? LOGO_URL
+                            let powerUnit =
+                                await PowerUnitService.viewSinglePowerUnitByTransactionId(
+                                    data.transactionId,
+                                );
+
+                            powerUnit = powerUnit
+                                ? await PowerUnitService.updateSinglePowerUnit(powerUnit.id, {
+                                    token: response.token,
+                                    transactionId: data.transactionId,
+                                })
+                                : await PowerUnitService.addPowerUnit({
+                                    id: uuidv4(),
+                                    transactionId: data.transactionId,
+                                    disco: data.meter.disco,
+                                    discoLogo,
+                                    amount: transaction.amount,
+                                    meterId: data.meter.id,
+                                    superagent: data.superAgent as ITransaction['superagent'],
+                                    token: response.token,
+                                    tokenFromVend: response.token,
+                                    tokenNumber: 0,
+                                    tokenUnits: "0",
+                                    address: transaction.meter.address,
+                                });
+                            await TransactionService.updateSingleTransaction(data.transactionId, {
+                                powerUnitId: powerUnit?.id, tokenFromVend: response.token
+                            });
+                            await transactionEventService.addTokenReceivedEvent(response.token ?? '');
+                            await VendorPublisher.publishEventForTokenReceivedFromVendor({
+                                transactionId: transaction!.id,
+                                user: {
+                                    name: user.name as string,
+                                    email: user.email,
+                                    address: user.address,
+                                    phoneNumber: user.phoneNumber,
+                                },
+                                partner: {
+                                    email: partner.email,
+                                },
+                                meter: {
+                                    id: meter.id,
+                                    meterNumber: meter.meterNumber,
+                                    disco: transaction!.disco,
+                                    vendType: meter.vendType,
+                                    token: response.token ?? '',
+                                },
+                            });
+                        }
+
+
+                        await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor({
+                            eventData: { ...eventMessage, error: { ...eventMessage.error, cause: TransactionErrorCause.UNEXPECTED_ERROR } },
+                            eventService: transactionEventService,
+                            retryCount: 1,
+                            superAgent: data.superAgent,
+                            tokenInResponse: null,
+                            transactionTimedOutFromBuypower: false,
+                            vendorRetryRecord: data.vendorRetryRecord
+                        })
+                        break;
+                    default:
+                        return await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
+                            {
+                                eventData: {
+                                    meter: data.meter,
+                                    transactionId: data.transactionId,
+                                    error: { code: 202, cause: TransactionErrorCause.NO_TOKEN_IN_RESPONSE },
+                                },
+                                eventService: transactionEventService,
+                                retryCount: 1,
+                                superAgent: data.superAgent,
+                                tokenInResponse: null,
+                                transactionTimedOutFromBuypower: false,
+                                vendorRetryRecord: transaction.retryRecord[transaction.retryRecord.length - 1]
+                            })
+                }
+            } catch (error) {
+                if (error instanceof CustomError) {
+                    error.meta = error.meta ?? {
+                        transactionId: data.transactionId
+                    }
+                }
+
+                throw error
+            }
+        })
+    }
+
+    private static async requeryTransactionForToken(
+        data: PublisherEventAndParameters[TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_REQUERY],
+    ) {
+
+        return newrelic.startBackgroundTransaction('ConsumerFunction:GetTransactionTokenRequery',async function(){
+            try {
+                const logMeta = { meta: { transactionId: data.transactionId } }
+                logger.warn("Requerying transaction from vendor", logMeta)
+                retry.count = data.retryCount;
+                console.log({ data: data.vendorRetryRecord, retyrCount: data.retryCount })
+
+                // Check if token has been found
+                const transaction = await TransactionService.viewSingleTransaction(data.transactionId);
+                if (!transaction) {
+                    logger.error("Transaction not found", logMeta);
+                    return;
+                }
+                // Get the current timestamp in milliseconds
+                const now = Date.now();
+
+                // Assuming you have another timestamp stored in a variable called 'previousTimestamp'
+                // For example:
+                const previousTimestamp = new Date(transaction.transactionTimestamp).getTime(); // This represents a timestamp for April 1, 2022
+
+                // Calculate the difference between the current timestamp and the previous timestamp in milliseconds
+                const differenceInMilliseconds = now - previousTimestamp;
+
+                // Convert milliseconds to hours
+                const differenceInHours = differenceInMilliseconds / (1000 * 60 * 60); // 1000 milliseconds * 60 seconds * 60 minutes
+
+                // Check if the difference is greater than two hours
+                // if (differenceInHours > 2) {
+
+                //check if transaction is greater than 2hrs then stop
+               if (differenceInHours > 2) {
+                    logger.info(`Flagged transaction with id ${transaction.id} after hitting requery limit`, {
+                                meta: { transactionId: transaction.id }
+                    })
+                    return await TransactionService.updateSingleTransaction(transaction.id, { status: Status.FLAGGED })
+                    
+                }
+
+                const user = await transaction.$get('user')
+                const meter = await transaction.$get('meter')
+                const partner = await transaction.$get('partner')
+                if (!user || !meter || !partner) {
+                    throw new CustomError("Transaction  required relations not found");
+                }
+
+                // Check if disco is up
+                const vendor = await VendorModelService.viewSingleVendorByName(data.superAgent)
+                if (!vendor) throw new CustomError('Vendor not found')
+
+                const product = await ProductService.viewSingleProductByMasterProductCode(transaction.disco)
+                if (!product) throw new CustomError('Product not found')
+
+                const vendorProduct = await VendorProductService.viewSingleVendorProductByVendorIdAndProductId(vendor.id, product.id)
+                if (!vendorProduct) throw new CustomError('Vendor product not found')
+
+                const discoCode = vendorProduct.schemaData.code
+
+                const transactionEventService = new TransactionEventService(
+                    transaction,
+                    data.meter,
+                    data.superAgent,
+                    partner.email
+                );
+                await transactionEventService.addGetTransactionTokenFromVendorInitiatedEvent();
+                await VendorPublisher.publishEventForGetTransactionTokenFromVendorInitiated(
+                    {
+                        transactionId: transaction.id,
+                        meter: data.meter,
+                        timeStamp: new Date(),
+                        superAgent: data.superAgent
+                    },
+                );
+
+                const requeryResult = await TokenHandlerUtil.requeryTransactionFromVendor(transaction).catch(e => e.response ?? {});
+
+                console.log({ requeryResult })
+                const response = await ResponseValidationUtil.validateTransactionCondition({
+                    requestType: 'REQUERY',
+                    vendor: vendor.name,
+                    httpCode: requeryResult instanceof AxiosError ? requeryResult.status : requeryResult.httpStatusCode,
+                    responseObject: requeryResult,
+                    vendType: meter.vendType,
+                    disco: discoCode,
+                    transactionId: transaction.id,
+                })
+
+                let eventMessage = {
+                    meter: {
+                        meterNumber: meter.meterNumber,
+                        disco: meter.disco,
+                        vendType: meter.vendType,
+                        id: meter.id,
+                    },
+                    transactionId: transaction.id,
+                    error: {
+                        code: (requeryResult instanceof AxiosError
+                            ? requeryResult.response?.data?.responseCode
+                            : undefined) as number | 0,
+                        cause: TransactionErrorCause.UNKNOWN,
+                    },
+                }
+
+                console.log({ response })
+                switch (response.action) {
+                    case -1:
+                        logger.error('Transaction condition pending - Requery', logMeta)
+                        await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor({
+                            eventData: { ...eventMessage, error: { ...eventMessage.error, cause: TransactionErrorCause.UNEXPECTED_ERROR } },
+                            eventService: transactionEventService,
+                            retryCount: data.retryCount + 1,
+                            superAgent: data.superAgent,
+                            tokenInResponse: null,
+                            transactionTimedOutFromBuypower: false,
+                            vendorRetryRecord: data.vendorRetryRecord
+                        })
+                        break;
+                    case 0:
+                        logger.error('Transaction condition not met - Retry', logMeta)
+                        await TokenHandlerUtil.triggerEventToRetryTransactionWithNewVendor({
+                            transaction: transaction,
+                            transactionEventService: transactionEventService,
+                            meter: eventMessage.meter,
+                            vendorRetryRecord: data.vendorRetryRecord
+                        })
+                        break;
+                    case 1:
                         logger.info('Transaction condition met - Successful', logMeta)
                         const _product = await ProductService.viewSingleProduct(transaction.productCodeId)
                         if (!_product) throw new CustomError('Product not found')
@@ -783,30 +1038,37 @@ class TokenHandler extends Registry {
                                 data.transactionId,
                             );
 
-                        powerUnit = powerUnit
-                            ? await PowerUnitService.updateSinglePowerUnit(powerUnit.id, {
-                                token: response.token,
-                                transactionId: data.transactionId,
-                            })
-                            : await PowerUnitService.addPowerUnit({
-                                id: uuidv4(),
-                                transactionId: data.transactionId,
-                                disco: data.meter.disco,
-                                discoLogo,
-                                amount: transaction.amount,
-                                meterId: data.meter.id,
-                                superagent: data.superAgent as ITransaction['superagent'],
-                                token: response.token,
-                                tokenFromVend: response.token,
-                                tokenNumber: 0,
-                                tokenUnits: "0",
-                                address: transaction.meter.address,
-                            });
+                        let tokenInResponse: string | null = null
+                        if (response.vendType == 'PREPAID') {
+                            tokenInResponse = response.token
+                            logger.info('Token from requery ', { meta: { ...logMeta, requeryToken: response.token } });
+                            await TransactionService.updateSingleTransaction(transaction.id, { tokenFromRequery: response.token })
+                            powerUnit = powerUnit
+                                ? await PowerUnitService.updateSinglePowerUnit(powerUnit.id, {
+                                    token: response.token,
+                                    transactionId: data.transactionId,
+                                })
+                                : await PowerUnitService.addPowerUnit({
+                                    id: uuidv4(),
+                                    transactionId: data.transactionId,
+                                    disco: data.meter.disco,
+                                    discoLogo,
+                                    amount: transaction.amount,
+                                    meterId: data.meter.id,
+                                    superagent: data.superAgent as ITransaction['superagent'],
+                                    token: response.token,
+                                    tokenNumber: 0,
+                                    tokenUnits: "0",
+                                    address: transaction.meter.address,
+                                });
+                        }
+
                         await TransactionService.updateSingleTransaction(data.transactionId, {
-                            powerUnitId: powerUnit?.id, tokenFromVend: response.token
+                            status: Status.COMPLETE,
+                            powerUnitId: powerUnit?.id,
                         });
-                        await transactionEventService.addTokenReceivedEvent(response.token ?? '');
-                        await VendorPublisher.publishEventForTokenReceivedFromVendor({
+                        await transactionEventService.addTokenReceivedFromRequery(tokenInResponse ?? '');
+                        return await VendorPublisher.publishEventForTokenReceivedFromRequery({
                             transactionId: transaction!.id,
                             user: {
                                 name: user.name as string,
@@ -822,246 +1084,46 @@ class TokenHandler extends Registry {
                                 meterNumber: meter.meterNumber,
                                 disco: transaction!.disco,
                                 vendType: meter.vendType,
-                                token: response.token ?? '',
+                                token: tokenInResponse ?? '',
                             },
                         });
-                    }
-
-
-                    await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor({
-                        eventData: { ...eventMessage, error: { ...eventMessage.error, cause: TransactionErrorCause.UNEXPECTED_ERROR } },
-                        eventService: transactionEventService,
-                        retryCount: 1,
-                        superAgent: data.superAgent,
-                        tokenInResponse: null,
-                        transactionTimedOutFromBuypower: false,
-                        vendorRetryRecord: data.vendorRetryRecord
-                    })
-                    break;
-                default:
-                    return await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
-                        {
-                            eventData: {
-                                meter: data.meter,
-                                transactionId: data.transactionId,
-                                error: { code: 202, cause: TransactionErrorCause.NO_TOKEN_IN_RESPONSE },
-                            },
-                            eventService: transactionEventService,
-                            retryCount: 1,
-                            superAgent: data.superAgent,
-                            tokenInResponse: null,
-                            transactionTimedOutFromBuypower: false,
-                            vendorRetryRecord: transaction.retryRecord[transaction.retryRecord.length - 1]
-                        })
-            }
-        } catch (error) {
-            if (error instanceof CustomError) {
-                error.meta = error.meta ?? {
-                    transactionId: data.transactionId
-                }
-            }
-
-            throw error
-        }
-    }
-
-    private static async requeryTransactionForToken(
-        data: PublisherEventAndParameters[TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_REQUERY],
-    ) {
-        try {
-            const logMeta = { meta: { transactionId: data.transactionId } }
-            logger.warn("Requerying transaction from vendor", logMeta)
-            retry.count = data.retryCount;
-            console.log({ data: data.vendorRetryRecord, retyrCount: data.retryCount })
-
-            // Check if token has been found
-            const transaction = await TransactionService.viewSingleTransaction(data.transactionId);
-            if (!transaction) {
-                logger.error("Transaction not found", logMeta);
-                return;
-            }
-
-            const user = await transaction.$get('user')
-            const meter = await transaction.$get('meter')
-            const partner = await transaction.$get('partner')
-            if (!user || !meter || !partner) {
-                throw new CustomError("Transaction  required relations not found");
-            }
-
-            // Check if disco is up
-            const vendor = await VendorModelService.viewSingleVendorByName(data.superAgent)
-            if (!vendor) throw new CustomError('Vendor not found')
-
-            const product = await ProductService.viewSingleProductByMasterProductCode(transaction.disco)
-            if (!product) throw new CustomError('Product not found')
-
-            const vendorProduct = await VendorProductService.viewSingleVendorProductByVendorIdAndProductId(vendor.id, product.id)
-            if (!vendorProduct) throw new CustomError('Vendor product not found')
-
-            const discoCode = vendorProduct.schemaData.code
-
-            const transactionEventService = new TransactionEventService(
-                transaction,
-                data.meter,
-                data.superAgent,
-                partner.email
-            );
-            await transactionEventService.addGetTransactionTokenFromVendorInitiatedEvent();
-            await VendorPublisher.publishEventForGetTransactionTokenFromVendorInitiated(
-                {
-                    transactionId: transaction.id,
-                    meter: data.meter,
-                    timeStamp: new Date(),
-                    superAgent: data.superAgent
-                },
-            );
-
-            const requeryResult = await TokenHandlerUtil.requeryTransactionFromVendor(transaction).catch(e => e.response ?? {});
-
-            console.log({ requeryResult })
-            const response = await ResponseValidationUtil.validateTransactionCondition({
-                requestType: 'REQUERY',
-                vendor: vendor.name,
-                httpCode: requeryResult instanceof AxiosError ? requeryResult.status : requeryResult.httpStatusCode,
-                responseObject: requeryResult,
-                vendType: meter.vendType,
-                disco: discoCode,
-                transactionId: transaction.id,
-            })
-
-            let eventMessage = {
-                meter: {
-                    meterNumber: meter.meterNumber,
-                    disco: meter.disco,
-                    vendType: meter.vendType,
-                    id: meter.id,
-                },
-                transactionId: transaction.id,
-                error: {
-                    code: (requeryResult instanceof AxiosError
-                        ? requeryResult.response?.data?.responseCode
-                        : undefined) as number | 0,
-                    cause: TransactionErrorCause.UNKNOWN,
-                },
-            }
-
-            console.log({ response })
-            switch (response.action) {
-                case -1:
-                    logger.error('Transaction condition pending - Requery', logMeta)
-                    await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor({
-                        eventData: { ...eventMessage, error: { ...eventMessage.error, cause: TransactionErrorCause.UNEXPECTED_ERROR } },
-                        eventService: transactionEventService,
-                        retryCount: 1,
-                        superAgent: data.superAgent,
-                        tokenInResponse: null,
-                        transactionTimedOutFromBuypower: false,
-                        vendorRetryRecord: data.vendorRetryRecord
-                    })
-                    break;
-                case 0:
-                    logger.error('Transaction condition not met - Retry', logMeta)
-                    await TokenHandlerUtil.triggerEventToRetryTransactionWithNewVendor({
-                        transaction: transaction,
-                        transactionEventService: transactionEventService,
-                        meter: eventMessage.meter,
-                        vendorRetryRecord: data.vendorRetryRecord
-                    })
-                    break;
-                case 1:
-                    logger.info('Transaction condition met - Successful', logMeta)
-                    const _product = await ProductService.viewSingleProduct(transaction.productCodeId)
-                    if (!_product) throw new CustomError('Product not found')
-
-                    const discoLogo = DISCO_LOGO[_product.productName as keyof typeof DISCO_LOGO] ?? LOGO_URL
-                    let powerUnit =
-                        await PowerUnitService.viewSinglePowerUnitByTransactionId(
-                            data.transactionId,
-                        );
-
-                    let tokenInResponse: string | null = null
-                    if (response.vendType == 'PREPAID') {
-                        tokenInResponse = response.token
-                        logger.info('Token from requery ', { meta: { ...logMeta, requeryToken: response.token } });
-                        await TransactionService.updateSingleTransaction(transaction.id, { tokenFromRequery: response.token })
-                        powerUnit = powerUnit
-                            ? await PowerUnitService.updateSinglePowerUnit(powerUnit.id, {
-                                token: response.token,
-                                transactionId: data.transactionId,
+                    default:
+                        logger.error('Transaction condition were not met', { meta: { transactionId: data.transactionId, response } })
+                        return await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
+                            {
+                                eventData: {
+                                    meter: data.meter,
+                                    transactionId: data.transactionId,
+                                    error: { code: 202, cause: TransactionErrorCause.NO_TOKEN_IN_RESPONSE },
+                                },
+                                eventService: transactionEventService,
+                                retryCount: data.retryCount + 1,
+                                superAgent: data.superAgent,
+                                tokenInResponse: null,
+                                transactionTimedOutFromBuypower: false,
+                                vendorRetryRecord: transaction.retryRecord[transaction.retryRecord.length - 1]
                             })
-                            : await PowerUnitService.addPowerUnit({
-                                id: uuidv4(),
-                                transactionId: data.transactionId,
-                                disco: data.meter.disco,
-                                discoLogo,
-                                amount: transaction.amount,
-                                meterId: data.meter.id,
-                                superagent: data.superAgent as ITransaction['superagent'],
-                                token: response.token,
-                                tokenNumber: 0,
-                                tokenUnits: "0",
-                                address: transaction.meter.address,
-                            });
-                    }
-
-                    await TransactionService.updateSingleTransaction(data.transactionId, {
-                        status: Status.COMPLETE,
-                        powerUnitId: powerUnit?.id,
-                    });
-                    await transactionEventService.addTokenReceivedFromRequery(tokenInResponse ?? '');
-                    return await VendorPublisher.publishEventForTokenReceivedFromRequery({
-                        transactionId: transaction!.id,
-                        user: {
-                            name: user.name as string,
-                            email: user.email,
-                            address: user.address,
-                            phoneNumber: user.phoneNumber,
-                        },
-                        partner: {
-                            email: partner.email,
-                        },
-                        meter: {
-                            id: meter.id,
-                            meterNumber: meter.meterNumber,
-                            disco: transaction!.disco,
-                            vendType: meter.vendType,
-                            token: tokenInResponse ?? '',
-                        },
-                    });
-                default:
-                    logger.error('Transaction condition were not met', { meta: { transactionId: data.transactionId, response } })
-                    return await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
-                        {
-                            eventData: {
-                                meter: data.meter,
-                                transactionId: data.transactionId,
-                                error: { code: 202, cause: TransactionErrorCause.NO_TOKEN_IN_RESPONSE },
-                            },
-                            eventService: transactionEventService,
-                            retryCount: data.retryCount + 1,
-                            superAgent: data.superAgent,
-                            tokenInResponse: null,
-                            transactionTimedOutFromBuypower: false,
-                            vendorRetryRecord: transaction.retryRecord[transaction.retryRecord.length - 1]
-                        })
-            }
-
-            return
-        } catch (error) {
-            if (error instanceof CustomError) {
-                error.meta = error.meta ?? {
-                    transactionId: data.transactionId
                 }
-            }
 
-            throw error
-        }
+                return
+            } catch (error) {
+                if (error instanceof CustomError) {
+                    error.meta = error.meta ?? {
+                        transactionId: data.transactionId
+                    }
+                }
+
+                throw error
+            }
+        })
     }
 
     private static async scheduleRequeryTransaction(
         data: PublisherEventAndParameters[TOPICS.SCHEDULE_REQUERY_FOR_TRANSACTION],
     ) {
         // Check the timeStamp, and the delayInSeconds
+
+        return newrelic.startBackgroundTransaction('ConsumerFunction:ScheduleRequeryTransaction',async function(){
         const { timeStamp, delayInSeconds } = data;
 
         const currentTimeInSeconds = Math.floor(Date.now() / 1000);
@@ -1110,12 +1172,16 @@ class TokenHandler extends Registry {
             delayInSeconds: data.delayInSeconds,
             log: 0
         })
+
+        })
     }
 
     private static async scheduleRetryTransaction(
         data: PublisherEventAndParameters[TOPICS.SCHEDULE_RETRY_FOR_TRANSACTION],
     ) {
         // Check the timeStamp, and the delayInSeconds
+
+        return newrelic.startBackgroundTransaction('ConsumerFunction:ScheduleRetryForTransaction',async function(){
         const { timeStamp, delayInSeconds } = data;
 
         const currentTimeInSeconds = Math.floor(Date.now() / 1000);
@@ -1168,6 +1234,7 @@ class TokenHandler extends Registry {
             timeStamp: data.timeStamp,
             delayInSeconds: data.delayInSeconds,
             log: 0
+        })
         })
     }
 

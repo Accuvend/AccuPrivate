@@ -2,11 +2,13 @@ import { Transaction } from "sequelize";
 import { Database } from "../models";
 import MockEndpointData from "../models/MockAPI.model";
 import { IMockEndpointData } from "../models/MockAPI.model";
+import { Op } from "sequelize";
 
 // Interface for specifying optional filters when retrieving mock data based on vendor and endpoint
 interface getAllMockDataVendorEndpointWhereClause {
     apiType?: string;
-    vendorName?: string;
+    vendorName?: string | {};
+    activated ?: boolean
 }
 
 export default class MockApiService {
@@ -18,7 +20,13 @@ export default class MockApiService {
      */
     static async getMockData(where: any): Promise<MockEndpointData | void> {
         try {
-            const data: MockEndpointData | null = await MockEndpointData.findOne({ where });
+            const whereClause: getAllMockDataVendorEndpointWhereClause = {};
+            if (where?.apiType) whereClause.apiType = where?.apiType;
+            if (where?.vendorName) whereClause.vendorName = {
+                [Op.iLike]:`${where?.vendorName}`
+            };
+            if(where.activated) whereClause.activated = where?.activated;
+            const data: MockEndpointData | null = await MockEndpointData.findOne({ where: {...whereClause} });
             if (data === null) throw Error('No item found');
             return data;
         } catch (err) {
@@ -36,7 +44,9 @@ export default class MockApiService {
         try {
             const whereClause: getAllMockDataVendorEndpointWhereClause = {};
             if (endpoint) whereClause.apiType = endpoint;
-            if (vendor) whereClause.vendorName = vendor;
+            if (vendor) whereClause.vendorName = {
+                [Op.iLike]:`${vendor}`
+            };
 
             const data: MockEndpointData[] = await MockEndpointData.findAll({ where: { ...whereClause } });
 
@@ -63,7 +73,9 @@ export default class MockApiService {
         try {
             await Database.transaction(async (tran: Transaction) => {
                 const currentTrueItem = await MockEndpointData.findOne({
-                    where: { vendorName: vendor, apiType: endpoint, activated: true }
+                    where: { vendorName: {
+                        [Op.iLike]:`${vendor}`
+                    }, apiType: endpoint, activated: true }
                 });
 
                 // If currentItem exists, set activated to false

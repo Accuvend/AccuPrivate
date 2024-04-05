@@ -28,8 +28,8 @@ class TokenUtil {
         return jwt.verify(token, ENCRYPTION_KEY)
     }
 
-    static saveTokenToCache({ key, token, expiry }: SaveTokenToCache) {
-        const response = expiry ? redisClient.setex(key, expiry, token) : redisClient.set(key, token)
+    static async saveTokenToCache({ key, token, expiry }: SaveTokenToCache) {
+        const response = expiry ? await redisClient.setex(key, expiry, token) : await redisClient.set(key, token)
         return response
     }
 
@@ -117,6 +117,7 @@ class AuthUtil {
             token = `${token_1}:${token_2}:${token_3}`
         }
 
+        console.log(' generating code')
         await TokenUtil.saveTokenToCache({ key: tokenKey, token, expiry })
 
         return token as GeneratedCode<T>

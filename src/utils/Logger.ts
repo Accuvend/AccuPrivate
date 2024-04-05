@@ -11,7 +11,7 @@ declare module "winston" {
 }
 
 // Define a custom transport to write logs to PostgreSQL using Sequelize
-class YourCustomPostgresTransport extends winston.Transport {
+class PostgresTransport extends winston.Transport {
     log(info: any, callback: Function) {
         const { timestamp, level, message, meta } = info;
         SysLog.create({
@@ -102,8 +102,8 @@ const transports =
                     enumerateErrorFormat(),
                 ),
             }),
-            ...fileTransports,
-            new YourCustomPostgresTransport(), // Replace this with your custom transport
+            // ...fileTransports,
+            new PostgresTransport(), // Replace this with your custom transport
         ]
         : [
             new winston.transports.Console({

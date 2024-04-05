@@ -70,10 +70,7 @@ export default class EntityService {
     }
 
     static async getAssociatedProfile(entity: Entity): Promise<PartnerProfile | TeamMemberProfile | null> {
-        const partnerProfile = await entity.$get('partnerProfile')
-        const teamMemberProfile = await entity.$get('teamMemberProfile')
-
-        return partnerProfile || teamMemberProfile
+        return entity.partnerProfileId ? await entity.$get('partnerProfile') : await entity.$get('teamMemberProfile')
     }
 
     static async viewEntityByTeamMemberProfileId(teamMemberProfileId: string): Promise<Entity | null> {

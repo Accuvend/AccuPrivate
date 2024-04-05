@@ -51,7 +51,6 @@ export default class MessageProcessorFactory {
 
             await this.processMessage(data)
 
-            // Commit offset
             await messagePayload.heartbeat()
         } catch (error) {
             console.log(error)

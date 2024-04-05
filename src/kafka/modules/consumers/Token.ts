@@ -91,13 +91,17 @@ const TransactionErrorCodeAndCause = {
 }
 
 
-export async function getCurrentWaitTimeForRequeryEvent(retryCount: number) {
+export async function getCurrentWaitTimeForRequeryEvent(retryCount: number, superAgent?: Transaction['superagent']) {
     // Time in seconds
     // const defaultValues = [10, 20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 10240, 20480, 40960, 81920, 163840, 327680, 655360, 1310720, 2621440, 5242880]
     const defaultValues = [10, 10] // Default to 2mins because of buypowerng minimum wait time for requery
     const timesToRetry = defaultValues
     timesToRetry.unshift(1)
 
+    if (superAgent === 'BUYPOWERNG') {
+        return 30
+    }
+    
     if (retryCount >= timesToRetry.length) {
         return timesToRetry[timesToRetry.length - 1]
     }
@@ -186,7 +190,7 @@ export class TokenHandlerUtil {
             retryCount,
             superAgent,
             vendorRetryRecord,
-            waitTime: await getCurrentWaitTimeForRequeryEvent(retryCount)
+            waitTime: await getCurrentWaitTimeForRequeryEvent(retryCount, superAgent)
         };
 
         // Publish event in increasing intervals of seconds i.e 1, 2, 4, 8, 16, 32, 64, 128, 256, 512

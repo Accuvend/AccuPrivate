@@ -9,6 +9,7 @@ import { RoleEnum } from "../models/Role.model";
 import VendorAdminController from "../controllers/Admin/VendorApi.controller";
 
 const router: Router = express.Router()
+const newrelic: any = require('newrelic')
 
 router
     .post('/validate/meter', validateApiKey, VendorController.validateMeter)

@@ -44,7 +44,7 @@ import VendorRates from "../../../models/VendorRates.model";
 import ProductService from "../../../services/Product.service";
 import VendorProduct, { VendorProductSchemaData } from "../../../models/VendorProduct.model";
 import Vendor from "../../../models/Vendor.model";
-require('newrelic');
+const newrelic: any = require('newrelic');
 import VendorProductService from "../../../services/VendorProduct.service";
 import VendorDocService from '../../../services/Vendor.service'
 import { generateRandomString, generateRandonNumbers } from "../../../utils/Helper";
@@ -263,6 +263,7 @@ class VendorControllerValdator {
         meterNumber: string, disco: string, vendType: 'PREPAID' | 'POSTPAID', transaction: Transaction
     }) {
         async function validateWithBuypower() {
+            
             Logger.apiRequest.info('Validating meter with buypower', { meta: { transactionId: transaction.id } })
             const buypowerVendor = await VendorDocService.viewSingleVendorByName('BUYPOWERNG')
             if (!buypowerVendor) {
@@ -457,6 +458,8 @@ export default class VendorController {
     }
 
     static async validateMeter(req: Request, res: Response, next: NextFunction) {
+        // setting transaction name for validate meter in new relic
+        newrelic.setTransactionName('ValidateMeter')
         const {
             meterNumber,
             email,
@@ -668,6 +671,7 @@ export default class VendorController {
     }
 
     static async requestToken(req: Request, res: Response, next: NextFunction) {
+        newrelic.setTransactionName('RequestToken')
         const { transactionId, bankComment, vendType, bankRefId } =
             req.query as Record<string, any>;
         console.log({ transactionId, bankComment, vendType })
@@ -747,7 +751,8 @@ export default class VendorController {
         vendorTokenConsumer.setConsumerInstance(vendorTokenConsumer)
         try {
             console.log({ transaction: transaction.superagent })
-            const response = await VendorPublisher.publishEventForInitiatedPowerPurchase({
+
+            const response = await newrelic.startBackgroundTransaction('KafkaPublish:PowePurchaseInitiated',function(){VendorPublisher.publishEventForInitiatedPowerPurchase({
                 transactionId: transaction.id,
                 user: {
                     name: user.name as string,
@@ -763,6 +768,7 @@ export default class VendorController {
                 vendorRetryRecord: {
                     retryCount: 1,
                 }
+            }) 
             })
 
             if (response instanceof Error) {
@@ -853,6 +859,7 @@ export default class VendorController {
             return
         } catch (error) {
             logger.error('SuttingDown vendor token consumer of id')
+            console.log(error)
             await vendorTokenConsumer.shutdown()
         }
     }

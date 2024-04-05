@@ -25,6 +25,7 @@
         "aws-msk-iam-sasl-signer-js": "github:aws/aws-msk-iam-sasl-signer-js",
         "axios": "^1.6.0",
         "bcrypt": "^5.1.1",
+        "bcryptjs": "^2.4.3",
         "body-parser": "^1.20.2",
         "cloudinary": "^1.41.0",
         "cors": "^2.8.5",
@@ -64,6 +65,7 @@
     "devDependencies": {
         "@types/africastalking": "^0.6.2",
         "@types/bcrypt": "^5.0.2",
+        "@types/bcryptjs": "^2.4.6",
         "@types/cors": "^2.8.15",
         "@types/ejs": "^3.1.5",
         "@types/express": "^4.17.20",

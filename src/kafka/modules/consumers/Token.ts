@@ -525,139 +525,140 @@ class ResponseValidationUtil {
     }): Promise<TxnValidationResponse> {
         vendor = vendor === 'BUYPOWERNG' ? 'BUYPOWER' : vendor
 
-        return newrelic.startBackgroundTransaction('UtilityFunction:ValidateTransactionCondition',async function(){
+        return newrelic.startBackgroundTransaction('UtilityFunction:ValidateTransactionCondition', async function () {
 
-        console.log({
-            requestType, vendor, responseObject, httpCode
-        })
-
-        // Get response path and refCode for current request and vendor
-        const responsePath = await ResponsePathService.viewResponsePathForValidation({
-            requestType, vendor
-        })
-        if (!responsePath) {
-            logger.error('Response path not found', {
-                meta: { requestType, vendor }
+            console.log({
+                requestType, vendor, responseObject, httpCode
             })
-            return { action: -1, vendType: vendType }
-        }
 
-        const responsePathToCheck = responsePath.map(res => res.dataValues)
-
-        logger.info(
-            'ERROR_CODE_VALIDATION: Response paths to validate from request object', 
-            {
-                meta: {
-                    transactionId
-                }
-            }
-        )
-        // Create map of refCode and values of responseObject[path]  -- (path will be gotten from responsePath.path values)
-        const dbQueryParams = { request: requestType, vendor } as Record<string, string | number>
-
-        const propertiesToConsider: [string, string][] = [] // [[path, refCode]]
-
-        // Get the values to consider
-        Array.from(responsePath).forEach(path => {
-            propertiesToConsider.push([path.path, path.accuvendRefCode])
-        })
-
-        function getFieldValueFromResponseObject(prop: string) {
-            let _prop: Record<string, any> | undefined = responseObject
-            const path = prop.split('.')
-            for (const p of path) {
-                if (_prop && _prop[p]) {
-                    _prop = _prop[p]
-                } else {
-                    _prop = undefined
-                }
-            }
-
-            return _prop as any
-        }
-
-        const missingPropertiesInResponse: string[] = []
-        const propValue = {} as Record<string, any>
-
-        // Check if they exist in the response
-        Array.from(propertiesToConsider).forEach(property => {
-            const value = getFieldValueFromResponseObject(property[0])
-            if (!value) {
-                logger.error(`Property ${property} not found in response`, {
-                    meta: { property }
+            // Get response path and refCode for current request and vendor
+            const responsePath = await ResponsePathService.viewResponsePathForValidation({
+                requestType, vendor
+            })
+            if (!responsePath) {
+                logger.error('ERROR_CODE_VALIDATION: Response path not found', {
+                    meta: { requestType, vendor, transactionId }
                 })
-                missingPropertiesInResponse.push(property[0])
+                return { action: -1, vendType: vendType }
             }
 
-            propValue[property[0]] = value
-            dbQueryParams[property[1]] = value
-        })
+            const responsePathToCheck = responsePath.map(res => res.dataValues)
 
-        logger.info(
-            'ERROR_CODE_VALIDATION: Properties to consider in request object', 
-            {
-                meta: {
-                    transactionId,
-                    propertiesToConsider
+            logger.info(
+                'ERROR_CODE_VALIDATION: Response paths to validate from request object',
+                {
+                    meta: {
+                        transactionId,
+                        responsePathToCheck
+                    }
                 }
-            }
-        )
-        console.log({ missingPropertiesInResponse, propertiesToConsider, propValue, dbQueryParams })
+            )
+            // Create map of refCode and values of responseObject[path]  -- (path will be gotten from responsePath.path values)
+            const dbQueryParams = { request: requestType, vendor } as Record<string, string | number>
 
-        // Requery transaction if some required properties are missing in the response object
-        if (missingPropertiesInResponse.length > 0) {
-            logger.error('ERROR_CODE_VALIDATION: Missing properties in response', {
-                meta: { missingPropertiesInResponse, responseObject, expectedProperties: propertiesToConsider, transactionId }
+            const propertiesToConsider: [string, string][] = [] // [[path, refCode]]
+
+            // Get the values to consider
+            Array.from(responsePath).forEach(path => {
+                propertiesToConsider.push([path.path, path.accuvendRefCode])
             })
-            return { action: -1, vendType }
-        }
 
-        // Convert CODE (httpStatusCode) to string if it is a number, because the db stores it as a string
-        if (dbQueryParams.CODE) {
-            dbQueryParams.CODE = dbQueryParams.CODE.toString()
-        }
+            function getFieldValueFromResponseObject(prop: string) {
+                let _prop: Record<string, any> | undefined = responseObject
+                const path = prop.split('.')
+                for (const p of path) {
+                    if (_prop && _prop[p]) {
+                        _prop = _prop[p]
+                    } else {
+                        _prop = undefined
+                    }
+                }
 
-        logger.info('ERROR_CODE_VALIDATION: Properties from response object', {
-            meta: {
-                transactionId: responseObject.transactionId,
-                properties: propValue
+                return _prop as any
             }
-        })
 
-        // Search for error code with match and return the accuvendMasterResponseCode
-        const errorCode = await ErrorCodeService.getErrorCodesForValidation(dbQueryParams)
+            const missingPropertiesInResponse: string[] = []
+            const propValue = {} as Record<string, any>
 
-        console.log({ errorCode: errorCode?.dataValues })
-        logger.info('ERROR_CODE_VALIDATION: Error code for transaction validation', {
-            meta: {
-                transactionId: transactionId,
-                errorCodeData: errorCode?.dataValues
-            }
-        })
+            // Check if they exist in the response
+            Array.from(propertiesToConsider).forEach(property => {
+                const value = getFieldValueFromResponseObject(property[0])
+                if (!value) {
+                    logger.error(`Property ${property} not found in response`, {
+                        meta: { property }
+                    })
+                    missingPropertiesInResponse.push(property[0])
+                }
 
-        // Requery transaction if no error code was found
-        if (!errorCode) {
-            logger.error('Error code not found', {
-                meta: { requestType, vendor, httpCode, transactionId }
+                propValue[property[0]] = value
+                dbQueryParams[property[1]] = value
             })
-            return { action: -1, vendType }
-        }
 
-        // Requery transaction if no token was found and vendType is PREPAID
-        if (!dbQueryParams['TK'] && vendType === 'PREPAID') {
-            // Check if disco is down
-            const discoUp = await VendorService.buyPowerCheckDiscoUp(disco)
-            if (!discoUp) {
-                logger.error(`ERROR_CODE_VALIDATION: Disco ${disco} is down`, {
-                    meta: { transactionId: transactionId, disco: disco, }
+            logger.info(
+                'ERROR_CODE_VALIDATION: Properties to consider in request object',
+                {
+                    meta: {
+                        transactionId,
+                        propertiesToConsider
+                    }
+                }
+            )
+            console.log({ missingPropertiesInResponse, propertiesToConsider, propValue, dbQueryParams })
+
+            // Requery transaction if some required properties are missing in the response object
+            if (missingPropertiesInResponse.length > 0) {
+                logger.error('ERROR_CODE_VALIDATION: Missing properties in response', {
+                    meta: { missingPropertiesInResponse, responseObject, expectedProperties: propertiesToConsider, transactionId }
                 })
+                return { action: -1, vendType }
             }
 
-            return { action: -1, vendType }
-        }
+            // Convert CODE (httpStatusCode) to string if it is a number, because the db stores it as a string
+            if (dbQueryParams.CODE) {
+                dbQueryParams.CODE = dbQueryParams.CODE.toString()
+            }
 
-        // If no masterResponseCode was set requery transaction
-        return { action: (errorCode.accuvendMasterResponseCode as -1 | 0 | 1) ?? -1, token: dbQueryParams['TK'] as string, vendType: vendType } as TxnValidationResponse
+            logger.info('ERROR_CODE_VALIDATION: Properties from response object', {
+                meta: {
+                    transactionId: transactionId,
+                    properties: propValue
+                }
+            })
+
+            // Search for error code with match and return the accuvendMasterResponseCode
+            const errorCode = await ErrorCodeService.getErrorCodesForValidation(dbQueryParams)
+
+            console.log({ errorCode: errorCode?.dataValues })
+            logger.info('ERROR_CODE_VALIDATION: Error code for transaction validation', {
+                meta: {
+                    transactionId: transactionId,
+                    errorCodeData: errorCode?.dataValues
+                }
+            })
+
+            // Requery transaction if no error code was found
+            if (!errorCode) {
+                logger.error('Error code not found', {
+                    meta: { requestType, vendor, httpCode, transactionId }
+                })
+                return { action: -1, vendType }
+            }
+
+            // Requery transaction if no token was found and vendType is PREPAID
+            if (!dbQueryParams['TK'] && vendType === 'PREPAID') {
+                // Check if disco is down
+                const discoUp = await VendorService.buyPowerCheckDiscoUp(disco)
+                if (!discoUp) {
+                    logger.error(`ERROR_CODE_VALIDATION: Disco ${disco} is down`, {
+                        meta: { transactionId: transactionId, disco: disco, }
+                    })
+                }
+
+                return { action: -1, vendType }
+            }
+
+            // If no masterResponseCode was set requery transaction
+            return { action: (errorCode.accuvendMasterResponseCode as -1 | 0 | 1) ?? -1, token: dbQueryParams['TK'] as string, vendType: vendType } as TxnValidationResponse
         })
     }
 }
@@ -667,8 +668,8 @@ class TokenHandler extends Registry {
         data: PublisherEventAndParameters[TOPICS.POWER_PURCHASE_INITIATED_BY_CUSTOMER],
     ) {
 
-        return newrelic.startBackgroundTransaction('ConsumerFunction:PowerPurchaseIntiated',async function(){
-        
+        return newrelic.startBackgroundTransaction('ConsumerFunction:PowerPurchaseIntiated', async function () {
+
             try {
                 console.log({ log: 'New token request', currentVendor: data.superAgent, retry: data.vendorRetryRecord })
 
@@ -902,7 +903,7 @@ class TokenHandler extends Registry {
         data: PublisherEventAndParameters[TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_REQUERY],
     ) {
 
-        return newrelic.startBackgroundTransaction('ConsumerFunction:GetTransactionTokenRequery',async function(){
+        return newrelic.startBackgroundTransaction('ConsumerFunction:GetTransactionTokenRequery', async function () {
             try {
                 const logMeta = { meta: { transactionId: data.transactionId } }
                 logger.warn("Requerying transaction from vendor", logMeta)
@@ -932,12 +933,12 @@ class TokenHandler extends Registry {
                 // if (differenceInHours > 2) {
 
                 //check if transaction is greater than 2hrs then stop
-               if (differenceInHours > 2) {
+                if (differenceInHours > 2) {
                     logger.info(`Flagged transaction with id ${transaction.id} after hitting requery limit`, {
-                                meta: { transactionId: transaction.id }
+                        meta: { transactionId: transaction.id }
                     })
                     return await TransactionService.updateSingleTransaction(transaction.id, { status: Status.FLAGGED })
-                    
+
                 }
 
                 const user = await transaction.$get('user')
@@ -1123,55 +1124,55 @@ class TokenHandler extends Registry {
     ) {
         // Check the timeStamp, and the delayInSeconds
 
-        return newrelic.startBackgroundTransaction('ConsumerFunction:ScheduleRequeryTransaction',async function(){
-        const { timeStamp, delayInSeconds } = data;
+        return newrelic.startBackgroundTransaction('ConsumerFunction:ScheduleRequeryTransaction', async function () {
+            const { timeStamp, delayInSeconds } = data;
 
-        const currentTimeInSeconds = Math.floor(Date.now() / 1000);
-        const timeStampInSeconds = Math.floor(new Date(timeStamp).getTime() / 1000);
-        const timeInSecondsSinceInit = currentTimeInSeconds - timeStampInSeconds;
-        const timeDifference = delayInSeconds - timeInSecondsSinceInit
+            const currentTimeInSeconds = Math.floor(Date.now() / 1000);
+            const timeStampInSeconds = Math.floor(new Date(timeStamp).getTime() / 1000);
+            const timeInSecondsSinceInit = currentTimeInSeconds - timeStampInSeconds;
+            const timeDifference = delayInSeconds - timeInSecondsSinceInit
 
-        console.log({ timeDifference, timeStamp, currentTime: new Date(), delayInSeconds, timeInSecondsSinceInit })
+            console.log({ timeDifference, timeStamp, currentTime: new Date(), delayInSeconds, timeInSecondsSinceInit })
 
-        if (timeDifference <= 0) {
-            const existingTransaction = await TransactionService.viewSingleTransaction(data.scheduledMessagePayload.transactionId)
-            if (!existingTransaction) {
-                throw new CustomError('Transaction not found')
-            }
+            if (timeDifference <= 0) {
+                const existingTransaction = await TransactionService.viewSingleTransaction(data.scheduledMessagePayload.transactionId)
+                if (!existingTransaction) {
+                    throw new CustomError('Transaction not found')
+                }
 
-            // Check if transaction has been requeried successfuly before
-            const tokenReceivedFromRequery = await EventService.viewSingleEventByTransactionIdAndType(data.scheduledMessagePayload.transactionId, TOPICS.TOKEN_RECIEVED_FROM_REQUERY)
-            if (tokenReceivedFromRequery) {
-                logger.warn('Transaction has been requeried successfully before', {
-                    meta: { transactionId: data.scheduledMessagePayload.transactionId, currentMessagePayload: data }
+                // Check if transaction has been requeried successfuly before
+                const tokenReceivedFromRequery = await EventService.viewSingleEventByTransactionIdAndType(data.scheduledMessagePayload.transactionId, TOPICS.TOKEN_RECIEVED_FROM_REQUERY)
+                if (tokenReceivedFromRequery) {
+                    logger.warn('Transaction has been requeried successfully before', {
+                        meta: { transactionId: data.scheduledMessagePayload.transactionId, currentMessagePayload: data }
+                    })
+                    return
+                }
+
+                const transactionEventService = new TransactionEventService(
+                    existingTransaction,
+                    data.scheduledMessagePayload.meter,
+                    existingTransaction.superagent,
+                    data.scheduledMessagePayload.superAgent,
+                )
+                await transactionEventService.addScheduleRequeryEvent({
+                    timeStamp: new Date().toString(),
+                    waitTime: delayInSeconds
                 })
-                return
+                return await VendorPublisher.publishEventForGetTransactionTokenRequestedFromVendorRetry(data.scheduledMessagePayload)
             }
 
-            const transactionEventService = new TransactionEventService(
-                existingTransaction,
-                data.scheduledMessagePayload.meter,
-                existingTransaction.superagent,
-                data.scheduledMessagePayload.superAgent,
-            )
-            await transactionEventService.addScheduleRequeryEvent({
-                timeStamp: new Date().toString(),
-                waitTime: delayInSeconds
+            // Change error cause to RESCHEDULED_BEFORE_WAIT_TIME
+            data.scheduledMessagePayload.error.cause = TransactionErrorCause.RESCHEDULED_BEFORE_WAIT_TIME
+
+            // logger.info("Rescheduling requery for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
+            // Else, schedule a new event to requery transaction from vendor
+            return await VendorPublisher.publishEventToScheduleRequery({
+                scheduledMessagePayload: data.scheduledMessagePayload,
+                timeStamp: data.timeStamp,
+                delayInSeconds: data.delayInSeconds,
+                log: 0
             })
-            return await VendorPublisher.publishEventForGetTransactionTokenRequestedFromVendorRetry(data.scheduledMessagePayload)
-        }
-
-        // Change error cause to RESCHEDULED_BEFORE_WAIT_TIME
-        data.scheduledMessagePayload.error.cause = TransactionErrorCause.RESCHEDULED_BEFORE_WAIT_TIME
-
-        // logger.info("Rescheduling requery for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
-        // Else, schedule a new event to requery transaction from vendor
-        return await VendorPublisher.publishEventToScheduleRequery({
-            scheduledMessagePayload: data.scheduledMessagePayload,
-            timeStamp: data.timeStamp,
-            delayInSeconds: data.delayInSeconds,
-            log: 0
-        })
 
         })
     }
@@ -1181,60 +1182,60 @@ class TokenHandler extends Registry {
     ) {
         // Check the timeStamp, and the delayInSeconds
 
-        return newrelic.startBackgroundTransaction('ConsumerFunction:ScheduleRetryForTransaction',async function(){
-        const { timeStamp, delayInSeconds } = data;
+        return newrelic.startBackgroundTransaction('ConsumerFunction:ScheduleRetryForTransaction', async function () {
+            const { timeStamp, delayInSeconds } = data;
 
-        const currentTimeInSeconds = Math.floor(Date.now() / 1000);
-        const timeStampInSeconds = Math.floor(new Date(timeStamp).getTime() / 1000);
-        const timeInSecondsSinceInit = currentTimeInSeconds - timeStampInSeconds;
-        const timeDifference = delayInSeconds - timeInSecondsSinceInit
+            const currentTimeInSeconds = Math.floor(Date.now() / 1000);
+            const timeStampInSeconds = Math.floor(new Date(timeStamp).getTime() / 1000);
+            const timeInSecondsSinceInit = currentTimeInSeconds - timeStampInSeconds;
+            const timeDifference = delayInSeconds - timeInSecondsSinceInit
 
-        console.log({ timeDifference, timeStamp, currentTime: new Date(), delayInSeconds, timeInSecondsSinceInit })
+            console.log({ timeDifference, timeStamp, currentTime: new Date(), delayInSeconds, timeInSecondsSinceInit })
 
-        // Check if current time is greater than the timeStamp + delayInSeconds
-        if (timeDifference <= 0) {
-            const existingTransaction = await TransactionService.viewSingleTransaction(data.scheduledMessagePayload.transactionId)
-            if (!existingTransaction) {
-                throw new CustomError('Transaction not found')
+            // Check if current time is greater than the timeStamp + delayInSeconds
+            if (timeDifference <= 0) {
+                const existingTransaction = await TransactionService.viewSingleTransaction(data.scheduledMessagePayload.transactionId)
+                if (!existingTransaction) {
+                    throw new CustomError('Transaction not found')
+                }
+
+                const transactionEventService = new TransactionEventService(
+                    existingTransaction,
+                    data.scheduledMessagePayload.meter,
+                    existingTransaction.superagent,
+                    data.scheduledMessagePayload.superAgent,
+                )
+
+                await TransactionService.updateSingleTransaction(data.scheduledMessagePayload.transactionId, {
+                    superagent: data.scheduledMessagePayload.newVendor,
+                    retryRecord: data.scheduledMessagePayload.retryRecord,
+                    vendorReferenceId: data.scheduledMessagePayload.newTransactionReference,
+                    reference: data.scheduledMessagePayload.newTransactionReference,
+                    irechargeAccessToken: data.scheduledMessagePayload.irechargeAccessToken,
+                    previousVendors: data.scheduledMessagePayload.previousVendors,
+                })
+
+                await VendorPublisher.publishEventForRetryPowerPurchaseWithNewVendor({
+                    meter: data.scheduledMessagePayload.meter,
+                    partner: data.scheduledMessagePayload.partner,
+                    transactionId: data.scheduledMessagePayload.transactionId,
+                    superAgent: data.scheduledMessagePayload.superAgent,
+                    user: data.scheduledMessagePayload.user,
+                    newVendor: data.scheduledMessagePayload.newVendor,
+                })
+
+                await transactionEventService.addPowerPurchaseInitiatedEvent(data.scheduledMessagePayload.newTransactionReference, existingTransaction.amount);
+                return await VendorPublisher.publishEventForInitiatedPowerPurchase(data.scheduledMessagePayload)
             }
 
-            const transactionEventService = new TransactionEventService(
-                existingTransaction,
-                data.scheduledMessagePayload.meter,
-                existingTransaction.superagent,
-                data.scheduledMessagePayload.superAgent,
-            )
-
-            await TransactionService.updateSingleTransaction(data.scheduledMessagePayload.transactionId, {
-                superagent: data.scheduledMessagePayload.newVendor,
-                retryRecord: data.scheduledMessagePayload.retryRecord,
-                vendorReferenceId: data.scheduledMessagePayload.newTransactionReference,
-                reference: data.scheduledMessagePayload.newTransactionReference,
-                irechargeAccessToken: data.scheduledMessagePayload.irechargeAccessToken,
-                previousVendors: data.scheduledMessagePayload.previousVendors,
+            // logger.info("Rescheduling retry for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
+            // Else, schedule a new event to requery transaction from vendor
+            return await VendorPublisher.publishEventToScheduleRetry({
+                scheduledMessagePayload: data.scheduledMessagePayload,
+                timeStamp: data.timeStamp,
+                delayInSeconds: data.delayInSeconds,
+                log: 0
             })
-
-            await VendorPublisher.publishEventForRetryPowerPurchaseWithNewVendor({
-                meter: data.scheduledMessagePayload.meter,
-                partner: data.scheduledMessagePayload.partner,
-                transactionId: data.scheduledMessagePayload.transactionId,
-                superAgent: data.scheduledMessagePayload.superAgent,
-                user: data.scheduledMessagePayload.user,
-                newVendor: data.scheduledMessagePayload.newVendor,
-            })
-
-            await transactionEventService.addPowerPurchaseInitiatedEvent(data.scheduledMessagePayload.newTransactionReference, existingTransaction.amount);
-            return await VendorPublisher.publishEventForInitiatedPowerPurchase(data.scheduledMessagePayload)
-        }
-
-        // logger.info("Rescheduling retry for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
-        // Else, schedule a new event to requery transaction from vendor
-        return await VendorPublisher.publishEventToScheduleRetry({
-            scheduledMessagePayload: data.scheduledMessagePayload,
-            timeStamp: data.timeStamp,
-            delayInSeconds: data.delayInSeconds,
-            log: 0
-        })
         })
     }
 

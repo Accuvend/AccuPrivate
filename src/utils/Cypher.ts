@@ -1,4 +1,4 @@
-import bcrypt from 'bcrypt'
+import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { CRYPTO_IV, CRYPTO_PASSWORD } from './Constants';
 import { generateRandomString } from './Helper';
@@ -13,8 +13,8 @@ class Cypher {
         return bcrypt.hashSync(password, salt);
     }
 
-    static comparePassword(password: string, hash: string): boolean {
-        return bcrypt.compareSync(password, hash);
+    static async comparePassword(password: string, hash: string): Promise<boolean> {
+        return await bcrypt.compareSync(password, hash);
     }
 
     static encryptString(data: string): string {

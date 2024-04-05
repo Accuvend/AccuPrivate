@@ -44,6 +44,9 @@ export default class DiscoStatus extends Model<IDiscoStatus | DiscoStatus> {
 
     @Column({ type: DataType.STRING })
     disco: string;
+
+    @Column({ type: DataType.DATE })
+    createdAt: Date;
 }
 
 
@@ -52,5 +55,6 @@ export interface IDiscoStatus {
     id: string;
     disco: string;
     status: 'available'  | 'unavailable';
+    createdAt?: Date;
 }
 

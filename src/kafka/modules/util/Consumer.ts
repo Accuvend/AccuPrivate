@@ -24,9 +24,13 @@ export default class ConsumerFactory {
         try {
             await this.kafkaConsumer.connect()
             await this.kafkaConsumer.subscribe(subscription)
-
             await this.kafkaConsumer.run({
-                eachMessage: (messagePayload) => this.messageProcessor.processEachMessage(messagePayload as MessagePayload)
+                eachMessage: async (messagePayload) => {
+                    await this.messageProcessor.processEachMessage(messagePayload as MessagePayload)
+                    await this.kafkaConsumer.commitOffsets([
+                        { topic: messagePayload.topic, partition: messagePayload.partition, offset: messagePayload.message.offset }
+                    ])
+                }
             })
 
         } catch (error) {

@@ -92,7 +92,7 @@ const TransactionErrorCodeAndCause = {
 export async function getCurrentWaitTimeForRequeryEvent(retryCount: number) {
     // Time in seconds
     // const defaultValues = [10, 20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 10240, 20480, 40960, 81920, 163840, 327680, 655360, 1310720, 2621440, 5242880]
-    const defaultValues = [10, 120] // Default to 2mins because of buypowerng minimum wait time for requery
+    const defaultValues = [10, 10] // Default to 2mins because of buypowerng minimum wait time for requery
     const timesToRetry = defaultValues
     timesToRetry.unshift(1)
 
@@ -532,7 +532,16 @@ class ResponseValidationUtil {
             return { action: -1, vendType: vendType }
         }
 
-        console.log({ responsePath: responsePath.map(res => res.dataValues) })
+        const responsePathToCheck = responsePath.map(res => res.dataValues)
+
+        logger.info(
+            'ERROR_CODE_VALIDATION: Response paths to validate from request object', 
+            {
+                meta: {
+                    transactionId
+                }
+            }
+        )
         // Create map of refCode and values of responseObject[path]  -- (path will be gotten from responsePath.path values)
         const dbQueryParams = { request: requestType, vendor } as Record<string, string | number>
 
@@ -574,12 +583,21 @@ class ResponseValidationUtil {
             dbQueryParams[property[1]] = value
         })
 
+        logger.info(
+            'ERROR_CODE_VALIDATION: Properties to consider in request object', 
+            {
+                meta: {
+                    transactionId,
+                    propertiesToConsider
+                }
+            }
+        )
         console.log({ missingPropertiesInResponse, propertiesToConsider, propValue, dbQueryParams })
 
         // Requery transaction if some required properties are missing in the response object
         if (missingPropertiesInResponse.length > 0) {
-            logger.error('Missing properties in response', {
-                meta: { missingPropertiesInResponse, responseObject, expectedProperties: propertiesToConsider }
+            logger.error('ERROR_CODE_VALIDATION: Missing properties in response', {
+                meta: { missingPropertiesInResponse, responseObject, expectedProperties: propertiesToConsider, transactionId }
             })
             return { action: -1, vendType }
         }
@@ -589,7 +607,7 @@ class ResponseValidationUtil {
             dbQueryParams.CODE = dbQueryParams.CODE.toString()
         }
 
-        logger.info('Properties from response object', {
+        logger.info('ERROR_CODE_VALIDATION: Properties from response object', {
             meta: {
                 transactionId: responseObject.transactionId,
                 properties: propValue
@@ -600,9 +618,9 @@ class ResponseValidationUtil {
         const errorCode = await ErrorCodeService.getErrorCodesForValidation(dbQueryParams)
 
         console.log({ errorCode: errorCode?.dataValues })
-        logger.info('Error code for transaction validation', {
+        logger.info('ERROR_CODE_VALIDATION: Error code for transaction validation', {
             meta: {
-                transactionId: responseObject.transactionId,
+                transactionId: transactionId,
                 errorCodeData: errorCode?.dataValues
             }
         })
@@ -610,7 +628,7 @@ class ResponseValidationUtil {
         // Requery transaction if no error code was found
         if (!errorCode) {
             logger.error('Error code not found', {
-                meta: { requestType, vendor, httpCode }
+                meta: { requestType, vendor, httpCode, transactionId }
             })
             return { action: -1, vendType }
         }
@@ -620,7 +638,7 @@ class ResponseValidationUtil {
             // Check if disco is down
             const discoUp = await VendorService.buyPowerCheckDiscoUp(disco)
             if (!discoUp) {
-                logger.error(`Disco ${disco} is down`, {
+                logger.error(`ERROR_CODE_VALIDATION: Disco ${disco} is down`, {
                     meta: { transactionId: transactionId, disco: disco, }
                 })
             }
@@ -916,7 +934,10 @@ class TokenHandler extends Registry {
                 },
             );
 
-            const requeryResult = await TokenHandlerUtil.requeryTransactionFromVendor(transaction).catch(e => e.response ?? {});
+            const requeryResult = await TokenHandlerUtil.requeryTransactionFromVendor(transaction).catch(e => {
+                console.log({ error: e })
+                return e.response ?? {}
+            });
 
             console.log({ requeryResult })
             const response = await ResponseValidationUtil.validateTransactionCondition({
@@ -929,6 +950,7 @@ class TokenHandler extends Registry {
                 transactionId: transaction.id,
             })
 
+            // process.exit(1)
             let eventMessage = {
                 meter: {
                     meterNumber: meter.meterNumber,
@@ -946,6 +968,7 @@ class TokenHandler extends Registry {
             }
 
             console.log({ response })
+            // process.exit(1)
             switch (response.action) {
                 case -1:
                     logger.error('Transaction condition pending - Requery', logMeta)

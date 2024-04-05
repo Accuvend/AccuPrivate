@@ -23,7 +23,7 @@ import WebhookService from "../../services/Webhook.service";
 import RoleService from "../../services/Role.service";
 require('newrelic');
 
-async function getUniquePartnerCode (partnerName: string, count = 0) {
+async function getUniquePartnerCode(partnerName: string, count = 0) {
     partnerName = partnerName.toUpperCase()
     const partnerCode = partnerName.slice(0, 1) + partnerName.slice(-2) + 'BK' + '000' + count.toString()
     const partner = await PartnerService.viewSinglePartnerByPartnerCode(partnerCode)

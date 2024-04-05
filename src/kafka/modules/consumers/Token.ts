@@ -33,6 +33,7 @@ import WaitTimeService from "../../../services/Waittime.service";
 import ResponsePathService from "../../../services/ResponsePath.service";
 import ErrorCodeService from "../../../services/ErrorCodes.service";
 import ErrorCode from "../../../models/ErrorCodes.model";
+import { TokenUtil } from "../../../utils/Auth/Token";
 
 interface EventMessage {
     meter: {
@@ -119,6 +120,12 @@ export async function getCurrentWaitTimeForSwitchEvent(retryCount: number) {
 type TransactionWithProductId = Exclude<Transaction, 'productCodeId'> & { productCodeId: NonNullable<Transaction['productCodeId']> }
 export class TokenHandlerUtil {
     static async flaggTransaction(transactionId: string) {
+        logger.warn(
+            'Flagging transaction after hitting requery limit',
+            {
+                meta: { transactionId }
+            }
+        )
         return await TransactionService.updateSingleTransaction(transactionId, { status: Status.FLAGGED })
     }
 
@@ -896,6 +903,16 @@ class TokenHandler extends Registry {
             const transaction = await TransactionService.viewSingleTransaction(data.transactionId);
             if (!transaction) {
                 logger.error("Transaction not found", logMeta);
+                return;
+            }
+
+            // Check if transaction was created 2hrs ago
+            const transactionCreatedAt = new Date(transaction.createdAt).getTime()  
+            const currentTime = new Date().getTime()
+            const timeDifference = currentTime - transactionCreatedAt
+            if (timeDifference > 7200000) {
+                logger.error("Transaction has exceeded 2hrs", logMeta);
+                await TokenHandlerUtil.flaggTransaction(data.transactionId)
                 return;
             }
 

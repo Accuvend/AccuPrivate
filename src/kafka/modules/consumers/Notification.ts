@@ -1,5 +1,5 @@
 import { AxiosError } from "axios";
-import Transaction from "../../../models/Transaction.model";
+import Transaction, { Status } from "../../../models/Transaction.model";
 import EntityService from "../../../services/Entity/Entity.service";
 import EventService from "../../../services/Event.service";
 import NotificationService from "../../../services/Notification.service";
@@ -17,6 +17,7 @@ import { v4 as uuidv4 } from 'uuid';
 import ProductService from "../../../services/Product.service";
 import { SmsService } from "../../../utils/Sms";
 import { VendorPublisher } from "../publishers/Vendor";
+import Event from "../../../models/Event.model";
 
 class NotificationHandler extends Registry {
     private static async handleTokenToSendToUser(data: PublisherEventAndParameters[TOPICS.TOKEN_RECIEVED_FROM_REQUERY]) {
@@ -65,16 +66,22 @@ class NotificationHandler extends Registry {
             }),
         })
 
+        let tokenSentToUserSms: Event | null = null
         const msgTemplate = data.meter.vendType.toUpperCase() === 'POSTPAID' ? await SmsService.postpaidElectricityTemplate(transaction) : await SmsService.prepaidElectricityTemplate(transaction)
         await SmsService.sendSms(data.user.phoneNumber, msgTemplate)
             .then(async () => {
-                await transactionEventService.addSmsTokenSentToUserEvent()
+                tokenSentToUserSms = await transactionEventService.addSmsTokenSentToUserEvent()
             })
             .catch((error: AxiosError) => {
                 console.log(error.response?.data)
                 logger.error('Error sending sms', error)
             })
         await transactionEventService.addTokenSentToUserEmailEvent()
+
+        const tokenSentToPartnerEvent = await EventService.viewSingleEventByTransactionIdAndType(transaction.id, TOPICS.TOKEN_SENT_TO_PARTNER)
+        if (tokenSentToUserSms && tokenSentToPartnerEvent) {
+            await TransactionService.updateSingleTransaction(transaction.id, { status: Status.COMPLETE })
+        }
 
         return
     }
@@ -124,6 +131,13 @@ class NotificationHandler extends Registry {
                 notification
             );
             await transactionEventService.addTokenSentToPartnerEvent()
+        }
+
+        const tokenSentToPartnerEvent = await EventService.viewSingleEventByTransactionIdAndType(transaction.id, TOPICS.TOKEN_SENT_TO_PARTNER)
+        const tokenSentToUserEmailEvent = await EventService.viewSingleEventByTransactionIdAndType(transaction.id, TOPICS.TOKEN_SENT_TO_EMAIL)
+        const tokenSentToUserSMSEvent = await EventService.viewSingleEventByTransactionIdAndType(transaction.id, TOPICS.SMS_TOKEN_SENT_TO_USER)
+        if (tokenSentToPartnerEvent && (tokenSentToUserEmailEvent || tokenSentToUserSMSEvent)) {
+            await TransactionService.updateSingleTransaction(transaction.id, { status: Status.COMPLETE })
         }
 
         const product = await ProductService.viewSingleProduct(transaction.productCodeId)

@@ -101,7 +101,7 @@ export async function getCurrentWaitTimeForRequeryEvent(retryCount: number, supe
     if (superAgent === 'BUYPOWERNG') {
         return 30
     }
-    
+
     if (retryCount >= timesToRetry.length) {
         return timesToRetry[timesToRetry.length - 1]
     }
@@ -1108,7 +1108,6 @@ class TokenHandler extends Registry {
                         }
 
                         await TransactionService.updateSingleTransaction(data.transactionId, {
-                            status: Status.COMPLETE,
                             powerUnitId: powerUnit?.id,
                         });
                         await transactionEventService.addTokenReceivedFromRequery(tokenInResponse ?? '');

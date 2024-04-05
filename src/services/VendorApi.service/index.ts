@@ -675,7 +675,7 @@ export default class VendorService {
 
     static baxiAxios(): AxiosInstance {
         const AxiosCreate = axios.create({
-            baseURL: `${BAXI_URL}`,
+            baseURL: NODE_ENV === 'production' ? VENDOR_URL.BAXI.PROD : VENDOR_URL.BAXI.DEV,
             headers: {
                 "x-api-key": BAXI_TOKEN,
             },
@@ -688,7 +688,7 @@ export default class VendorService {
     static buyPowerAxios(): AxiosInstance {
         // Create an Axios instance with BuyPower URL and token in the headers
         const AxiosCreate = axios.create({
-            baseURL: `${BUYPOWER_URL}`,
+            baseURL: NODE_ENV === 'production' ? VENDOR_URL.BUYPOWERNG.PROD : VENDOR_URL.BUYPOWERNG.DEV,
             headers: {
                 Authorization: `Bearer ${BUYPOWER_TOKEN}`,
             },

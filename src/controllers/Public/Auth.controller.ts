@@ -71,7 +71,8 @@ export default class AuthController {
                 email,
                 status: {
                     activated: false,
-                    emailVerified: false
+                    emailVerified: false,
+                    passwordApproved: false
                 },
                 partnerProfileId: newPartner.id,
                 role: RoleEnum.Partner,
@@ -159,6 +160,7 @@ export default class AuthController {
                 id: uuidv4(),
                 email,
                 status: {
+                    passwordApproved: false,
                     activated: false,
                     emailVerified: false
                 },
@@ -397,7 +399,7 @@ export default class AuthController {
 
         const phoneNumber = _phoneNumber ? _phoneNumber.startsWith('+234') ? _phoneNumber.replace('+234', '0') : _phoneNumber : null
 
-        let entity = email && await EntityService.viewSingleEntityByEmail(email)
+        let entity = email ? await EntityService.viewSingleEntityByEmail(email) : null
         entity = phoneNumber ? await EntityService.viewSingleEntityByPhoneNumber(phoneNumber) : entity
         if (!entity) {
             throw new BadRequestError('Invalid Email or password')
@@ -411,6 +413,9 @@ export default class AuthController {
         if (!entity.status.activated) {
             throw new BadRequestError('Account not activated')
         }
+
+        entity.status.passwordApproved = true
+        await entity.save()
 
         const role = await entity.$get('role')
         if (!role) {
@@ -457,8 +462,8 @@ export default class AuthController {
             }
         }
 
-        const refreshToken = accessToken ? undefined : await AuthUtil.generateToken({ type: 'refresh', entity, profile: profile ?? entity, expiry: 60 * 60 * 60 * 60 })
-        accessToken = accessToken ?? await AuthUtil.generateToken({ type: 'access', entity, profile: profile ?? entity, expiry: 60 * 60 * 24 * 30 })
+        const refreshToken = accessToken ? undefined : await AuthUtil.generateToken({ type: 'refresh', entity, profile: profile ?? entity, expiry: 60 * 60 * 24 * 5 })
+        accessToken = accessToken ?? await AuthUtil.generateToken({ type: 'access', entity, profile: profile ?? entity, expiry: 60 * 60 * 24 })
 
         if ([RoleEnum.TeamMember].includes(entity.role.name)) {
             const memberProfile = profile as TeamMemberProfile
@@ -527,8 +532,8 @@ export default class AuthController {
             entity: entity.dataValues
         })
 
-        const accessToken = await AuthUtil.generateToken({ type: 'access', entity, profile: profile ?? entity, expiry: 60 * 60 * 24 * 30 })
-        const refreshToken = await AuthUtil.generateToken({ type: 'refresh', entity, profile: profile ?? entity, expiry: 60 * 60 * 60 * 60 })
+        const accessToken = await AuthUtil.generateToken({ type: 'access', entity, profile: profile ?? entity, expiry: 60 * 60 * 24 * 5 })
+        const refreshToken = await AuthUtil.generateToken({ type: 'refresh', entity, profile: profile ?? entity, expiry: 60 * 60 * 24 })
 
         res.status(200).json({
             status: 'success',

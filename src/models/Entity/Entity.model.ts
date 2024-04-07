@@ -30,6 +30,7 @@ export default class Entity extends Model<Entity | IEntity> {
     status: {
         activated: boolean;
         emailVerified: boolean;
+        passwordApproved: boolean
     }
 
     @Column({ type: DataType.STRING, allowNull: true })
@@ -115,6 +116,7 @@ export interface IEntity {
     status: {
         activated: boolean;
         emailVerified: boolean;
+        passwordApproved: boolean
     };
     userId?: string;
     profilePicture?: string;
@@ -144,10 +146,7 @@ export interface IUpdateEntity {
         failedTransactions: boolean;
     },
     profilePicture?: string;
-    status?: {
-        activated: boolean;
-        emailVerified: boolean;
-    },
+    status?: IEntity['status'],
     requireOTPOnLogin?: boolean
 
     // You can define specific properties here that are updatable for a Entity

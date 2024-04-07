@@ -42,6 +42,7 @@ export default class TeamMemberProfileController {
                 id: uuidv4(),
                 email: email,
                 status: {
+                    passwordApproved: false,
                     activated: true,
                     emailVerified: false
                 },

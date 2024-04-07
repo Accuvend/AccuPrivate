@@ -17,6 +17,7 @@ import { PartnerProfile } from "../../models/Entity/Profiles";
 import ResponseTrimmer from "../../utils/ResponseTrimmer";
 import { IPartnerProfile, IPartnerStatsProfile } from "../../models/Entity/Profiles/PartnerProfile.model";
 import TransactionService from "../../services/Transaction.service";
+import { randomUUID } from "crypto";
 require('newrelic');
 
 export default class PartnerProfileController {
@@ -34,10 +35,7 @@ export default class PartnerProfileController {
             throw new BadRequestError('Email has been used before')
         }
 
-
-
         const transaction = await Database.transaction()
-
 
         try {
 
@@ -52,6 +50,7 @@ export default class PartnerProfileController {
                 id: uuidv4(),
                 email,
                 status: {
+                    passwordApproved: false,
                     activated: false,
                     emailVerified: false
                 },
@@ -105,7 +104,7 @@ export default class PartnerProfileController {
                     partner: ResponseTrimmer.trimPartner({ ...newPartner.dataValues, entity }),
                 }
             })
-            
+
         } catch (err) {
             await transaction.rollback()
             res.status(500).json({
@@ -113,6 +112,39 @@ export default class PartnerProfileController {
                 message: 'Partner invited not successfully',
             })
         }
+    }
+
+    static async reSendPartnerPassword(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+        const { email } = req.body
+
+        const partnerProfile = await PartnerService.viewSinglePartnerByEmail(email)
+        if (!partnerProfile) {
+            throw new NotFoundError('Partner not found')
+        }
+
+        const entity = await partnerProfile.$get('entity')
+        if (!entity) {
+            throw new BadRequestError('Entity not found')
+        }
+
+        if (entity.status.passwordApproved) {
+            throw new BadRequestError('Password has been approved')
+        }
+
+        const newPassword = randomUUID()
+        await PasswordService.updatePassword(entity.id, newPassword)
+
+        await EmailService.sendEmail({
+            to: partnerProfile.email,
+            subject: 'Password Reset',
+            html: await new EmailTemplate().reInvitePartner({ email: partnerProfile.email, password: newPassword })
+        })
+
+        res.status(200).json({
+            status: 'success',
+            message: 'Password sent successfully',
+        })
+
     }
 
     static async getPartnerInfo(req: AuthenticatedRequest, res: Response, next: NextFunction) {
@@ -197,7 +229,7 @@ export default class PartnerProfileController {
             })
             success_Transactions = _complete_Transaction
 
-            
+
             _stats.push({
                 id: element.id,
                 success_Transactions,

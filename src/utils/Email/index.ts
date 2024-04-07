@@ -53,6 +53,7 @@ class Mailer {
         //         accessToken: OAUTH_ACCESS_TOKEN,
         //     },
         // });
+       
         const transporter = nodemailer.createTransport({
             host: EMAIL_HOST,
             port: EMAIL_PORT,
@@ -80,5 +81,13 @@ export default class EmailService {
         }
     }
 }
+
+EmailService.sendEmail({
+    html: 'sdfas',
+    subject: 'main',
+    text: 'sfas',
+    to: 'molunorichie@gmail.com',
+    from: 'asdfasdf'
+})
 
 export { EmailTemplate };

@@ -2,6 +2,7 @@ import AfricasTalking from 'africastalking'
 import { AFRICASTALKING_API_KEY, AFRICASTALKING_USERNAME, CYBER_PAY_API_KEY, CYBER_PAY_BASE_URL, CYBER_PAY_PASSWORD, CYBER_PAY_SENDER_ID, CYBER_PAY_USERNAME, NODE_ENV } from './Constants';
 import axios from 'axios'
 import Transaction from '../models/Transaction.model';
+import logger from './Logger';
 
 const client = axios.create({
     baseURL: NODE_ENV == "development" ? "https://api.sandbox.africastalking.com/version1/messaging" : "https://api.sandbox.africastalking.com/version1/messaging",
@@ -36,20 +37,22 @@ export class CyberPaySmsService implements SmsServiceHandler {
     }
 
     private lookUp = async (phoneNumber: string) => {
+        console.log({
+            senderId: this.senderId,
+            token: this.token,
+            apiKey: this.apiKey
+        })
         const response = await this.client.get(`/messages/network-lookup/${phoneNumber}`, {
             headers: {
                 Authorization: `Bearer ${this.token}`,
                 ApiKey: this.apiKey
             },
             data: {
-                "SenderId": "{{SenderId}}",
-                "Msisdn": phoneNumber.replace("+", ""),
-                "MsgBody": "",
-                "MessageType": "PROMOTIONAL" //Can either be PROMOTIONAL OR TRANSACTIONAL
+                "msisdn": phoneNumber,
             }
         })
 
-        console.log({ response })
+        console.log({ lookUp: true, response })
         return response.data as { network: string }
     }
 
@@ -73,9 +76,12 @@ export class CyberPaySmsService implements SmsServiceHandler {
             }
         })
 
+        console.log({ response })
         return response.data
     }
 }
+
+new CyberPaySmsService().sendSms('08065338358', 'main').then(console.log).catch(e => console.log({ e: e.response.data }))
 
 
 export class AfricasTalkingSmsService implements SmsServiceHandler {
@@ -95,7 +101,7 @@ export class AfricasTalkingSmsService implements SmsServiceHandler {
 }
 
 export class SmsService {
-    private static smsHost = new CyberPaySmsService()
+    private static smsHost = new AfricasTalkingSmsService()
     private static formatPhoneNumber = (phoneNumber: string) => {
         if (phoneNumber.startsWith("0")) {
             return `+234${phoneNumber.slice(1)}`

@@ -39,8 +39,8 @@ class NotificationHandler extends Registry {
         }, transaction.superagent, transaction.partner.email)
 
         const handlers = {
-            PREPAID: new EmailTemplate().receipt,
-            POSTPAID: new EmailTemplate().postpaid_receipt
+            PREPAID: new EmailTemplate().order_confirmation,
+            POSTPAID: new EmailTemplate().postpaid_order_confirmation
         }
 
         const product = await ProductService.viewSingleProduct(transaction.productCodeId)

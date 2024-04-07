@@ -18,6 +18,12 @@ class EmailTemplate {
     failedTransaction = async ({ transaction }: { transaction: Transaction }) => {
         return container(await ejs.renderFile(__dirname + '/failedtxn.ejs', { transaction }))
     }
+    order_confirmation = async ({ transaction, meterNumber, token, address, name }: IReceiptEmailTemplateProps) => {
+        return container(await ejs.renderFile(__dirname + '/order-confirmation.ejs', { transaction, meterNumber, token, address, name }))
+    }
+    postpaid_order_confirmation = async ({ transaction, meterNumber, token, address, name }: IReceiptEmailTemplateProps) => {
+        return container(await ejs.renderFile(__dirname + '/order-confirmation-postpaid.ejs', { transaction, meterNumber, token, address, name }))
+    }
     receipt = async ({ transaction, meterNumber, token, address, name }: IReceiptEmailTemplateProps) => {
         return container(await ejs.renderFile(__dirname + '/receipt.ejs', { transaction, meterNumber, token, address, name }))
     }

@@ -47,10 +47,11 @@ import Vendor from "../../../models/Vendor.model";
 const newrelic: any = require('newrelic');
 import VendorProductService from "../../../services/VendorProduct.service";
 import VendorDocService from '../../../services/Vendor.service'
-import { generateRandomString, generateRandonNumbers } from "../../../utils/Helper";
+import { generateRandomString, generateRandonNumbers, generateVendorReference } from "../../../utils/Helper";
 import ResponseTrimmer from "../../../utils/ResponseTrimmer";
 import PowerUnit from "../../../models/PowerUnit.model";
 import PowerUnitService from "../../../services/PowerUnit.service";
+import { TokenUtil } from "../../../utils/Auth/Token";
 interface valideMeterRequestBody {
     meterNumber: string;
     superagent: "BUYPOWERNG" | "BAXI";
@@ -106,90 +107,6 @@ interface RequestTokenUtilParams {
         id: string,
     },
     previousRetryEvent: Event
-}
-
-
-class VendorTokenHandler implements Registry {
-    private tokenSent = false
-    private transaction: Transaction
-    private response: () => Response
-    private consumerInstance: ConsumerFactory
-
-    private async handleTokenReceived(data: PublisherEventAndParameters[TOPICS.TOKEN_RECIEVED_FROM_VENDOR]) {
-        try {
-            if (this.consumerInstance) {
-                this.consumerInstance.shutdown()
-            }
-
-            const product = await ProductService.viewSingleProductByMasterProductCode(this.transaction.disco)
-            if (!product) {
-                logger.warn('Product not found', { meta: { transactionId: this.transaction.id } })
-                throw new InternalServerError('Product not found')
-            }
-
-            this.response().status(200).send({
-                status: 'success',
-                message: 'Token purchase initiated successfully',
-                data: {
-                    transaction: {
-                        disco: product.productName,
-                        "amount": this.transaction.amount,
-                        "transactionId": this.transaction.id,
-                        "id": this.transaction.id,
-                        "bankRefId": this.transaction.bankRefId,
-                        "bankComment": this.transaction.bankComment,
-                        "productType": this.transaction.productType,
-                        "transactionTimestamp": this.transaction.transactionTimestamp,
-                    },
-                    meter: { ...data.meter, disco: product.productName },
-                    token: data.meter.token
-                }
-            })
-
-            this.tokenSent = true
-        } catch (error) {
-            Logger.kafkaFailure.info('Already sent token to user', { meta: { transactionId: this.transaction.id } })
-        }
-    }
-
-    constructor(transaction: Transaction, response: Response) {
-        this.transaction = transaction
-        this.response = () => response
-        return this
-    }
-
-    public getTokenState() {
-        return this.tokenSent
-    }
-
-    public setConsumerInstance(consumerInstance: ConsumerFactory) {
-        this.consumerInstance = consumerInstance
-    }
-
-    public registry = {
-        [TOPICS.TOKEN_RECIEVED_FROM_VENDOR]: this.handleTokenReceived.bind(this)
-        // [TOPICS.TOKEN_RECIEVED_FROM_REQUERY]: this.handleTokenReceived.bind(this),
-    }
-}
-
-
-class VendorTokenReceivedSubscriber extends ConsumerFactory {
-    private tokenHandler: VendorTokenHandler
-
-    constructor(transaction: Transaction, response: Response) {
-        const tokenHandler = new VendorTokenHandler(transaction, response)
-        const messageProcessor = new MessageProcessorFactory(tokenHandler.registry, transaction.id)
-        super(messageProcessor)
-        this.tokenHandler = tokenHandler
-    }
-
-    public getTokenSentState() {
-        return this.tokenHandler.getTokenState()
-    }
-
-    public setConsumerInstance(consumerInstance: ConsumerFactory) {
-        this.tokenHandler.setConsumerInstance(consumerInstance)
-    }
 }
 
 // Validate request parameters for each controller
@@ -263,7 +180,7 @@ class VendorControllerValdator {
         meterNumber: string, disco: string, vendType: 'PREPAID' | 'POSTPAID', transaction: Transaction
     }) {
         async function validateWithBuypower() {
-            
+
             Logger.apiRequest.info('Validating meter with buypower', { meta: { transactionId: transaction.id } })
             const buypowerVendor = await VendorDocService.viewSingleVendorByName('BUYPOWERNG')
             if (!buypowerVendor) {
@@ -514,12 +431,12 @@ export default class VendorController {
                 transactionTimestamp: new Date(),
                 disco: disco,
                 partnerId: partnerId,
-                reference: transactionReference,
+                reference: transactionId,
                 transactionType: transactionTypes[existingProductCodeForDisco.category],
                 productCodeId: existingProductCodeForDisco.id,
                 retryRecord: [],
                 previousVendors: [superagent],
-                vendorReferenceId: generateRandonNumbers(12),
+                vendorReferenceId: generateVendorReference(),
                 productType: transactionTypes[existingProductCodeForDisco.category],
                 channel
             })
@@ -745,30 +662,27 @@ export default class VendorController {
             throw e
         });
 
-
-        const vendorTokenConsumer = new VendorTokenReceivedSubscriber(transaction, res)
-        await vendorTokenConsumer.start()
-        vendorTokenConsumer.setConsumerInstance(vendorTokenConsumer)
         try {
             console.log({ transaction: transaction.superagent })
 
-            const response = await newrelic.startBackgroundTransaction('KafkaPublish:PowePurchaseInitiated',function(){VendorPublisher.publishEventForInitiatedPowerPurchase({
-                transactionId: transaction.id,
-                user: {
-                    name: user.name as string,
-                    email: user.email,
-                    address: user.address,
-                    phoneNumber: user.phoneNumber,
-                },
-                partner: {
-                    email: partnerEntity.email,
-                },
-                meter: meterInfo,
-                superAgent: transaction.superagent,
-                vendorRetryRecord: {
-                    retryCount: 1,
-                }
-            }) 
+            const response = await newrelic.startBackgroundTransaction('KafkaPublish:PowePurchaseInitiated', function () {
+                VendorPublisher.publishEventForInitiatedPowerPurchase({
+                    transactionId: transaction.id,
+                    user: {
+                        name: user.name as string,
+                        email: user.email,
+                        address: user.address,
+                        phoneNumber: user.phoneNumber,
+                    },
+                    partner: {
+                        email: partnerEntity.email,
+                    },
+                    meter: meterInfo,
+                    superAgent: transaction.superagent,
+                    vendorRetryRecord: {
+                        retryCount: 1,
+                    }
+                })
             })
 
             if (response instanceof Error) {
@@ -783,8 +697,8 @@ export default class VendorController {
             delete _transaction.powerUnit
             delete _transaction.events
 
-            const tokenHasBeenSentFromVendorConsumer = vendorTokenConsumer.getTokenSentState()
-            if (!tokenHasBeenSentFromVendorConsumer && _transaction) {
+            const tokenFromVendor = await TokenUtil.getTokenFromCache('transaction_token:' + _transaction.id)
+            if (!tokenFromVendor) {
                 // removed to update endpoint reponse mapping
                 // const responseData = { status: 'success', message: 'Token purchase initiated successfully', data: { transaction: ResponseTrimmer.trimTransactionResponse(_transaction)}}
                 const _product = await ProductService.viewSingleProduct(_transaction.productCodeId || "")
@@ -800,36 +714,46 @@ export default class VendorController {
                             "productType": _transaction?.productType,
                             "transactionTimestamp": _transaction?.transactionTimestamp,
                         }
-                    }
+                    } as Record<string, any>
                 }
 
-                // Delay in background  for 30 seconds to check if token has been gotten from vendor
-                // IF not gotten, send response
-                // IF gotten, send response
+                const start = Date.now()
+                //  Ping redis every 2 seconds for the token
+                const intervalId = setInterval(async () => {
+                    logger.info('Runnign interval')
+                    const tokenFromVendor = await TokenUtil.getTokenFromCache('transaction_token:' + _transaction.id)
+                    if (tokenFromVendor) {
+                        // Clear interval
+                        clearInterval(intervalId)
 
-                setTimeout(async () => {
-                    const tokenHasBeenSentFromVendorConsumer = vendorTokenConsumer.getTokenSentState()
-                    if (!tokenHasBeenSentFromVendorConsumer) {
-                        responseData.message = 'Transaction is being processed'
-                        await vendorTokenConsumer.shutdown()
-                        res.status(200).json(responseData);
-                        Logger.apiRequest.info('Token purchase initiated successfully', { meta: { transactionId: transaction.id, ...responseData } })
-                        return
+                        await TokenUtil.deleteTokenFromCache('transaction_token:' + _transaction.id)
+
+                        logger.info('Token from interval received => ' + tokenFromVendor)
+
+                        // Send response if token has been gotten from vendor
+                        responseData.data.meter = meterInfo
+                        responseData.data.token = tokenFromVendor
+                        res.status(200).json(responseData)
+
+                        const existingEvent = await EventService.viewSingleEventByTransactionIdAndType(transactionId, TOPICS.TOKEN_SENT_TO_PARTNER)
+                        if (!existingEvent) await transactionEventService.addTokenSentToPartnerEvent();
+
+                    } else {
+                        // Check if 1 minutes has passed
+                        const timeDifference = Date.now() - start
+                        if (timeDifference > 60000) {
+                            // Clear interval
+                            clearInterval(intervalId)
+                            // Send response if token has not been gotten from vendor
+                            Logger.apiRequest.info('Token purchase initiated successfully', { meta: { transactionId: transaction.id, ...responseData } })
+                            responseData.message = 'Transaction is being processed'
+                            res.status(200).json(responseData)
+                        }
                     }
-
-                    const existingEvent = await EventService.viewSingleEventByTransactionIdAndType(transactionId, TOPICS.TOKEN_SENT_TO_PARTNER)
-                    if (!existingEvent) await transactionEventService.addTokenSentToPartnerEvent();
-
-                    return
-                }, 60000)
+                }, 3000)
 
                 return
             } else {
-                const powerUnit = await transaction.$get('powerUnit')
-                if (!powerUnit) {
-                    throw new InternalServerError('Power unit not found')
-                }
-
                 // Send response if token has been gotten from vendor
                 res.status(200).json({
                     status: 'success',
@@ -845,12 +769,15 @@ export default class VendorController {
                             "productType": transaction.productType,
                             "transactionTimestamp": transaction.transactionTimestamp,
                         },
-                        meter: { ...meterInfo, token: powerUnit.token }
+                        meter: { ...meterInfo },
+                        token: tokenFromVendor
                     }
                 })
 
                 // TODO: Add Code to send response if token has been gotten from vendor
                 await transactionEventService.addTokenSentToPartnerEvent();
+                await TokenUtil.deleteTokenFromCache('transaction_token:' + _transaction.id)
+
                 return
             }
 
@@ -860,7 +787,6 @@ export default class VendorController {
         } catch (error) {
             logger.error('SuttingDown vendor token consumer of id')
             console.log(error)
-            await vendorTokenConsumer.shutdown()
         }
     }
 

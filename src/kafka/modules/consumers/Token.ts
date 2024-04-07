@@ -21,7 +21,7 @@ import MessageProcessor from "../util/MessageProcessor";
 import { v4 as uuidv4 } from "uuid";
 import EventService from "../../../services/Event.service";
 import VendorService, { ElectricityPurchaseResponse, ElectricityRequeryResponse, IRechargeVendorService, SuccessResponseForBuyPowerRequery, Vendor } from "../../../services/VendorApi.service";
-import { generateRandomString, generateRandomToken, generateRandonNumbers } from "../../../utils/Helper";
+import { generateRandomString, generateRandomToken, generateRandonNumbers, generateVendorReference } from "../../../utils/Helper";
 import ProductService from "../../../services/Product.service";
 import { CustomError } from "../../../utils/Errors";
 import VendorProductService from "../../../services/VendorProduct.service";
@@ -35,6 +35,7 @@ import ErrorCodeService from "../../../services/ErrorCodes.service";
 import ErrorCode from "../../../models/ErrorCodes.model";
 const newrelic = require('newrelic')
 import { TokenUtil } from "../../../utils/Auth/Token";
+import { randomUUID } from "crypto";
 
 interface EventMessage {
     meter: {
@@ -101,7 +102,7 @@ export async function getCurrentWaitTimeForRequeryEvent(retryCount: number, supe
     if (superAgent === 'BUYPOWERNG') {
         return 30
     }
-    
+
     if (retryCount >= timesToRetry.length) {
         return timesToRetry[timesToRetry.length - 1]
     }
@@ -267,7 +268,7 @@ export class TokenHandlerUtil {
             }
 
             // Check for the reference used in the last retry record
-            retryRecord[retryRecord.length - 1].reference.push(currentVendor.vendor === 'IRECHARGE' ? generateRandonNumbers(12) : generateRandomString(12))
+            retryRecord[retryRecord.length - 1].reference.push(currentVendor.vendor === 'IRECHARGE' ? generateVendorReference() : randomUUID())
         } else {
             logger.warn('Switching to new vendor', meta)
             // Add new record to the retry record
@@ -881,6 +882,8 @@ class TokenHandler extends Registry {
                             await TransactionService.updateSingleTransaction(data.transactionId, {
                                 powerUnitId: powerUnit?.id, tokenFromVend: response.token
                             });
+
+
                             await transactionEventService.addTokenReceivedEvent(response.token ?? '');
                             await VendorPublisher.publishEventForTokenReceivedFromVendor({
                                 transactionId: transaction!.id,
@@ -902,6 +905,8 @@ class TokenHandler extends Registry {
                                 },
                             });
                         }
+                        logger.info('Saving token to cache')
+                        await TokenUtil.saveTokenToCache({ key: 'transaction_token:' + transaction.id, token: (response as any).token ?? '' })
 
 
                         await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor({
@@ -1108,7 +1113,6 @@ class TokenHandler extends Registry {
                         }
 
                         await TransactionService.updateSingleTransaction(data.transactionId, {
-                            status: Status.COMPLETE,
                             powerUnitId: powerUnit?.id,
                         });
                         await transactionEventService.addTokenReceivedFromRequery(tokenInResponse ?? '');

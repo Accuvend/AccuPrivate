@@ -38,6 +38,7 @@ export default class UserService {
                 status: {
                     emailVerified: true,
                     activated: true,
+                    passwordApproved: false,
                 },
                 requireOTPOnLogin: true,
                 phoneNumber: user.phoneNumber,
@@ -83,5 +84,5 @@ export default class UserService {
         return user;
     }
 
-    static async updateSingleUser() {}
+    static async updateSingleUser() { }
 }

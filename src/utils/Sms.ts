@@ -33,46 +33,29 @@ export class CyberPaySmsService implements SmsServiceHandler {
         })
 
         this.token = response.data.token
+
         return this
     }
-
-    private lookUp = async (phoneNumber: string) => {
-        console.log({
-            senderId: this.senderId,
-            token: this.token,
-            apiKey: this.apiKey
-        })
-        const response = await this.client.get(`/messages/network-lookup/${phoneNumber}`, {
-            headers: {
-                Authorization: `Bearer ${this.token}`,
-                ApiKey: this.apiKey
-            },
-            data: {
-                "msisdn": phoneNumber,
-            }
-        })
-
-        console.log({ lookUp: true, response })
-        return response.data as { network: string }
-    }
-
     public sendSms = async (to: string, message: string): Promise<any> => {
-        if (this.token === '') await this.login()
-
-        const lookUpInfo = await this.lookUp(to)
+        await this.login()
 
         const requestBody = {
-            "NetworkID": lookUpInfo.network,
             "SenderId": this.senderId,
             "Msisdn": to,
             "MsgBody": message,
             "MessageType": "PROMOTIONAL"
         }
 
-        const response = await this.client.post('/messages/send', requestBody, {
+        console.log({
+            requestBody, token: this.token, apiKey: this.apiKey, enc: {
+                Authorization: `Bearer ${this.token}`,
+                ApiKey: btoa(this.apiKey)
+            }
+        })
+        const response = await this.client.post('/messages/network-lookup-and-send', requestBody, {
             headers: {
                 Authorization: `Bearer ${this.token}`,
-                ApiKey: this.apiKey
+                ApiKey: btoa(this.apiKey)
             }
         })
 

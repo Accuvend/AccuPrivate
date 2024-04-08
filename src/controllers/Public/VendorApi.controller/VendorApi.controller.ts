@@ -217,9 +217,8 @@ class VendorControllerValdator {
 
         // Try with the first super agetn, if it fails try with the next, then update the transaction superagent
         let superAgents = await TokenHandlerUtil.getSortedVendorsAccordingToCommissionRate(transaction.productCodeId, parseFloat(transaction.amount))
-        //  Put irecharge first 
 
-        // superAgents = ['BUYPOWERNG', 'BUYPOWERNG']
+        //  Put irecharge first 
         interface IResponses {
             BUYPOWERNG: Awaited<ReturnType<typeof validateWithBuypower>>,
             BAXI: Awaited<ReturnType<typeof validateWithBaxi>>,
@@ -697,7 +696,7 @@ export default class VendorController {
                 }
 
                 const start = Date.now()
-                //  Ping redis every 2 seconds for the token
+                //  Ping redis every 20 seconds for the token
                 const intervalId = setInterval(async () => {
                     logger.info('Pinging redis for token')
                     const tokenFromVendor = await TokenUtil.getTokenFromCache('transaction_token:' + _transaction.id)
@@ -718,7 +717,7 @@ export default class VendorController {
                         if (!existingEvent) await transactionEventService.addTokenSentToPartnerEvent();
 
                     } else {
-                        // Check if 1 minutes has passed
+                        // Check if 5 minutes has passed
                         const timeDifference = Date.now() - start
                         if (timeDifference > 60000) {
                             // Clear interval

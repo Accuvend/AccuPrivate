@@ -5941,6 +5941,8 @@ export const HTTP_URL = {
     },
 }
 
+export const ACCUVEND_RECEIPT_BASE_URL = process.env.ACCUVEND_RECEIPT_BASE_URL as string
+
 interface Bundle {
     bundleCode: string;
     bundleName: string;

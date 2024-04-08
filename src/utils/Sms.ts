@@ -36,6 +36,7 @@ export class CyberPaySmsService implements SmsServiceHandler {
 
         return this
     }
+
     public sendSms = async (to: string, message: string): Promise<any> => {
         await this.login()
 
@@ -46,12 +47,6 @@ export class CyberPaySmsService implements SmsServiceHandler {
             "MessageType": "PROMOTIONAL"
         }
 
-        console.log({
-            requestBody, token: this.token, apiKey: this.apiKey, enc: {
-                Authorization: `Bearer ${this.token}`,
-                ApiKey: btoa(this.apiKey)
-            }
-        })
         const response = await this.client.post('/messages/network-lookup-and-send', requestBody, {
             headers: {
                 Authorization: `Bearer ${this.token}`,
@@ -59,13 +54,9 @@ export class CyberPaySmsService implements SmsServiceHandler {
             }
         })
 
-        console.log({ response })
         return response.data
     }
 }
-
-new CyberPaySmsService().sendSms('08065338358', 'main').then(console.log).catch(e => console.log({ e: e.response.data }))
-
 
 export class AfricasTalkingSmsService implements SmsServiceHandler {
     public sendSms = async (to: string, message: string) => {
@@ -83,8 +74,9 @@ export class AfricasTalkingSmsService implements SmsServiceHandler {
     }
 }
 
+const DEFAULT_SMS_SERVICE = new AfricasTalkingSmsService()
 export class SmsService {
-    private static smsHost = new AfricasTalkingSmsService()
+    private static smsHost = DEFAULT_SMS_SERVICE
     private static formatPhoneNumber = (phoneNumber: string) => {
         if (phoneNumber.startsWith("0")) {
             return `+234${phoneNumber.slice(1)}`

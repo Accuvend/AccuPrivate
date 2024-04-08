@@ -697,7 +697,7 @@ export default class VendorController {
                 }
 
                 const start = Date.now()
-                //  Ping redis every 20 seconds for the token
+                //  Ping redis every 2 seconds for the token
                 const intervalId = setInterval(async () => {
                     logger.info('Pinging redis for token')
                     const tokenFromVendor = await TokenUtil.getTokenFromCache('transaction_token:' + _transaction.id)
@@ -718,7 +718,7 @@ export default class VendorController {
                         if (!existingEvent) await transactionEventService.addTokenSentToPartnerEvent();
 
                     } else {
-                        // Check if 5 minutes has passed
+                        // Check if 1 minutes has passed
                         const timeDifference = Date.now() - start
                         if (timeDifference > 60000) {
                             // Clear interval

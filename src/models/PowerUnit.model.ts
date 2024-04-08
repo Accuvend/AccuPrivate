@@ -77,7 +77,7 @@ export interface IPowerUnit {
     superagent: ITransaction['superagent'];      // superagent associated with the PowerUnit.
     amount: string;          // amount related to the PowerUnit.
     tokenNumber: number;    // Token number associated with the PowerUnit.
-    token: String;          // Token number associated with the PowerUnit
+    token?: String;          // Token number associated with the PowerUnit
     tokenUnits: string;    // Token units associated with the PowerUnit.
     meterId: string;         // Unique identifier of the Meter associated with the PowerUnit.
     transactionId: string;  // Unique identifier of the Transaction associated with the PowerUnit.

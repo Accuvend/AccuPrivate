@@ -137,6 +137,7 @@ export interface IReceiptEmailTemplateProps {
     token: string;
     address: string;
     name: string;
+    units: string
 }
 
 export interface INotification {

@@ -86,28 +86,6 @@ interface RequestTokenValidatorResponse {
     partnerEntity: Entity;
 }
 
-interface UserInfo {
-    name: string,
-    email: string,
-    phoneNumber: string,
-    id: string
-}
-
-interface ValidateMeterParams extends valideMeterRequestBody {
-    transaction: Transaction,
-    userInfo: UserInfo
-}
-
-interface RequestTokenUtilParams {
-    transaction: Transaction,
-    meterInfo: {
-        meterNumber: string,
-        disco: string,
-        vendType: 'PREPAID' | 'POSTPAID',
-        id: string,
-    },
-    previousRetryEvent: Event
-}
 
 // Validate request parameters for each controller
 class VendorControllerValdator {
@@ -241,6 +219,7 @@ class VendorControllerValdator {
         let superAgents = await TokenHandlerUtil.getSortedVendorsAccordingToCommissionRate(transaction.productCodeId, parseFloat(transaction.amount))
         //  Put irecharge first 
 
+        // superAgents = ['BUYPOWERNG', 'BUYPOWERNG']
         interface IResponses {
             BUYPOWERNG: Awaited<ReturnType<typeof validateWithBuypower>>,
             BAXI: Awaited<ReturnType<typeof validateWithBaxi>>,
@@ -720,7 +699,7 @@ export default class VendorController {
                 const start = Date.now()
                 //  Ping redis every 20 seconds for the token
                 const intervalId = setInterval(async () => {
-                    logger.info('Runnign interval')
+                    logger.info('Pinging redis for token')
                     const tokenFromVendor = await TokenUtil.getTokenFromCache('transaction_token:' + _transaction.id)
                     if (tokenFromVendor) {
                         // Clear interval

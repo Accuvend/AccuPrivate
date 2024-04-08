@@ -218,6 +218,7 @@ export class VendorPublisher extends ProducerFactory {
                     email: data.partner.email,
                 },
                 transactionId: data.transactionId,
+                tokenUnits: data.tokenUnits
             },
         })
     }
@@ -246,6 +247,7 @@ export class VendorPublisher extends ProducerFactory {
                     email: data.partner.email,
                 },
                 transactionId: data.transactionId,
+                tokenUnits: data.tokenUnits
             },
         })
     }
@@ -383,6 +385,7 @@ export class VendorPublisher extends ProducerFactory {
                     email: data.partner.email,
                 },
                 transactionId: data.transactionId,
+                tokenUnits: data.tokenUnits
             },
         })
     }

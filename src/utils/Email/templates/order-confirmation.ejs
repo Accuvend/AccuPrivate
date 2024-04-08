@@ -53,6 +53,8 @@
 </head>
 <%
 
+transaction.amount = parseFloat(transaction.amount, 10);
+unit = parseFloat(unit, 10)
 const originalAmount = transaction.amount;
 const percentageToRemove = 1.5;
 const amountNow = transaction.amount * (percentageToRemove / 100);

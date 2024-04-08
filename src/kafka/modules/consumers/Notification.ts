@@ -18,6 +18,7 @@ import ProductService from "../../../services/Product.service";
 import { SmsService } from "../../../utils/Sms";
 import { VendorPublisher } from "../publishers/Vendor";
 import Event from "../../../models/Event.model";
+import PowerUnit from "../../../models/PowerUnit.model";
 
 class NotificationHandler extends Registry {
     private static async handleTokenToSendToUser(data: PublisherEventAndParameters[TOPICS.TOKEN_RECIEVED_FROM_REQUERY]) {
@@ -62,7 +63,8 @@ class NotificationHandler extends Registry {
                 meterNumber: data.meter.meterNumber,
                 token: data.meter.token,
                 address: meter?.address ?? '',
-                name: user?.dataValues.name ?? ''
+                name: user?.dataValues.name ?? '',
+                units: data.tokenUnits,
             }),
         })
 

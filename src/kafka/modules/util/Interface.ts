@@ -108,6 +108,15 @@ export interface PublisherEventAndParameters extends Record<TOPICS, { log?: 1 | 
         user: User;
         partner: Partner;
         transactionId: string;
+        tokenUnits: string;
+    };
+    [TOPICS.TOKEN_RECIEVED_FROM_REQUERY]: {
+        log?: 1 | 0,
+        meter: MeterInfo & { id: string; token: string };
+        user: User;
+        partner: Partner;
+        transactionId: string;
+        tokenUnits: string;
     };
     [TOPICS.WEBHOOK_NOTIFICATION_TO_PARTNER_RETRY]: {
         log?: 1 | 0,
@@ -161,6 +170,7 @@ export interface PublisherEventAndParameters extends Record<TOPICS, { log?: 1 | 
         user: User;
         partner: Partner;
         transactionId: string;
+        tokenUnits: string
     };
     [TOPICS.CREATE_USER_INITIATED]: {
         log?: 1 | 0,

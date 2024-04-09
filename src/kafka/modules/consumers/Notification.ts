@@ -135,10 +135,9 @@ class NotificationHandler extends Registry {
             await transactionEventService.addTokenSentToPartnerEvent()
         }
 
-        const tokenSentToPartnerEvent = await EventService.viewSingleEventByTransactionIdAndType(transaction.id, TOPICS.TOKEN_SENT_TO_PARTNER)
         const tokenSentToUserEmailEvent = await EventService.viewSingleEventByTransactionIdAndType(transaction.id, TOPICS.TOKEN_SENT_TO_EMAIL)
         const tokenSentToUserSMSEvent = await EventService.viewSingleEventByTransactionIdAndType(transaction.id, TOPICS.SMS_TOKEN_SENT_TO_USER)
-        if (tokenSentToPartnerEvent && (tokenSentToUserEmailEvent || tokenSentToUserSMSEvent)) {
+        if (tokenSentToUserEmailEvent || tokenSentToUserSMSEvent) {
             await TransactionService.updateSingleTransaction(transaction.id, { status: Status.COMPLETE })
         }
 

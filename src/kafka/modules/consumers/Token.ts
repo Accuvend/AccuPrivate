@@ -562,8 +562,10 @@ class ResponseValidationUtil {
         requestType, vendor, responseObject,
         httpCode, vendType,
         transactionId,
-        disco
+        disco,
+        isError,
     }: {
+        isError: boolean,
         disco: string;
         transactionId: string,
         vendType: 'PREPAID' | 'POSTPAID'
@@ -583,7 +585,7 @@ class ResponseValidationUtil {
 
             // Get response path and refCode for current request and vendor
             const responsePath = await ResponsePathService.viewResponsePathForValidation({
-                requestType, vendor
+                requestType, vendor, forErrorResponses: isError ? true : undefined
             })
             if (!responsePath) {
                 logger.error('ERROR_CODE_VALIDATION: Response path not found', {
@@ -617,7 +619,7 @@ class ResponseValidationUtil {
                 let _prop: Record<string, any> | undefined = responseObject
                 const path = prop.split('.')
                 for (const p of path) {
-                    if (_prop && _prop[p]) {
+                    if (_prop && _prop[p] != undefined) {
                         _prop = _prop[p]
                     } else {
                         _prop = undefined
@@ -675,7 +677,7 @@ class ResponseValidationUtil {
             })
 
             // Search for error code with match and return the accuvendMasterResponseCode
-            const errorCode = await ErrorCodeService.getErrorCodesForValidation(dbQueryParams)
+            const errorCode = await ErrorCodeService.getErrorCodesForValidation(dbQueryParams, isError)
 
             console.log({ errorCode: errorCode?.dataValues })
             logger.info('ERROR_CODE_VALIDATION: Error code for transaction validation', {
@@ -815,11 +817,12 @@ class TokenHandler extends Registry {
                     responseObject: tokenInfo instanceof AxiosError ? tokenInfo.response?.data : tokenInfo,
                     vendType: meter.vendType,
                     disco: disco,
-                    transactionId: transaction.id
+                    transactionId: transaction.id,
+                    isError: tokenInfo instanceof AxiosError
                 })
 
                 console.log({ response })
-            
+
                 switch (response.action) {
                     case -1:
                         logger.error('Transaction condition pending - Requery', logMeta)
@@ -1038,6 +1041,7 @@ class TokenHandler extends Registry {
                     vendType: meter.vendType,
                     disco: discoCode,
                     transactionId: transaction.id,
+                    isError: requeryResult instanceof AxiosError
                 })
 
                 let eventMessage = {

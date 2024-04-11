@@ -30,6 +30,9 @@ export default class ResponsePath extends Model<ResponsePath | IResponsePath> {
 
     @Column({ type: DataType.STRING, allowNull: false })
     requestType: string
+
+    @Column({ type: DataType.BOOLEAN, allowNull: true })
+    forErrorResponses?: boolean
 }
 
 // Interface to represent a ResponsePath object with specific properties
@@ -40,6 +43,7 @@ export interface IResponsePath {
     description?: string
     accuvendRefCode?: string
     requestType: string
+    forErrorResponses?: boolean
 }
 
 // Interface to represent thep structure of data for creating a new ResponsePath

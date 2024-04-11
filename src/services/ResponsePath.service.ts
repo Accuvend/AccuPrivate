@@ -27,11 +27,16 @@ export default class ResponsePathService {
     }
 
     static async viewResponsePathForValidation({
-        requestType, vendor
-    }: { requestType: string, vendor: string }): Promise<ResponsePath[] | void | null> {
+        requestType, vendor, forErrorResponses
+    }: { requestType: string, vendor: string, forErrorResponses?: boolean }): Promise<ResponsePath[] | void | null> {
         try {
+            const query = {} as Record<string, string | boolean>;
+            if (requestType != undefined) query['requestType'] = requestType;
+            if (vendor != undefined) query['vendor'] = vendor;
+            if (forErrorResponses != undefined) query['forErrorResponses'] = forErrorResponses;
+
             const bundle: ResponsePath[] | null = await ResponsePath.findAll({
-                where: { requestType, vendor }
+                where: query
             });
             return bundle;
         } catch (err) {

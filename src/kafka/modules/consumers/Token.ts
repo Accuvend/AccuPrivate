@@ -660,7 +660,6 @@ class ResponseValidationUtil {
                 logger.error('ERROR_CODE_VALIDATION: Missing properties in response object', {
                     meta: { missingPropertiesInResponse, responseObject, expectedProperties: propertiesToConsider, transactionId }
                 })
-                return { action: -1, vendType }
             }
 
             // Convert CODE (httpStatusCode) to string if it is a number, because the db stores it as a string
@@ -703,8 +702,6 @@ class ResponseValidationUtil {
                         meta: { transactionId: transactionId, disco: disco, }
                     })
                 }
-
-                return { action: errorCode.accuvendMasterResponseCode, vendType }
             }
 
             // If no masterResponseCode was set requery transaction

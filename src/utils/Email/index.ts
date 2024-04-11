@@ -82,12 +82,12 @@ export default class EmailService {
     }
 }
 
-EmailService.sendEmail({
-    html: 'sdfas',
-    subject: 'main',
-    text: 'sfas',
-    to: 'molunorichie@gmail.com',
-    from: 'asdfasdf'
-})
+// EmailService.sendEmail({
+//     html: 'sdfas',
+//     subject: 'main',
+//     text: 'sfas',
+//     to: 'molunorichie@gmail.com',
+//     from: 'asdfasdf'
+// })
 
 export { EmailTemplate };

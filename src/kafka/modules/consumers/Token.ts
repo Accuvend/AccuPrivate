@@ -268,7 +268,7 @@ export class TokenHandlerUtil {
             }
 
             // Check for the reference used in the last retry record
-            retryRecord[retryRecord.length - 1].reference.push(currentVendor.vendor === 'IRECHARGE' ? generateVendorReference() : randomUUID())
+            retryRecord[retryRecord.length - 1].reference.push(currentVendor.vendor === 'IRECHARGE' ? await generateVendorReference() : randomUUID())
         } else {
             logger.warn('Switching to new vendor', meta)
             // Add new record to the retry record
@@ -390,6 +390,11 @@ export class TokenHandlerUtil {
                 logger.info('Generated access token for irecharge meter validation', { transactionId: data.transaction.id })
             }
 
+            logger.info('Processing vend request', {
+                vendor: data.transaction.superagent,
+                transactionId: data.transaction.id,
+                preTransformedPayload: _data,
+            })
             switch (data.transaction.superagent) {
                 case "BAXI":
                     return await VendorService.purchaseElectricity({ data: _data, vendor: 'BAXI' })
@@ -629,8 +634,8 @@ class ResponseValidationUtil {
             Array.from(propertiesToConsider).forEach(property => {
                 const value = getFieldValueFromResponseObject(property[0])
                 if (!value) {
-                    logger.error(`Property ${property} not found in response`, {
-                        meta: { property }
+                    logger.error(`ERROR_CODE_VALIDATION:RESPONSE_PATH:  Property ${property} not found in response object`, {
+                        meta: { property, transactionId }
                     })
                     missingPropertiesInResponse.push(property[0])
                 }
@@ -652,10 +657,9 @@ class ResponseValidationUtil {
 
             // Requery transaction if some required properties are missing in the response object
             if (missingPropertiesInResponse.length > 0) {
-                logger.error('ERROR_CODE_VALIDATION: Missing properties in response', {
+                logger.error('ERROR_CODE_VALIDATION: Missing properties in response object', {
                     meta: { missingPropertiesInResponse, responseObject, expectedProperties: propertiesToConsider, transactionId }
                 })
-                return { action: -1, vendType }
             }
 
             // Convert CODE (httpStatusCode) to string if it is a number, because the db stores it as a string
@@ -698,8 +702,6 @@ class ResponseValidationUtil {
                         meta: { transactionId: transactionId, disco: disco, }
                     })
                 }
-
-                return { action: -1, vendType }
             }
 
             // If no masterResponseCode was set requery transaction
@@ -766,7 +768,7 @@ class TokenHandler extends Registry {
                     vendType: meter.vendType,
                     phone: user.phoneNumber,
                     accessToken: transaction.irechargeAccessToken
-                }).catch(e => e.response);
+                }).catch(e => e);
 
                 console.log({
                     point: 'power purchase initiated',
@@ -809,15 +811,15 @@ class TokenHandler extends Registry {
                 const response = await ResponseValidationUtil.validateTransactionCondition({
                     requestType: 'VENDREQUEST',
                     vendor: vendor.name,
-                    httpCode: tokenInfo?.httpStatusCode,
-                    responseObject: tokenInfo,
+                    httpCode: tokenInfo instanceof AxiosError ? tokenInfo.response?.status : tokenInfo?.httpStatusCode,
+                    responseObject: tokenInfo instanceof AxiosError ? tokenInfo.response?.data : tokenInfo,
                     vendType: meter.vendType,
                     disco: disco,
                     transactionId: transaction.id
                 })
 
                 console.log({ response })
-
+            
                 switch (response.action) {
                     case -1:
                         logger.error('Transaction condition pending - Requery', logMeta)
@@ -1025,14 +1027,14 @@ class TokenHandler extends Registry {
                     },
                 );
 
-                const requeryResult = await TokenHandlerUtil.requeryTransactionFromVendor(transaction).catch(e => e.response ?? {});
+                const requeryResult = await TokenHandlerUtil.requeryTransactionFromVendor(transaction).catch(e => e ?? {});
 
                 console.log({ requeryResult: requeryResult })
                 const response = await ResponseValidationUtil.validateTransactionCondition({
                     requestType: 'REQUERY',
                     vendor: vendor.name,
                     httpCode: requeryResult instanceof AxiosError ? requeryResult.status : requeryResult.httpStatusCode,
-                    responseObject: requeryResult,
+                    responseObject: requeryResult instanceof AxiosError ? requeryResult.response?.data : requeryResult,
                     vendType: meter.vendType,
                     disco: discoCode,
                     transactionId: transaction.id,

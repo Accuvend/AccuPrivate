@@ -414,7 +414,7 @@ export default class VendorController {
                 productCodeId: existingProductCodeForDisco.id,
                 retryRecord: [],
                 previousVendors: [superagent],
-                vendorReferenceId: generateVendorReference(),
+                vendorReferenceId: await generateVendorReference(),
                 productType: transactionTypes[existingProductCodeForDisco.category],
                 channel
             })

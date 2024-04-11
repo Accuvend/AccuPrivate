@@ -205,3 +205,4 @@ dist-old-2
 dist-*
 compare.env.js
 dist.zip
+change_id_*.js

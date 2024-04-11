@@ -490,9 +490,9 @@ export default class VendorService {
             } catch (error: any) {
                 console.log({
                     message: error.message,
-                    response: error.response?.data.errors,
+                    response: error.response?.data?.errors,
                 });
-                throw new Error(error.message);
+                throw error
             }
         })
     }
@@ -612,7 +612,7 @@ export default class VendorService {
             return responseData;
         } catch (error: any) {
             console.log(error.response);
-            throw new Error(error.message);
+            throw error;
         }
     }
 
@@ -726,6 +726,7 @@ export default class VendorService {
                     method: "POST",
                 },
                 data: postData,
+                transactionId: body.transactionId
             };
 
             // WHY IS THERE HARD CODE !!!!
@@ -749,8 +750,8 @@ export default class VendorService {
                 });
                 logger.info("Vend response from buypower", {
                     meta: {
+                        requestData: postData,
                         responseData: response.data,
-                        transactionId: body.transactionId,
                         ...mainMeta,
                     },
                 });

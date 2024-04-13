@@ -33,7 +33,7 @@ import WaitTimeService from "../../../services/Waittime.service";
 import ResponsePathService from "../../../services/ResponsePath.service";
 import ErrorCodeService from "../../../services/ErrorCodes.service";
 import ErrorCode from "../../../models/ErrorCodes.model";
-const newrelic = require('newrelic')
+import newrelic from 'newrelic'
 import { TokenUtil } from "../../../utils/Auth/Token";
 import { randomUUID } from "crypto";
 
@@ -585,7 +585,7 @@ class ResponseValidationUtil {
 
             // Get response path and refCode for current request and vendor
             const responsePath = await ResponsePathService.viewResponsePathForValidation({
-                requestType, vendor, forErrorResponses: isError ? true : undefined
+                requestType, vendor, forErrorResponses: isError
             })
             if (!responsePath) {
                 logger.error('ERROR_CODE_VALIDATION: Response path not found', {
@@ -868,7 +868,7 @@ class TokenHandler extends Registry {
 
                         powerUnit = powerUnit
                             ? await PowerUnitService.updateSinglePowerUnit(powerUnit.id, {
-                                token,
+                                tokenFromVend: token,
                                 tokenUnits: response.tokenUnits,
                                 transactionId: data.transactionId,
                             })
@@ -880,7 +880,6 @@ class TokenHandler extends Registry {
                                 amount: transaction.amount,
                                 meterId: data.meter.id,
                                 superagent: data.superAgent as ITransaction['superagent'],
-                                token: token,
                                 tokenFromVend: token,
                                 tokenNumber: 0,
                                 tokenUnits: response.tokenUnits,

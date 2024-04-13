@@ -164,11 +164,11 @@ export class VendorPublisher extends ProducerFactory {
     }
 
     static async publishEventForRetryPowerPurchaseWithNewVendor(
-        data: PublisherEventAndParameters[TOPICS.RETRY_PURCHASE_FROM_NEW_VENDOR],
+        data: PublisherEventAndParameters[TOPICS.RETRY_PURCHASE_FROM_VENDOR],
     ) {
 
         return ProducerFactory.sendMessage({
-            topic: TOPICS.RETRY_PURCHASE_FROM_NEW_VENDOR,
+            topic: TOPICS.RETRY_PURCHASE_FROM_VENDOR,
             message: {
                 log: data.log,
                 meter: {

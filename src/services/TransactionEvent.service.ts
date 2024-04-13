@@ -1115,8 +1115,8 @@ export default class TransactionEventService {
 
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
-            eventType: TOPICS.RETRY_PURCHASE_FROM_NEW_VENDOR,
-            eventText: TOPICS.RETRY_PURCHASE_FROM_NEW_VENDOR,
+            eventType: TOPICS.RETRY_PURCHASE_FROM_VENDOR,
+            eventText: TOPICS.RETRY_PURCHASE_FROM_VENDOR,
             payload: JSON.stringify({
                 bankRefId,
                 transactionId: this.transaction.id,

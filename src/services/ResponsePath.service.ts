@@ -33,8 +33,11 @@ export default class ResponsePathService {
             const query = {} as Record<string, string | boolean>;
             if (requestType != undefined) query['requestType'] = requestType;
             if (vendor != undefined) query['vendor'] = vendor;
-            if (forErrorResponses != undefined) query['forErrorResponses'] = forErrorResponses;
+            if (forErrorResponses != undefined) {
+                query['forErrorResponses'] = forErrorResponses
+            };
 
+            console.log({ query })
             const bundle: ResponsePath[] | null = await ResponsePath.findAll({
                 where: query
             });

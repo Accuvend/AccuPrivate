@@ -81,7 +81,7 @@ const retry = {
     count: 0,
     limit: 5,
     limitToStopRetryingWhenTransactionIsSuccessful: 20,
-    retryCountBeforeSwitchingVendor: 4,
+    retryCountBeforeSwitchingVendor: 2,
     testForSwitchingVendor: true,
 }
 
@@ -319,7 +319,7 @@ export class TokenHandlerUtil {
         await new TransactionEventService(
             transaction, meter, newVendor, partner.email
         ).addScheduleRetryEvent({
-            timeStamp: new Date().toString(), waitTime
+            timeStamp: new Date().toString(), waitTime, retryRecord: currentVendor
         })
 
         logger.info('Scheduled retry event', meta)

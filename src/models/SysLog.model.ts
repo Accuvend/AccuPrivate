@@ -1,6 +1,7 @@
 import { all } from "axios";
 import { Table, Column, Model, DataType, PrimaryKey, Default, CreatedAt, ForeignKey } from "sequelize-typescript";
 import Transaction from "./Transaction.model";
+import { LoggerDatabase } from ".";
 
 // Define the Sequelize model for the "SysLog" table
 @Table
@@ -22,7 +23,6 @@ export default class SysLog extends Model<SysLog | ISysLog> {
     @Column(DataType.TEXT)
     message: string;
 
-    @ForeignKey(() => Transaction)
     @Column({ type: DataType.STRING, allowNull: true, })
     transactionId?: string;
 

@@ -847,7 +847,7 @@ export default class TransactionEventService {
         return this.transaction
     }
 
-    public async addScheduleRetryEvent({ timeStamp, waitTime }: { timeStamp: string, waitTime: number }): Promise<Event> {
+    public async addScheduleRetryEvent({ timeStamp, waitTime, retryRecord }: { timeStamp: string, waitTime: number, retryRecord: Transaction['retryRecord'][number] }): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.SCHEDULE_RETRY_FOR_TRANSACTION,
@@ -860,6 +860,7 @@ export default class TransactionEventService {
                 vendType: this.meterInfo.vendType,
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
+                retryRecord:  retryRecord
             }),
             source: 'API',
             eventTimestamp: new Date(),

@@ -574,7 +574,7 @@ export default class VendorController {
         console.log({ transactionId, bankComment, vendType })
 
         const errorMeta = { transactionId: transactionId };
-
+        
         const transaction: Transaction | null =
             await TransactionService.viewSingleTransaction(transactionId);
         if (!transaction) {

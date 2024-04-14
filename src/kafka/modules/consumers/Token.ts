@@ -912,7 +912,8 @@ class TokenHandler extends Registry {
                             tokenUnits: response.tokenUnits
                         });
                         logger.info('Saving token to cache')
-                        token && await TokenUtil.saveTokenToCache({ key: 'transaction_token:' + transaction.id, token: (response as any).token ?? '' })
+                        const twoMinsExpiry = 2 * 60 * 1000
+                        token && await TokenUtil.saveTokenToCache({ key: 'transaction_token:' + transaction.id, token: (response as any).token ?? '', expiry: twoMinsExpiry })
 
                         await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor({
                             eventData: { ...eventMessage, error: { ...eventMessage.error, cause: TransactionErrorCause.UNEXPECTED_ERROR } },

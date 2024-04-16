@@ -383,7 +383,7 @@ jobs:
             DB_HOST=$(grep DB_HOST ./.env | cut -d "=" -f2)
           
             echo "DB_URL=postgres://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=require" >> .env
-            
+            echo "LOG_DB_URL=postgres://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=require" >> .env
             #install depencendies in dist folder
             npm install
             

@@ -177,7 +177,6 @@ class NotificationHandler extends Registry {
                 partnerEntity.id,
                 notification,
             );
-            await transactionEventService.addTokenSentToPartnerEvent();
         }
 
         return;

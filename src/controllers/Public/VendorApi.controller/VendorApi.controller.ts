@@ -44,7 +44,7 @@ import VendorRates from "../../../models/VendorRates.model";
 import ProductService from "../../../services/Product.service";
 import VendorProduct, { VendorProductSchemaData } from "../../../models/VendorProduct.model";
 import Vendor from "../../../models/Vendor.model";
-const newrelic: any = require('newrelic');
+import newrelic from 'newrelic';
 import VendorProductService from "../../../services/VendorProduct.service";
 import VendorDocService from '../../../services/Vendor.service'
 import { generateRandomString, generateRandonNumbers, generateVendorReference } from "../../../utils/Helper";
@@ -52,6 +52,8 @@ import ResponseTrimmer from "../../../utils/ResponseTrimmer";
 import PowerUnit from "../../../models/PowerUnit.model";
 import PowerUnitService from "../../../services/PowerUnit.service";
 import { TokenUtil } from "../../../utils/Auth/Token";
+import ResponsePath from "../../../models/ResponsePath.model";
+import { Op } from "sequelize";
 interface valideMeterRequestBody {
     meterNumber: string;
     superagent: "BUYPOWERNG" | "BAXI";
@@ -572,7 +574,7 @@ export default class VendorController {
         console.log({ transactionId, bankComment, vendType })
 
         const errorMeta = { transactionId: transactionId };
-
+        
         const transaction: Transaction | null =
             await TransactionService.viewSingleTransaction(transactionId);
         if (!transaction) {
@@ -617,7 +619,7 @@ export default class VendorController {
             vendType: meter.vendType,
             id: meter.id,
         }
-        const updatedTransaction = await TransactionService.viewSingleTransaction(transactionId)
+        let updatedTransaction = await TransactionService.viewSingleTransaction(transactionId)
         if (!updatedTransaction) { throw new NotFoundError('Transaction not found') }
 
         const transactionEventService = new EventService.transactionEventService(updatedTransaction, meterInfo, transaction.superagent, transaction.partner.email);
@@ -640,131 +642,143 @@ export default class VendorController {
             throw e
         });
 
-        try {
-            console.log({ transaction: transaction.superagent })
-
-            const response = await newrelic.startBackgroundTransaction('KafkaPublish:PowePurchaseInitiated', function () {
-                VendorPublisher.publishEventForInitiatedPowerPurchase({
-                    transactionId: transaction.id,
-                    user: {
-                        name: user.name as string,
-                        email: user.email,
-                        address: user.address,
-                        phoneNumber: user.phoneNumber,
-                    },
-                    partner: {
-                        email: partnerEntity.email,
-                    },
-                    meter: meterInfo,
-                    superAgent: transaction.superagent,
-                    vendorRetryRecord: {
-                        retryCount: 1,
-                    }
-                })
+        console.log({ transaction: transaction.superagent })
+        const response = await newrelic.startBackgroundTransaction('KafkaPublish:PowePurchaseInitiated', function () {
+            return VendorPublisher.publishEventForInitiatedPowerPurchase({
+                transactionId: transaction.id,
+                user: {
+                    name: user.name as string,
+                    email: user.email,
+                    address: user.address,
+                    phoneNumber: user.phoneNumber,
+                },
+                partner: {
+                    email: partnerEntity.email,
+                },
+                meter: meterInfo,
+                superAgent: transaction.superagent,
+                vendorRetryRecord: {
+                    retryCount: 1,
+                }
             })
+        })
 
-            if (response instanceof Error) {
-                throw error
+        if (response instanceof Error) {
+            throw error
+        }
+
+        updatedTransaction = await TransactionService.viewSingleTransaction(transactionId)
+        if (!updatedTransaction) { throw new NotFoundError('Transaction not found') }
+        const logMeta = {
+            transactionId: transaction.id,
+        } as Record<string, any>
+
+        const _transaction = updatedTransaction.dataValues as Partial<Transaction>
+        delete _transaction.meter
+        delete _transaction.powerUnit
+        delete _transaction.events
+
+        const tokenFromVendor = await TokenUtil.getTokenFromCache('transaction_token:' + _transaction.id)
+        if (!tokenFromVendor) {
+            // removed to update endpoint reponse mapping
+            // const responseData = { status: 'success', message: 'Token purchase initiated successfully', data: { transaction: ResponseTrimmer.trimTransactionResponse(_transaction)}}
+            const _product = await ProductService.viewSingleProduct(_transaction.productCodeId || "")
+            const responseData = {
+                status: 'success',
+                message: 'Token purchase initiated successfully',
+                data: {
+                    transaction: {
+                        disco: _product?.productName,
+                        "amount": _transaction?.amount,
+                        "transactionId": _transaction?.id,
+                        "id": _transaction?.id,
+                        "productType": _transaction?.productType,
+                        "transactionTimestamp": _transaction?.transactionTimestamp,
+                    }
+                } as Record<string, any>
             }
 
-            const updatedTransaction = await TransactionService.viewSingleTransaction(transactionId)
-            if (!updatedTransaction) { throw new NotFoundError('Transaction not found') }
+            const start = Date.now()
+            //  Ping redis every 20 seconds for the token
+            const intervalId = setInterval(async () => {
+                logger.info('Pinging redis for token')
+                const tokenFromVendor = await TokenUtil.getTokenFromCache('transaction_token:' + _transaction.id)
+                if (tokenFromVendor) {
+                    // Clear interval
+                    clearInterval(intervalId)
 
-            const _transaction = updatedTransaction.dataValues as Partial<Transaction>
-            delete _transaction.meter
-            delete _transaction.powerUnit
-            delete _transaction.events
+                    await TokenUtil.deleteTokenFromCache('transaction_token:' + _transaction.id)
 
-            const tokenFromVendor = await TokenUtil.getTokenFromCache('transaction_token:' + _transaction.id)
-            if (!tokenFromVendor) {
-                // removed to update endpoint reponse mapping
-                // const responseData = { status: 'success', message: 'Token purchase initiated successfully', data: { transaction: ResponseTrimmer.trimTransactionResponse(_transaction)}}
-                const _product = await ProductService.viewSingleProduct(_transaction.productCodeId || "")
-                const responseData = {
-                    status: 'success',
-                    message: 'Token purchase initiated successfully',
-                    data: {
-                        transaction: {
-                            disco: _product?.productName,
-                            "amount": _transaction?.amount,
-                            "transactionId": _transaction?.id,
-                            "id": _transaction?.id,
-                            "productType": _transaction?.productType,
-                            "transactionTimestamp": _transaction?.transactionTimestamp,
+                    logger.info('Token from interval received => ' + tokenFromVendor)
+
+                    // Send response if token has been gotten from vendor
+                    responseData.data.meter = meterInfo
+                    responseData.data.token = tokenFromVendor
+                    res.status(200).json(responseData)
+                    logger.info('Vend response sent to partner', {
+                        meta: {
+                            transactionId: transaction.id,
+                            response: responseData
                         }
-                    } as Record<string, any>
-                }
+                    })
 
-                const start = Date.now()
-                //  Ping redis every 20 seconds for the token
-                const intervalId = setInterval(async () => {
-                    logger.info('Pinging redis for token')
-                    const tokenFromVendor = await TokenUtil.getTokenFromCache('transaction_token:' + _transaction.id)
-                    if (tokenFromVendor) {
+                    const existingEvent = await EventService.viewSingleEventByTransactionIdAndType(transactionId, TOPICS.TOKEN_SENT_TO_PARTNER)
+                    if (!existingEvent) await transactionEventService.addTokenSentToPartnerEvent();
+
+                } else {
+                    // Check if 5 minutes has passed
+                    const timeDifference = Date.now() - start
+                    if (timeDifference > 60000) {
                         // Clear interval
                         clearInterval(intervalId)
-
-                        await TokenUtil.deleteTokenFromCache('transaction_token:' + _transaction.id)
-
-                        logger.info('Token from interval received => ' + tokenFromVendor)
-
-                        // Send response if token has been gotten from vendor
-                        responseData.data.meter = meterInfo
-                        responseData.data.token = tokenFromVendor
+                        // Send response if token has not been gotten from vendor
+                        Logger.apiRequest.info('Token purchase initiated successfully', { meta: { transactionId: transaction.id, ...responseData } })
+                        responseData.message = 'Transaction is being processed'
                         res.status(200).json(responseData)
-
-                        const existingEvent = await EventService.viewSingleEventByTransactionIdAndType(transactionId, TOPICS.TOKEN_SENT_TO_PARTNER)
-                        if (!existingEvent) await transactionEventService.addTokenSentToPartnerEvent();
-
-                    } else {
-                        // Check if 5 minutes has passed
-                        const timeDifference = Date.now() - start
-                        if (timeDifference > 60000) {
-                            // Clear interval
-                            clearInterval(intervalId)
-                            // Send response if token has not been gotten from vendor
-                            Logger.apiRequest.info('Token purchase initiated successfully', { meta: { transactionId: transaction.id, ...responseData } })
-                            responseData.message = 'Transaction is being processed'
-                            res.status(200).json(responseData)
-                        }
+                        logger.info('Vend response sent to partner', {
+                            meta: {
+                                transactionId: transaction.id,
+                                response: responseData
+                            }
+                        })
                     }
-                }, 3000)
-
-                return
-            } else {
-                // Send response if token has been gotten from vendor
-                res.status(200).json({
-                    status: 'success',
-                    message: 'Token purchase initiated successfully',
-                    data: {
-                        transaction: {
-                            disco: transaction.disco,
-                            "amount": transaction.amount,
-                            "transactionId": transaction.id,
-                            "id": transaction.id,
-                            "bankRefId": transaction.bankRefId,
-                            "bankComment": transaction.bankComment,
-                            "productType": transaction.productType,
-                            "transactionTimestamp": transaction.transactionTimestamp,
-                        },
-                        meter: { ...meterInfo },
-                        token: tokenFromVendor
-                    }
-                })
-
-                // TODO: Add Code to send response if token has been gotten from vendor
-                await transactionEventService.addTokenSentToPartnerEvent();
-                await TokenUtil.deleteTokenFromCache('transaction_token:' + _transaction.id)
-
-                return
-            }
-
-
+                }
+            }, 3000)
 
             return
-        } catch (error) {
-            logger.error('SuttingDown vendor token consumer of id')
-            console.log(error)
+        } else {
+            const responseData = {
+                status: 'success',
+                message: 'Token purchase initiated successfully',
+                data: {
+                    transaction: {
+                        disco: transaction.disco,
+                        "amount": transaction.amount,
+                        "transactionId": transaction.id,
+                        "id": transaction.id,
+                        "bankRefId": transaction.bankRefId,
+                        "bankComment": transaction.bankComment,
+                        "productType": transaction.productType,
+                        "transactionTimestamp": transaction.transactionTimestamp,
+                    },
+                    meter: { ...meterInfo },
+                    token: tokenFromVendor
+                }
+            }
+            // Send response if token has been gotten from vendor
+            res.status(200).json(responseData)
+            logger.info('Vend response sent to partner', {
+                meta: {
+                    transactionId: transaction.id,
+                    response: responseData
+                }
+            })
+
+            // TODO: Add Code to send response if token has been gotten from vendor
+            await transactionEventService.addTokenSentToPartnerEvent();
+            await TokenUtil.deleteTokenFromCache('transaction_token:' + _transaction.id)
+
+            return
         }
     }
 

@@ -3,7 +3,7 @@ import Redis from 'ioredis'
 import { Dialect, DataTypes } from 'sequelize'
 import { Sequelize } from 'sequelize-typescript';
 import Mongoose from 'mongoose';
-import { DB_CONFIG, MONGO_URI_LOG, REDIS_HOST, REDIS_PASSWORD, REDIS_PORT, REDIS_URL } from '../utils/Constants';
+import { DB_CONFIG, LOG_DB_URL, MONGO_URI_LOG, REDIS_HOST, REDIS_PASSWORD, REDIS_PORT, REDIS_URL } from '../utils/Constants';
 import mongoose from 'mongoose';
 
 console.log(DB_CONFIG.URL)
@@ -19,17 +19,42 @@ const Database = new Sequelize(DB_CONFIG.URL, {
     }
 });
 
+export const LoggerDatabase = new Sequelize(LOG_DB_URL, {
+    logging: false,
+    pool: {
+        max: 1000,
+        min: 0,
+        idle: 1000,
+        acquire: 60000,
+        evict: 10000,
+    }
+});
+
+import { join } from 'path';
+
+
 // Asynchronous function to initiate the database connection
 async function initiateDB(db: Sequelize): Promise<void> {
     try {
         // Attempt to authenticate the database connection
         await db.authenticate();
 
-        // Add all Sequelize models in the specified directory for ts files except for 
-        await db.addModels([__dirname + '/**/*.model.ts']);
+        // Define the path to the directory containing Sequelize models
+        const modelsTSDirectory = join(__dirname, '**/*.model.ts');
+        const modelsJSDirectory = join(__dirname, '**/*.model.js');
 
-        // Add all Sequelize models in the specified directory for js files
-        await db.addModels([__dirname + '/**/*.model.js']);
+        // Define the path to the specific file you want to exclude
+        const excludedTSFile = join(__dirname, '/SysLog.model.ts');
+        const excludedJSFile = join(__dirname, '/SysLog.model.js');
+
+        // Add Sequelize models from TypeScript files in the specified directory, excluding the specified file
+        await db.addModels([modelsTSDirectory, `!${excludedTSFile}`]);
+
+        // Add Sequelize models from TypeScript files in the specified directory, excluding the specified file
+        await db.addModels([modelsJSDirectory, `!${excludedJSFile}`]);
+
+        await LoggerDatabase.addModels([excludedTSFile]);
+        await LoggerDatabase.addModels([excludedJSFile]);
 
         // Log a success message when the connection is established
         console.log('Connection has been established successfully.');

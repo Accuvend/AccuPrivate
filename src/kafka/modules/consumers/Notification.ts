@@ -93,15 +93,13 @@ class NotificationHandler extends Registry {
             }),
         });
 
-        let tokenSentToUserSms: Event | null = null;
         const msgTemplate =
             data.meter.vendType.toUpperCase() === "POSTPAID"
                 ? await SmsService.postpaidElectricityTemplate(transaction)
                 : await SmsService.prepaidElectricityTemplate(transaction);
         await SmsService.sendSms(data.user.phoneNumber, msgTemplate)
             .then(async () => {
-                tokenSentToUserSms =
-                    await transactionEventService.addSmsTokenSentToUserEvent();
+                await transactionEventService.addSmsTokenSentToUserEvent();
             })
             .catch((error: AxiosError) => {
                 console.log(error.response?.data);
@@ -181,34 +179,6 @@ class NotificationHandler extends Registry {
             );
             await transactionEventService.addTokenSentToPartnerEvent();
         }
-
-        const tokenSentToUserEmailEvent =
-            await EventService.viewSingleEventByTransactionIdAndType(
-                transaction.id,
-                TOPICS.TOKEN_SENT_TO_EMAIL,
-            );
-        const tokenSentToUserSMSEvent =
-            await EventService.viewSingleEventByTransactionIdAndType(
-                transaction.id,
-                TOPICS.SMS_TOKEN_SENT_TO_USER,
-            );
-        if (tokenSentToUserEmailEvent || tokenSentToUserSMSEvent) {
-            await TransactionService.updateSingleTransaction(transaction.id, {
-                status: Status.COMPLETE,
-            });
-        }
-
-        const product = await ProductService.viewSingleProduct(
-            transaction.productCodeId,
-        );
-        if (!product) {
-            throw new Error(
-                `Error fetching product with id ${transaction.productCodeId}`,
-            );
-        }
-
-        transaction.disco = product.productName;
-        console.log({ productName: transaction.disco });
 
         return;
     }

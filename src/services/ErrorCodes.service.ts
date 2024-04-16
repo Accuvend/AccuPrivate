@@ -1,5 +1,5 @@
 // Import necessary modules and dependencies
-import { Op } from "sequelize";
+import { literal, Op } from "sequelize";
 import ErrorCode, { ICreateErrorCode, IErrorCode } from "../models/ErrorCodes.model";
 
 // ErrorCodeService class for handling ErrorCode-related operations
@@ -30,7 +30,8 @@ export default class ErrorCodeService {
         }
     }
 
-    static async getErrorCodesForValidation(queryParams: Partial<Omit<ErrorCode, 'id'>>): Promise<ErrorCode | void | null> {
+    static async getErrorCodesForValidation(queryParams: Partial<Omit<ErrorCode, 'id'>>, inclusiveMsgSearch = false
+    ): Promise<ErrorCode | void | null> {
         try {
             const queryParms = {} as Record<string, string | number>;
 
@@ -52,7 +53,7 @@ export default class ErrorCodeService {
 
             // Include only the query parameters with values excluding (undefined)
             for (const key in queryParams) {
-                if (keysInErrorCode.includes(key) && queryParams[key as keyof typeof queryParams]) {
+                if (keysInErrorCode.includes(key) && queryParams[key as keyof typeof queryParams] != undefined) {
                     queryParms[key] = queryParams[key as keyof typeof queryParams] as string | number;
                 }
             }
@@ -65,6 +66,13 @@ export default class ErrorCodeService {
                     caseInsensitiveQuery[key] = { [Op.iLike]: queryParms[key] }
                 } else {
                     caseInsensitiveQuery[key] = queryParms[key]
+                }
+            }
+
+            // if inclusiveMsgSearch is true, change the msg query to check if the value is a substring of the msg
+            if (inclusiveMsgSearch) {
+                if (queryParams.MSG && typeof queryParams.MSG == 'string') {
+                    caseInsensitiveQuery['MSG'] = literal(`'${queryParams.MSG}' LIKE '%' || "ErrorCode"."MSG" || '%'`)
                 }
             }
 

@@ -33,7 +33,7 @@ import WaitTimeService from "../../../services/Waittime.service";
 import ResponsePathService from "../../../services/ResponsePath.service";
 import ErrorCodeService from "../../../services/ErrorCodes.service";
 import ErrorCode from "../../../models/ErrorCodes.model";
-const newrelic = require('newrelic')
+import newrelic from 'newrelic'
 import { TokenUtil } from "../../../utils/Auth/Token";
 import { randomUUID } from "crypto";
 
@@ -81,7 +81,7 @@ const retry = {
     count: 0,
     limit: 5,
     limitToStopRetryingWhenTransactionIsSuccessful: 20,
-    retryCountBeforeSwitchingVendor: 4,
+    retryCountBeforeSwitchingVendor: 2,
     testForSwitchingVendor: true,
 }
 
@@ -319,7 +319,7 @@ export class TokenHandlerUtil {
         await new TransactionEventService(
             transaction, meter, newVendor, partner.email
         ).addScheduleRetryEvent({
-            timeStamp: new Date().toString(), waitTime
+            timeStamp: new Date().toString(), waitTime, retryRecord: currentVendor
         })
 
         logger.info('Scheduled retry event', meta)
@@ -562,8 +562,10 @@ class ResponseValidationUtil {
         requestType, vendor, responseObject,
         httpCode, vendType,
         transactionId,
-        disco
+        disco,
+        isError,
     }: {
+        isError: boolean,
         disco: string;
         transactionId: string,
         vendType: 'PREPAID' | 'POSTPAID'
@@ -583,7 +585,7 @@ class ResponseValidationUtil {
 
             // Get response path and refCode for current request and vendor
             const responsePath = await ResponsePathService.viewResponsePathForValidation({
-                requestType, vendor
+                requestType, vendor, forErrorResponses: isError
             })
             if (!responsePath) {
                 logger.error('ERROR_CODE_VALIDATION: Response path not found', {
@@ -617,7 +619,7 @@ class ResponseValidationUtil {
                 let _prop: Record<string, any> | undefined = responseObject
                 const path = prop.split('.')
                 for (const p of path) {
-                    if (_prop && _prop[p]) {
+                    if (_prop && _prop[p] != undefined) {
                         _prop = _prop[p]
                     } else {
                         _prop = undefined
@@ -675,7 +677,7 @@ class ResponseValidationUtil {
             })
 
             // Search for error code with match and return the accuvendMasterResponseCode
-            const errorCode = await ErrorCodeService.getErrorCodesForValidation(dbQueryParams)
+            const errorCode = await ErrorCodeService.getErrorCodesForValidation(dbQueryParams, isError)
 
             console.log({ errorCode: errorCode?.dataValues })
             logger.info('ERROR_CODE_VALIDATION: Error code for transaction validation', {
@@ -815,11 +817,12 @@ class TokenHandler extends Registry {
                     responseObject: tokenInfo instanceof AxiosError ? tokenInfo.response?.data : tokenInfo,
                     vendType: meter.vendType,
                     disco: disco,
-                    transactionId: transaction.id
+                    transactionId: transaction.id,
+                    isError: tokenInfo instanceof AxiosError
                 })
 
                 console.log({ response })
-            
+
                 switch (response.action) {
                     case -1:
                         logger.error('Transaction condition pending - Requery', logMeta)
@@ -865,7 +868,7 @@ class TokenHandler extends Registry {
 
                         powerUnit = powerUnit
                             ? await PowerUnitService.updateSinglePowerUnit(powerUnit.id, {
-                                token,
+                                tokenFromVend: token,
                                 tokenUnits: response.tokenUnits,
                                 transactionId: data.transactionId,
                             })
@@ -877,7 +880,6 @@ class TokenHandler extends Registry {
                                 amount: transaction.amount,
                                 meterId: data.meter.id,
                                 superagent: data.superAgent as ITransaction['superagent'],
-                                token: token,
                                 tokenFromVend: token,
                                 tokenNumber: 0,
                                 tokenUnits: response.tokenUnits,
@@ -910,7 +912,8 @@ class TokenHandler extends Registry {
                             tokenUnits: response.tokenUnits
                         });
                         logger.info('Saving token to cache')
-                        token && await TokenUtil.saveTokenToCache({ key: 'transaction_token:' + transaction.id, token: (response as any).token ?? '' })
+                        const twoMinsExpiry = 2 * 60 * 1000
+                        token && await TokenUtil.saveTokenToCache({ key: 'transaction_token:' + transaction.id, token: (response as any).token ?? '', expiry: twoMinsExpiry })
 
                         await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor({
                             eventData: { ...eventMessage, error: { ...eventMessage.error, cause: TransactionErrorCause.UNEXPECTED_ERROR } },
@@ -1038,6 +1041,7 @@ class TokenHandler extends Registry {
                     vendType: meter.vendType,
                     disco: discoCode,
                     transactionId: transaction.id,
+                    isError: requeryResult instanceof AxiosError
                 })
 
                 let eventMessage = {

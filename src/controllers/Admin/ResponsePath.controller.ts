@@ -20,7 +20,7 @@ export default class ResponsePathController {
         // It has columns, id, Path, Vendor, AccuvendRefCode, RequestType, description
         const rows = csvData.split('\n');
         const data = rows.map(row => {
-            const [id, path, vendor, accuvendRefCode, requestType, description] = row.split(',');
+            const [id, path, vendor, accuvendRefCode, requestType, description, forErrorResponses] = row.split(',');
 
             return {
                 id,
@@ -28,13 +28,14 @@ export default class ResponsePathController {
                 vendor,
                 accuvendRefCode,
                 requestType,
-                description
+                description,
+                forErrorResponses
             };
         });
 
         // Seed data
         for (const row of data.slice(1)) {
-            const { id, path, vendor, accuvendRefCode, requestType, description } = row;
+            const { id, path, vendor, accuvendRefCode, requestType, description, forErrorResponses } = row;
 
             console.log({ row })
             await ResponsePathService.addResponsePath({
@@ -43,7 +44,8 @@ export default class ResponsePathController {
                 vendor,
                 accuvendRefCode,
                 requestType,
-                description
+                description,
+                forErrorResponses: forErrorResponses === 'true' ? true : false
             });
         }
         console.log('Data seeded successfully!');
@@ -61,7 +63,7 @@ export default class ResponsePathController {
         next: NextFunction,
     ) {
         const {
-            path, accuvendRefCode, description, requestType, vendor
+            path, accuvendRefCode, description, requestType, vendor, forErrorResponses
         } = req.body
 
         // const existingVendor = await VendorService.viewSingleVendor(vendorId)
@@ -74,7 +76,7 @@ export default class ResponsePathController {
         //     return
         // }
         const responsePath = await ResponsePathService.addResponsePath({
-            path, accuvendRefCode, description, requestType, id: randomUUID(), vendor
+            path, accuvendRefCode, description, requestType, id: randomUUID(), vendor, forErrorResponses
         })
 
         res.status(200).send({

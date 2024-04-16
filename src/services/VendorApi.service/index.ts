@@ -42,7 +42,7 @@ import {
 } from "./Baxi/Config";
 import { info } from "console";
 
-const newrelic = require('newrelic')
+import newrelic from 'newrelic'
 
 export interface PurchaseResponse extends BaseResponse {
     source: "BUYPOWERNG";
@@ -277,9 +277,10 @@ export class IRechargeVendorService {
         const hash = this.generateHash(combinedString);
 
         const response =
-            await this.client.get<IRechargeMeterValidationResponse>(
-                `/get_meter_info.php/?vendor_code=${this.VENDOR_CODE}&reference_id=${reference}&meter=${meterNumber}&disco=${disco}&response_format=json&hash=${hash}`,
-            );
+            await newrelic.startBackgroundTransaction('IRecharge:ValidateMeterApiCall', async () =>
+                await this.client.get<IRechargeMeterValidationResponse>(
+                    `/get_meter_info.php/?vendor_code=${this.VENDOR_CODE}&reference_id=${reference}&meter=${meterNumber}&disco=${disco}&response_format=json&hash=${hash}`,
+                ))
 
         return { ...response.data, httpStatusCode: response.status };
     }
@@ -341,7 +342,7 @@ export class IRechargeVendorService {
                 hash,
             },
         }
-        logger.info("Vending token with irecharge", {
+        logger.info("Vend request sent to irecharge", {
             meta: {
                 reference,
                 meterNumber,
@@ -353,29 +354,26 @@ export class IRechargeVendorService {
                 ...mainMeta,
             },
         });
-        const response = await this.client.get<IRechargeSuccessfulVendResponse>(
-            "/vend_power.php",
-            {
-                params: {
-                    vendor_code: this.VENDOR_CODE,
-                    reference_id: reference,
-                    meter: meterNumber,
-                    disco,
-                    amount,
-                    email,
-                    phone,
-                    access_token: accessToken,
-                    response_format: "json",
-                    hash,
+        const response = await newrelic.startBackgroundTransaction('IRecharge:VendApiCall', async () =>
+            await this.client.get<IRechargeSuccessfulVendResponse>(
+                "/vend_power.php",
+                {
+                    params: {
+                        vendor_code: this.VENDOR_CODE,
+                        reference_id: reference,
+                        meter: meterNumber,
+                        disco,
+                        amount,
+                        email,
+                        phone,
+                        access_token: accessToken,
+                        response_format: "json",
+                        hash,
+                    },
                 },
-            },
-        );
+            ))
 
         console.log({ response })
-
-        logger.info("Vend response from irecharge", {
-            meta: { responseData: response.data, transactionId, ...mainMeta },
-        });
 
         const responseData = { ...response.data, source: "IRECHARGE", httpStatusCode: response.status };
         return responseData;
@@ -421,10 +419,11 @@ export class IRechargeVendorService {
 
         console.log({ params });
 
-        const response = await this.client.get<IRechargeRequeryResponse>(
-            "/vend_status.php",
-            { params },
-        );
+        const response = await newrelic.startBackgroundTransaction('IRecharge:RequeryApiCall', async () =>
+            await this.client.get<IRechargeRequeryResponse>(
+                "/vend_status.php",
+                { params },
+            ))
 
         logger.info("Requery response from irecharge", {
             meta: { responseData: response.data, transactionId, ...mainMeta },
@@ -455,22 +454,23 @@ export default class VendorService {
                         agentReference: reference,
                     },
                 };
-                logger.info("Vending token with baxi", {
+                logger.info("Vend request sent to baxi", {
                     meta: {
                         ...mainMeta,
                         transactionId: body.transactionId,
                     },
                 });
-                const response = await this.baxiAxios().post<
-                    BaxiSuccessfulPuchaseResponse["Postpaid" | "Prepaid"]
-                >("/electricity/request", {
-                    amount,
-                    phone,
-                    account_number: meterNumber,
-                    service_type: disco,
-                    agentId: "baxi",
-                    agentReference: reference,
-                });
+                const response = await newrelic.startBackgroundTransaction('Baxi:VendTokenApiCall', async () =>
+                    await this.baxiAxios().post<
+                        BaxiSuccessfulPuchaseResponse["Postpaid" | "Prepaid"]
+                    >("/electricity/request", {
+                        amount,
+                        phone,
+                        account_number: meterNumber,
+                        service_type: disco,
+                        agentId: "baxi",
+                        agentReference: reference,
+                    }))
 
                 console.log({ responseFromBaxi: response })
 
@@ -490,9 +490,9 @@ export default class VendorService {
             } catch (error: any) {
                 console.log({
                     message: error.message,
-                    response: error.response?.data.errors,
+                    response: error.response?.data?.errors,
                 });
-                throw new Error(error.message);
+                throw error
             }
         })
     }
@@ -590,11 +590,12 @@ export default class VendorService {
             meta: { disco, meterNumber, vendType, transactionId, ...mainMeta },
         });
         try {
-            const response =
+            const response = await newrelic.startBackgroundTransaction('Baxi:ValidateMeterApiCall', async () =>
                 await this.baxiAxios().post<IBaxiValidateMeterResponse>(
                     "/electricity/verify",
                     postData,
-                );
+                ))
+
             const responseData = response.data;
 
             logger.info("Meter validation response from baxi", {
@@ -612,7 +613,7 @@ export default class VendorService {
             return responseData;
         } catch (error: any) {
             console.log(error.response);
-            throw new Error(error.message);
+            throw error;
         }
     }
 
@@ -708,8 +709,7 @@ export default class VendorService {
         body: IVendToken,
     ): Promise<PurchaseResponse | TimedOutResponse> {
         // Define data to be sent in the POST request
-
-        return newrelic.startBackgroundTransaction('buypower:VendTokenEndPoint', async () => {
+        return await newrelic.startBackgroundTransaction('buypower:VendTokenEndPoint', async () => {
             const postData = {
                 orderId: body.reference,
                 meter: body.meterNumber,
@@ -726,22 +726,20 @@ export default class VendorService {
                     method: "POST",
                 },
                 data: postData,
+                transactionId: body.transactionId
             };
 
-            // WHY IS THERE HARD CODE !!!!
-            // if (NODE_ENV === "development") {
-            //     postData.phone = "08034210294";
-            //     postData.meter = "12345678910";
-            // }
-
             try {
-                logger.info("Vending token with buypower", {
+                logger.info("Vending request to buypower", {
                     meta: { postData, ...mainMeta },
                 });
                 // Make a POST request using the BuyPower Axios instance
-                const response = await this.buyPowerAxios().post<
-                    PurchaseResponse | TimedOutResponse
-                >(`/vend?strict=0`, postData);
+                const response = await newrelic.startBackgroundTransaction('buypower:VendTokenApiCall', async () =>
+                    await this.buyPowerAxios().post<
+                        PurchaseResponse | TimedOutResponse
+                    >(`/vend?strict=0`, postData)
+                )
+
                 console.log({
                     requestData: postData,
                     info: "Vend response from buypower",
@@ -749,12 +747,12 @@ export default class VendorService {
                 });
                 logger.info("Vend response from buypower", {
                     meta: {
+                        requestData: postData,
                         responseData: response.data,
-                        transactionId: body.transactionId,
                         ...mainMeta,
                     },
                 });
-                return { ...response.data, source: "BUYPOWERNG", httpStatusCode: response.status };
+                return { ...response.data, source: "BUYPOWERNG" as const, httpStatusCode: response.status };
             } catch (error: any) {
                 if (error instanceof AxiosError) {
                     const requery =
@@ -788,15 +786,16 @@ export default class VendorService {
         reference: string;
         transactionId: string;
     }) {
-        return newrelic.startBackgroundTransaction('buyPower:RequeryEndPoint', async () => {
+        return await newrelic.startBackgroundTransaction('buyPower:RequeryEndPoint', async () => {
             try {
                 logger.info("Requerying transaction with buypower", {
                     meta: { reference, transactionId },
                 });
-                const response =
+                const response = await newrelic.startBackgroundTransaction('buypower:RequeryApiCall', async () =>
                     await this.buyPowerAxios().get<BuypowerRequeryResponse>(
                         `/transaction/${reference}`,
-                    );
+                    )
+                )
 
                 logger.info("Requery response from buypower", {
                     meta: { responseData: response.data, transactionId },
@@ -825,7 +824,6 @@ export default class VendorService {
                 throw error;
             }
         })
-
     }
 
     // Static method for validating a meter with BuyPower
@@ -1011,7 +1009,7 @@ export default class VendorService {
             email,
         } = body;
 
-        return newrelic.startBackgroundTransaction('irecharge:VendTokenEndPoint', async () => {
+        return await newrelic.startBackgroundTransaction('irecharge:VendTokenEndPoint', async () => {
             console.log({
                 requestData: body,
                 info: "Vending token with IRecharge",
@@ -1026,7 +1024,7 @@ export default class VendorService {
                     email,
                 },
             });
-            logger.info("Vending token with IRecharge", {
+            logger.info("Vending request to IRecharge", {
                 meta: { requestData: body, transactionId: body.transactionId },
             });
             const response = await IRechargeVendorService.vend({
@@ -1047,10 +1045,8 @@ export default class VendorService {
             logger.info("Vend response from IRecharge", {
                 meta: { responseData: response, transactionId: body.transactionId },
             });
-            return { ...response, source: "IRECHARGE", httpStatusCode: response.httpStatusCode };
+            return { ...response, source: "IRECHARGE" as const, httpStatusCode: response.httpStatusCode };
         })
-
-
     }
 
     static async irechargeRequeryTransaction({
@@ -1151,13 +1147,26 @@ export default class VendorService {
         };
         vendor: T;
     }): Promise<ElectricityPurchaseResponse[T]> {
+        let response: ElectricityPurchaseResponse[T]
 
-        if (vendor === "BUYPOWERNG") {
-            const response = (await this.buyPowerVendToken(
-                data,
-            )) as ElectricityPurchaseResponse[T];
+        try {
+            if (vendor === "BUYPOWERNG") {
+                response = (await this.buyPowerVendToken(
+                    data,
+                )) as ElectricityPurchaseResponse[T];
+            } else if (vendor === "IRECHARGE") {
+                response = (await this.irechargeVendToken(
+                    data,
+                )) as ElectricityPurchaseResponse[T];
+            } else if (vendor === "BAXI") {
+                response = (await this.baxiVendToken(
+                    data,
+                )) as ElectricityPurchaseResponse[T];
+            } else {
+                throw new Error("UNAVAILABLE_VENDOR");
+            }
 
-            logger.info('Transposed Response from Buypower', {
+            logger.info('Transposed Response from' + vendor, {
                 meta: {
                     transactionId: data.transactionId,
                     response,
@@ -1165,34 +1174,15 @@ export default class VendorService {
             })
 
             return response
-        } else if (vendor === "IRECHARGE") {
-            const response = (await this.irechargeVendToken(
-                data,
-            )) as ElectricityPurchaseResponse[T];
-
-            logger.info('Transposed Response from IRECHARGE', {
+        } catch (error) {
+            logger.error('Error from vend request to ' + vendor, {
                 meta: {
-                    transationId: data.transactionId,
-                    response
+                    transactionId: data.transactionId,
+                    error,
                 }
             })
-            return response
-        } else if (vendor === "BAXI") {
-            const response = (await this.baxiVendToken(
-                data,
-            )) as ElectricityPurchaseResponse[T];
-
-            logger.info('Transposed Response from BAXI', {
-                meta: {
-                    transationId: data.transactionId,
-                    response
-                }
-            })
-            return response
-        } else {
-            throw new Error("UNAVAILABLE_VENDOR");
+            throw error
         }
-
     }
 }
 

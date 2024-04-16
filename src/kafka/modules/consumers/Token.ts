@@ -33,7 +33,7 @@ import WaitTimeService from "../../../services/Waittime.service";
 import ResponsePathService from "../../../services/ResponsePath.service";
 import ErrorCodeService from "../../../services/ErrorCodes.service";
 import ErrorCode from "../../../models/ErrorCodes.model";
-const newrelic = require('newrelic')
+import newrelic from 'newrelic'
 import { TokenUtil } from "../../../utils/Auth/Token";
 import { randomUUID } from "crypto";
 
@@ -81,7 +81,7 @@ const retry = {
     count: 0,
     limit: 5,
     limitToStopRetryingWhenTransactionIsSuccessful: 20,
-    retryCountBeforeSwitchingVendor: 4,
+    retryCountBeforeSwitchingVendor: 2,
     testForSwitchingVendor: true,
 }
 
@@ -268,7 +268,7 @@ export class TokenHandlerUtil {
             }
 
             // Check for the reference used in the last retry record
-            retryRecord[retryRecord.length - 1].reference.push(currentVendor.vendor === 'IRECHARGE' ? generateVendorReference() : randomUUID())
+            retryRecord[retryRecord.length - 1].reference.push(currentVendor.vendor === 'IRECHARGE' ? await generateVendorReference() : randomUUID())
         } else {
             logger.warn('Switching to new vendor', meta)
             // Add new record to the retry record
@@ -319,7 +319,7 @@ export class TokenHandlerUtil {
         await new TransactionEventService(
             transaction, meter, newVendor, partner.email
         ).addScheduleRetryEvent({
-            timeStamp: new Date().toString(), waitTime
+            timeStamp: new Date().toString(), waitTime, retryRecord: currentVendor
         })
 
         logger.info('Scheduled retry event', meta)
@@ -390,6 +390,11 @@ export class TokenHandlerUtil {
                 logger.info('Generated access token for irecharge meter validation', { transactionId: data.transaction.id })
             }
 
+            logger.info('Processing vend request', {
+                vendor: data.transaction.superagent,
+                transactionId: data.transaction.id,
+                preTransformedPayload: _data,
+            })
             switch (data.transaction.superagent) {
                 case "BAXI":
                     return await VendorService.purchaseElectricity({ data: _data, vendor: 'BAXI' })
@@ -549,7 +554,7 @@ export class TokenHandlerUtil {
 
 type IAction = -1 | 0 | 1
 type IVendType = 'PREPAID' | 'POSTPAID'
-type TxnValidationResponse = ({ action: 1 } & ({ token: string, vendType: 'PREPAID' } | { vendType: 'POSTPAID' }) | { action: -1 | 0, vendType: IVendType })
+type TxnValidationResponse = ({ action: 1, tokenUnits: string } & ({ token: string, vendType: 'PREPAID' } | { vendType: 'POSTPAID' }) | { action: -1 | 0, vendType: IVendType })
 
 class ResponseValidationUtil {
 
@@ -557,8 +562,10 @@ class ResponseValidationUtil {
         requestType, vendor, responseObject,
         httpCode, vendType,
         transactionId,
-        disco
+        disco,
+        isError,
     }: {
+        isError: boolean,
         disco: string;
         transactionId: string,
         vendType: 'PREPAID' | 'POSTPAID'
@@ -575,9 +582,10 @@ class ResponseValidationUtil {
                 requestType, vendor, responseObject, httpCode
             })
 
+
             // Get response path and refCode for current request and vendor
             const responsePath = await ResponsePathService.viewResponsePathForValidation({
-                requestType, vendor
+                requestType, vendor, forErrorResponses: isError
             })
             if (!responsePath) {
                 logger.error('ERROR_CODE_VALIDATION: Response path not found', {
@@ -611,7 +619,7 @@ class ResponseValidationUtil {
                 let _prop: Record<string, any> | undefined = responseObject
                 const path = prop.split('.')
                 for (const p of path) {
-                    if (_prop && _prop[p]) {
+                    if (_prop && _prop[p] != undefined) {
                         _prop = _prop[p]
                     } else {
                         _prop = undefined
@@ -628,8 +636,8 @@ class ResponseValidationUtil {
             Array.from(propertiesToConsider).forEach(property => {
                 const value = getFieldValueFromResponseObject(property[0])
                 if (!value) {
-                    logger.error(`Property ${property} not found in response`, {
-                        meta: { property }
+                    logger.error(`ERROR_CODE_VALIDATION:RESPONSE_PATH:  Property ${property} not found in response object`, {
+                        meta: { property, transactionId }
                     })
                     missingPropertiesInResponse.push(property[0])
                 }
@@ -651,10 +659,9 @@ class ResponseValidationUtil {
 
             // Requery transaction if some required properties are missing in the response object
             if (missingPropertiesInResponse.length > 0) {
-                logger.error('ERROR_CODE_VALIDATION: Missing properties in response', {
+                logger.error('ERROR_CODE_VALIDATION: Missing properties in response object', {
                     meta: { missingPropertiesInResponse, responseObject, expectedProperties: propertiesToConsider, transactionId }
                 })
-                return { action: -1, vendType }
             }
 
             // Convert CODE (httpStatusCode) to string if it is a number, because the db stores it as a string
@@ -670,7 +677,7 @@ class ResponseValidationUtil {
             })
 
             // Search for error code with match and return the accuvendMasterResponseCode
-            const errorCode = await ErrorCodeService.getErrorCodesForValidation(dbQueryParams)
+            const errorCode = await ErrorCodeService.getErrorCodesForValidation(dbQueryParams, isError)
 
             console.log({ errorCode: errorCode?.dataValues })
             logger.info('ERROR_CODE_VALIDATION: Error code for transaction validation', {
@@ -697,12 +704,10 @@ class ResponseValidationUtil {
                         meta: { transactionId: transactionId, disco: disco, }
                     })
                 }
-
-                return { action: -1, vendType }
             }
 
             // If no masterResponseCode was set requery transaction
-            return { action: (errorCode.accuvendMasterResponseCode as -1 | 0 | 1) ?? -1, token: dbQueryParams['TK'] as string, vendType: vendType } as TxnValidationResponse
+            return { action: (errorCode.accuvendMasterResponseCode as -1 | 0 | 1) ?? -1, token: dbQueryParams['TK'] as string, tokenUnits: dbQueryParams['UNITS'], vendType: vendType } as TxnValidationResponse
         })
     }
 }
@@ -765,11 +770,11 @@ class TokenHandler extends Registry {
                     vendType: meter.vendType,
                     phone: user.phoneNumber,
                     accessToken: transaction.irechargeAccessToken
-                }).catch(e => e.response);
+                }).catch(e => e);
 
                 console.log({
                     point: 'power purchase initiated',
-                    tokenInfo
+                    tokenInfo: tokenInfo
                 })
                 logger.info('Token request processed', logMeta);
                 const updatedTransaction = await TransactionService.viewSingleTransaction(data.transactionId);
@@ -808,11 +813,12 @@ class TokenHandler extends Registry {
                 const response = await ResponseValidationUtil.validateTransactionCondition({
                     requestType: 'VENDREQUEST',
                     vendor: vendor.name,
-                    httpCode: tokenInfo?.httpStatusCode,
-                    responseObject: tokenInfo,
+                    httpCode: tokenInfo instanceof AxiosError ? tokenInfo.response?.status : tokenInfo?.httpStatusCode,
+                    responseObject: tokenInfo instanceof AxiosError ? tokenInfo.response?.data : tokenInfo,
                     vendType: meter.vendType,
                     disco: disco,
-                    transactionId: transaction.id
+                    transactionId: transaction.id,
+                    isError: tokenInfo instanceof AxiosError
                 })
 
                 console.log({ response })
@@ -842,72 +848,72 @@ class TokenHandler extends Registry {
                     case 1:
                         logger.info('Transaction condition met - Successful', logMeta)
 
-                        if (response.vendType === 'PREPAID') {
-                            logger.info('Token from vend', {
-                                meta: {
-                                    transactionId: transaction.id,
-                                    tokenFromVend: response.token
-                                }
+                        logger.info('Token from vend', {
+                            meta: {
+                                transactionId: transaction.id,
+                                tokenFromVend: response.vendType === 'PREPAID' ? response.token : undefined
+                            }
+                        })
+
+                        logger.info('Transaction condition met - Successful', logMeta)
+                        const _product = await ProductService.viewSingleProduct(transaction.productCodeId)
+                        if (!_product) throw new CustomError('Product not found')
+
+                        const token = response.vendType == 'PREPAID' ? response.token : undefined
+                        const discoLogo = DISCO_LOGO[_product.productName as keyof typeof DISCO_LOGO] ?? LOGO_URL
+                        let powerUnit =
+                            await PowerUnitService.viewSinglePowerUnitByTransactionId(
+                                data.transactionId,
+                            );
+
+                        powerUnit = powerUnit
+                            ? await PowerUnitService.updateSinglePowerUnit(powerUnit.id, {
+                                tokenFromVend: token,
+                                tokenUnits: response.tokenUnits,
+                                transactionId: data.transactionId,
                             })
-
-                            logger.info('Transaction condition met - Successful', logMeta)
-                            const _product = await ProductService.viewSingleProduct(transaction.productCodeId)
-                            if (!_product) throw new CustomError('Product not found')
-
-                            const discoLogo = DISCO_LOGO[_product.productName as keyof typeof DISCO_LOGO] ?? LOGO_URL
-                            let powerUnit =
-                                await PowerUnitService.viewSinglePowerUnitByTransactionId(
-                                    data.transactionId,
-                                );
-
-                            powerUnit = powerUnit
-                                ? await PowerUnitService.updateSinglePowerUnit(powerUnit.id, {
-                                    token: response.token,
-                                    transactionId: data.transactionId,
-                                })
-                                : await PowerUnitService.addPowerUnit({
-                                    id: uuidv4(),
-                                    transactionId: data.transactionId,
-                                    disco: data.meter.disco,
-                                    discoLogo,
-                                    amount: transaction.amount,
-                                    meterId: data.meter.id,
-                                    superagent: data.superAgent as ITransaction['superagent'],
-                                    token: response.token,
-                                    tokenFromVend: response.token,
-                                    tokenNumber: 0,
-                                    tokenUnits: "0",
-                                    address: transaction.meter.address,
-                                });
-                            await TransactionService.updateSingleTransaction(data.transactionId, {
-                                powerUnitId: powerUnit?.id, tokenFromVend: response.token
+                            : await PowerUnitService.addPowerUnit({
+                                id: uuidv4(),
+                                transactionId: data.transactionId,
+                                disco: data.meter.disco,
+                                discoLogo,
+                                amount: transaction.amount,
+                                meterId: data.meter.id,
+                                superagent: data.superAgent as ITransaction['superagent'],
+                                tokenFromVend: token,
+                                tokenNumber: 0,
+                                tokenUnits: response.tokenUnits,
+                                address: transaction.meter.address,
                             });
+                        token && await TransactionService.updateSingleTransaction(data.transactionId, {
+                            powerUnitId: powerUnit?.id, tokenFromVend: token, tokenInfo
+                        });
 
 
-                            await transactionEventService.addTokenReceivedEvent(response.token ?? '');
-                            await VendorPublisher.publishEventForTokenReceivedFromVendor({
-                                transactionId: transaction!.id,
-                                user: {
-                                    name: user.name as string,
-                                    email: user.email,
-                                    address: user.address,
-                                    phoneNumber: user.phoneNumber,
-                                },
-                                partner: {
-                                    email: partner.email,
-                                },
-                                meter: {
-                                    id: meter.id,
-                                    meterNumber: meter.meterNumber,
-                                    disco: transaction!.disco,
-                                    vendType: meter.vendType,
-                                    token: response.token ?? '',
-                                },
-                            });
-                        }
+                        await transactionEventService.addTokenReceivedEvent(token ?? '');
+                        await VendorPublisher.publishEventForTokenReceivedFromVendor({
+                            transactionId: transaction!.id,
+                            user: {
+                                name: user.name as string,
+                                email: user.email,
+                                address: user.address,
+                                phoneNumber: user.phoneNumber,
+                            },
+                            partner: {
+                                email: partner.email,
+                            },
+                            meter: {
+                                id: meter.id,
+                                meterNumber: meter.meterNumber,
+                                disco: transaction!.disco,
+                                vendType: meter.vendType,
+                                token: token ?? '',
+                            },
+                            tokenUnits: response.tokenUnits
+                        });
                         logger.info('Saving token to cache')
-                        await TokenUtil.saveTokenToCache({ key: 'transaction_token:' + transaction.id, token: (response as any).token ?? '' })
-
+                        const twoMinsExpiry = 2 * 60
+                        token && await TokenUtil.saveTokenToCache({ key: 'transaction_token:' + transaction.id, token: (response as any).token ?? '', expiry: twoMinsExpiry })
 
                         await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor({
                             eventData: { ...eventMessage, error: { ...eventMessage.error, cause: TransactionErrorCause.UNEXPECTED_ERROR } },
@@ -1024,17 +1030,18 @@ class TokenHandler extends Registry {
                     },
                 );
 
-                const requeryResult = await TokenHandlerUtil.requeryTransactionFromVendor(transaction).catch(e => e.response ?? {});
+                const requeryResult = await TokenHandlerUtil.requeryTransactionFromVendor(transaction).catch(e => e ?? {});
 
-                console.log({ requeryResult })
+                console.log({ requeryResult: requeryResult })
                 const response = await ResponseValidationUtil.validateTransactionCondition({
                     requestType: 'REQUERY',
                     vendor: vendor.name,
                     httpCode: requeryResult instanceof AxiosError ? requeryResult.status : requeryResult.httpStatusCode,
-                    responseObject: requeryResult,
+                    responseObject: requeryResult instanceof AxiosError ? requeryResult.response?.data : requeryResult,
                     vendType: meter.vendType,
                     disco: discoCode,
                     transactionId: transaction.id,
+                    isError: requeryResult instanceof AxiosError
                 })
 
                 let eventMessage = {
@@ -1087,30 +1094,29 @@ class TokenHandler extends Registry {
                                 data.transactionId,
                             );
 
-                        let tokenInResponse: string | null = null
-                        if (response.vendType == 'PREPAID') {
-                            tokenInResponse = response.token
-                            logger.info('Token from requery ', { meta: { ...logMeta, requeryToken: response.token } });
-                            await TransactionService.updateSingleTransaction(transaction.id, { tokenFromRequery: response.token })
-                            powerUnit = powerUnit
-                                ? await PowerUnitService.updateSinglePowerUnit(powerUnit.id, {
-                                    token: response.token,
-                                    transactionId: data.transactionId,
-                                })
-                                : await PowerUnitService.addPowerUnit({
-                                    id: uuidv4(),
-                                    transactionId: data.transactionId,
-                                    disco: data.meter.disco,
-                                    discoLogo,
-                                    amount: transaction.amount,
-                                    meterId: data.meter.id,
-                                    superagent: data.superAgent as ITransaction['superagent'],
-                                    token: response.token,
-                                    tokenNumber: 0,
-                                    tokenUnits: "0",
-                                    address: transaction.meter.address,
-                                });
-                        }
+                        let tokenInResponse: string | undefined = undefined
+                        tokenInResponse = response.vendType === 'PREPAID' ? response.token : undefined
+                        logger.info('Token from requery ', { meta: { ...logMeta, requeryToken: tokenInResponse } });
+                        await TransactionService.updateSingleTransaction(transaction.id, { tokenFromRequery: tokenInResponse })
+                        powerUnit = powerUnit
+                            ? await PowerUnitService.updateSinglePowerUnit(powerUnit.id, {
+                                token: tokenInResponse,
+                                transactionId: data.transactionId,
+                                tokenUnits: response.tokenUnits
+                            })
+                            : await PowerUnitService.addPowerUnit({
+                                id: uuidv4(),
+                                transactionId: data.transactionId,
+                                disco: data.meter.disco,
+                                discoLogo,
+                                amount: transaction.amount,
+                                meterId: data.meter.id,
+                                superagent: data.superAgent as ITransaction['superagent'],
+                                token: tokenInResponse,
+                                tokenNumber: 0,
+                                tokenUnits: response.tokenUnits,
+                                address: transaction.meter.address,
+                            });
 
                         await TransactionService.updateSingleTransaction(data.transactionId, {
                             powerUnitId: powerUnit?.id,
@@ -1134,6 +1140,7 @@ class TokenHandler extends Registry {
                                 vendType: meter.vendType,
                                 token: tokenInResponse ?? '',
                             },
+                            tokenUnits: response.tokenUnits
                         });
                     default:
                         logger.error('Transaction condition were not met', { meta: { transactionId: data.transactionId, response } })

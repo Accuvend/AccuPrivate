@@ -166,6 +166,7 @@ class WebhookParamsBase {
     user: { name?: string; address?: string; phoneNumber: string; email: string };
     partner: { email: string };
     transactionId: string;
+    tokenUnits: string
 }
 
 class WebhookParamsBaseForAirtime {

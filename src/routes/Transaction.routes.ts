@@ -6,8 +6,8 @@ import { AuthenticatedController } from "../utils/Interface";
 export const router: Router = express.Router();
 
 router
-    .use(basicAuth("access"))
     .get("/info", TransactionController.getTransactionInfo)
+    .use(basicAuth("access"))
     .get(
         "/",
         basicAuth("access"),
@@ -23,11 +23,11 @@ router
             TransactionController.getYesterdaysTransactions,
         ),
     )
-    // .get(
-    //     "/requery-transaction",
-    //     AuthenticatedController(
-    //         TransactionController.requeryTimedOutTransaction,
-    //     ),
-    // );
+// .get(
+//     "/requery-transaction",
+//     AuthenticatedController(
+//         TransactionController.requeryTimedOutTransaction,
+//     ),
+// );
 
 export default router;

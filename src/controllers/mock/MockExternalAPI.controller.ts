@@ -16,7 +16,13 @@ export default class MockExternalControllerAPI {
     static mapDataToResponse(mockEndpointData: MockEndpointData , response: Response):Response<any, Record<string, any>>{
         let code: number = 500
         if(mockEndpointData.httpCode) code = mockEndpointData.httpCode
-        return response.status(code).json(mockEndpointData.vendorResponse)
+        const randomToken: string = Math.floor(1000000000000000000 + Math.random() * 900000000000000000).toString()
+        //if it's buypower 
+        if(mockEndpointData.apiStatusType === APISTATUSTYPE.SUCCESS && (mockEndpointData.apiType === 'vend-power' || mockEndpointData.apiType === "requery")){
+        
+            return response.status(code).json(mockEndpointData.vendorResponse)
+
+        } else return response.status(code).json(mockEndpointData.vendorResponse)
     }
 
 

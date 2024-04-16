@@ -1,6 +1,6 @@
 import ejs from 'ejs';
 import fs from 'fs';
-import { LOGO_URL } from '../../Constants';
+import { ACCUVEND_RECEIPT_BASE_URL, LOGO_URL } from '../../Constants';
 import { IReceiptEmailTemplateProps } from '../../Interface';
 import Transaction from '../../../models/Transaction.model';
 import { randomUUID } from 'crypto';
@@ -18,11 +18,11 @@ class EmailTemplate {
     failedTransaction = async ({ transaction }: { transaction: Transaction }) => {
         return container(await ejs.renderFile(__dirname + '/failedtxn.ejs', { transaction }))
     }
-    order_confirmation = async ({ transaction, meterNumber, token, address, name }: IReceiptEmailTemplateProps) => {
-        return container(await ejs.renderFile(__dirname + '/order-confirmation.ejs', { transaction, meterNumber, token, address, name }))
+    order_confirmation = async ({ transaction, meterNumber, token, address, name, units }: IReceiptEmailTemplateProps) => {
+        return container(await ejs.renderFile(__dirname + '/order-confirmation.ejs', { transaction, meterNumber, token, address, name, unit: units, receiptUrl: ACCUVEND_RECEIPT_BASE_URL }))
     }
-    postpaid_order_confirmation = async ({ transaction, meterNumber, token, address, name }: IReceiptEmailTemplateProps) => {
-        return container(await ejs.renderFile(__dirname + '/order-confirmation-postpaid.ejs', { transaction, meterNumber, token, address, name }))
+    postpaid_order_confirmation = async ({ transaction, meterNumber, token, address, name, units }: IReceiptEmailTemplateProps) => {
+        return container(await ejs.renderFile(__dirname + '/order-confirmation-postpaid.ejs', { transaction, meterNumber, token, address, name, unit: units, receiptUrl: ACCUVEND_RECEIPT_BASE_URL }))
     }
     receipt = async ({ transaction, meterNumber, token, address, name }: IReceiptEmailTemplateProps) => {
         return container(await ejs.renderFile(__dirname + '/receipt.ejs', { transaction, meterNumber, token, address, name }))

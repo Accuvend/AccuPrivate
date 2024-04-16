@@ -52,7 +52,7 @@ export interface VendorRetryRecord {
     retryCount: number;
 }
 
-export interface PublisherEventAndParameters extends Record<TOPICS, { log?: 1 | 0  } & any> {
+export interface PublisherEventAndParameters extends Record<TOPICS, { log?: 1 | 0 } & any> {
     [TOPICS.SCHEDULE_REQUERY_FOR_TRANSACTION]: {
         log?: 1 | 0,
         timeStamp: string,
@@ -87,7 +87,7 @@ export interface PublisherEventAndParameters extends Record<TOPICS, { log?: 1 | 
         superAgent: Transaction['superagent'],
         vendorRetryRecord: VendorRetryRecord
     };
-    [TOPICS.RETRY_PURCHASE_FROM_NEW_VENDOR]: {
+    [TOPICS.RETRY_PURCHASE_FROM_VENDOR]: {
         log?: 1 | 0,
         meter: MeterInfo & { id: string };
         user: User;
@@ -108,6 +108,15 @@ export interface PublisherEventAndParameters extends Record<TOPICS, { log?: 1 | 
         user: User;
         partner: Partner;
         transactionId: string;
+        tokenUnits: string;
+    };
+    [TOPICS.TOKEN_RECIEVED_FROM_REQUERY]: {
+        log?: 1 | 0,
+        meter: MeterInfo & { id: string; token: string };
+        user: User;
+        partner: Partner;
+        transactionId: string;
+        tokenUnits: string;
     };
     [TOPICS.WEBHOOK_NOTIFICATION_TO_PARTNER_RETRY]: {
         log?: 1 | 0,
@@ -161,6 +170,7 @@ export interface PublisherEventAndParameters extends Record<TOPICS, { log?: 1 | 
         user: User;
         partner: Partner;
         transactionId: string;
+        tokenUnits: string
     };
     [TOPICS.CREATE_USER_INITIATED]: {
         log?: 1 | 0,

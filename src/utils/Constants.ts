@@ -117,6 +117,7 @@ export const DB_CONFIG = {
     HOST: process.env.DB_HOST as string,
     URL: process.env.DB_URL as string,
 };
+export const LOG_DB_URL = process.env.LOG_DB_URL as string;
 
 export const PRIMARY_ROLES = ["Admin", "Partner", "TeamMember", "SuperAdmin"];
 export const SU_HOST_EMAIL_1 = process.env.SU_HOST_EMAIL_1 as string,
@@ -5940,6 +5941,8 @@ export const HTTP_URL = {
         ELECTRICITY: BAXI_URL!,
     },
 }
+
+export const ACCUVEND_RECEIPT_BASE_URL = process.env.ACCUVEND_RECEIPT_BASE_URL as string
 
 interface Bundle {
     bundleCode: string;

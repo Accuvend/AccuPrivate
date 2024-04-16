@@ -42,19 +42,19 @@
         @media only screen and (min-width: 601px) {
             html{
                 width: 100%;
-            }
-           
-           
+            }           
         } 
     </style>
 </head>
 <%
+transaction.amount = parseFloat(transaction.amount, 10);
+unit = parseFloat(unit, 10)
 
 const originalAmount = transaction.amount;
 const percentageToRemove = 1.5;
 const amountNow = transaction.amount * (percentageToRemove / 100);
 
-
+const parsedReceiptUrl = receiptUrl + '/' + transaction.id;
 const newAmount = originalAmount + 100 + amountNow;
 
 
@@ -344,7 +344,7 @@ const formattedDate = transactionDate.toLocaleDateString('en-UK', {
                     <span style="float: left; padding-left: 5%;  ">Link to receipt</span>
                 </div>
                 <div>
-                    <a href="https://accuvend.ng/" style="float:right; padding-right: 5%; "> Your Receipt</a>
+                    <a href=<%= parsedReceiptUrl %>  style="float:right; padding-right: 5%; "> Your Receipt</a>
                 </div>
             </div>
            

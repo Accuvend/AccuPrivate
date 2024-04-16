@@ -18,13 +18,13 @@ export default class VendorAdminController {
         res: Response,
         next: NextFunction
     ) {
-        const { transactionId, token } = req.body
+        const { transactionId, token, tokenUnits } = req.body
 
         if (!transactionId) {
             throw new BadRequestError('Transaction ID is required')
         }
 
-        if (!token) throw new BadRequestError('Token is required')
+        if (!token || tokenUnits) throw new BadRequestError('Token and TokenUnits are required')
 
         const transaction = await TransactionService.viewSingleTransaction(transactionId)
         if (!transaction) {
@@ -123,6 +123,7 @@ export default class VendorAdminController {
                 vendType: meter.vendType,
                 token: tokenInResponse ?? '',
             },
+            tokenUnits: tokenUnits,
         });
 
         res.status(200).json({

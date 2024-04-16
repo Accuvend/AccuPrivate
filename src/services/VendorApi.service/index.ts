@@ -375,10 +375,6 @@ export class IRechargeVendorService {
 
         console.log({ response })
 
-        logger.info("Vend response from irecharge", {
-            meta: { responseData: response.data, transactionId, ...mainMeta },
-        });
-
         const responseData = { ...response.data, source: "IRECHARGE", httpStatusCode: response.status };
         return responseData;
     }

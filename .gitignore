@@ -206,3 +206,12 @@ dist-*
 compare.env.js
 dist.zip
 change_id_*.js
+.DS_Store
+*/.DS_Store
+*.DS_Store
+**/.DS_Store
+.DS_Store
+ansible/.DS_Store
+src/.DS_Store
+src/controllers/.DS_Store
+terraform/.DS_Store

@@ -22,6 +22,12 @@ export default class MessageProcessorFactory {
         try {
             await handler(messageData.value)
         } catch (error) {
+            logger.error((error as Error).message ?? "An Error occured while processing message", {
+                meta: {
+                    messageData,
+                    transactionId: messageData.value.transactionId
+                }
+            })
             if (error instanceof CustomError) {
                 logger.error(error.message, error.meta)
             } else {
@@ -35,16 +41,16 @@ export default class MessageProcessorFactory {
     public async processEachMessage(messagePayload: Omit<EachMessagePayload, 'topic'> & { topic: Topic }): Promise<void> {
         const { topic, partition, message } = messagePayload;
         const prefix = `[${topic}][${partition} | ${message.offset}] / ${message.timestamp}`;
+        const data: CustomMessageFormat = {
+            topic,
+            partition,
+            offset: message?.offset,
+            value: JSON.parse(message?.value?.toString() ?? '{}') as PublisherEventAndParameters[keyof PublisherEventAndParameters],
+            timestamp: message?.timestamp,
+            headers: message?.headers,
+        }
 
         try {
-            const data: CustomMessageFormat = {
-                topic,
-                partition,
-                offset: message.offset,
-                value: JSON.parse(message.value?.toString() ?? '{}') as PublisherEventAndParameters[keyof PublisherEventAndParameters],
-                timestamp: message.timestamp,
-                headers: message.headers,
-            }
             const shouldLogToDB = data.value.log == undefined ? 1 : data.value.log
 
             shouldLogToDB && logger.info(`Received message => [${this.consumerName}]: ` + prefix)
@@ -54,6 +60,12 @@ export default class MessageProcessorFactory {
             await messagePayload.heartbeat()
         } catch (error) {
             console.log(error)
+            logger.error((error as Error).message ?? "An Error occured while processing message", {
+                meta: {
+                    messaageData: messagePayload.message,
+                    transactionId: data.value.transactionId
+                }
+            })
             if (error instanceof CustomError) {
                 logger.error(error.message, error.meta)
             } else {

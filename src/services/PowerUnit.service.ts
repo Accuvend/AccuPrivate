@@ -1,8 +1,14 @@
 import PowerUnit from "../models/PowerUnit.model";
 import { ICreatePowerUnit } from "../models/PowerUnit.model";
+import logger from "../utils/Logger";
 export default class PowerUnitService {
 
     static async addPowerUnit(powerUnit: ICreatePowerUnit): Promise<PowerUnit> {
+        logger.info('Adding PowerUnit', {
+            meta: {
+                transactionId: powerUnit.transactionId
+            }
+        })
         const newPowerUnit: PowerUnit = PowerUnit.build(powerUnit)
         await newPowerUnit.save()
         return newPowerUnit
@@ -40,7 +46,7 @@ export default class PowerUnitService {
 
         const updatedPowerUnit: PowerUnit | null = await PowerUnit.findByPk(powerUnitId)
         if (!updatedPowerUnit) throw new Error('PowerUnit not found')
-        
+
         return updatedPowerUnit
     }
 }

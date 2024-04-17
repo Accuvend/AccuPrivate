@@ -103,7 +103,12 @@ class NotificationHandler extends Registry {
             })
             .catch((error: AxiosError) => {
                 console.log(error.response?.data);
-                logger.error("Error sending sms", error);
+                logger.error("Error sending sms", {
+                    meta: {
+                        transactionId: transaction.id,
+                        error: error.response?.data,
+                    }
+                });
             });
         await transactionEventService.addTokenSentToUserEmailEvent();
 

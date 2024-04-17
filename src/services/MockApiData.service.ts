@@ -82,10 +82,26 @@ export default class MockApiService {
                 if (currentTrueItem) {
                     await MockEndpointData.update({ activated: false }, { where: { id: currentTrueItem.id } });
                 }
+
+                //check if the endpoint like that exist 
+                const updateMockEndpoint: MockEndpointData | null = await MockEndpointData.findOne({
+                    where: {
+                        id,
+                        vendorName: {
+                            [Op.iLike]:`${vendor}`
+                        }, apiType: endpoint,
+                    }
+                })
+
+                //check the endpoint in the table exist
+                if(!updateMockEndpoint) throw Error('Endpoint with properities does not exist')
                 
                 // Set the selected item's activated status to true
                 await MockEndpointData.update({ activated: true }, { where: { id } });
-            }).catch(err => console.log(err));
+            }).catch(err => {
+                console.log(err)
+                throw err
+            });
         } catch (err) {
             throw err;
         }

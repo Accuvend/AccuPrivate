@@ -15,7 +15,7 @@ async function startServer(): Promise<void> {
         console.log("Kafka Connected Successfully");
 
         // Start the server and listen on port 3000
-        app.listen(process.env.PORT || 3002, () => {
+        app.listen(process.env.PORT || 3000, () => {
             console.log("Server Connected Successfully");
         });
 

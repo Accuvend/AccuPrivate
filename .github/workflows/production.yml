@@ -21,24 +21,15 @@ jobs:
   #         node-version: 18
   #     - run: npm ci
   #     - run: npm test
-  test-env-file:
-    name: test-env-file
-    runs-on: ubuntu-latest
-    environment: production
-    if : github.ref == 'refs/heads/production'
-    steps:
-    - name: test-environment
-      run: |
-        BAXI_TOKEN=${{ secrets.BAXI_TOKEN}}
-        echo "BAXI_TOKEN=$BAXI_TOKEN" >> .env
-        cat .env
+  
         
   # Generates the Env file and pushes to s3 bucket 
   generate-env-file:
     name: generate-env-file
     # needs: [push-build]
+    environment: PRODUCTION
     runs-on: ubuntu-latest
-    if : github.ref == 'refs/heads/build'
+    if : github.ref == 'refs/heads/production'
     steps:
     - name: chechkout
       uses: actions/checkout@v2
@@ -201,8 +192,8 @@ jobs:
         cat .env
     - name: push to state to s3
       run: |
-        cp ./.env test.env
-        aws s3 cp ./test.env s3://accuvend-bucket-configuration/ 
+        cp ./.env prod.env
+        aws s3 cp ./prod.env s3://accuvend-bucket-configuration/ 
     - name: Save env file
       uses: actions/cache@v2
       with:
@@ -384,7 +375,7 @@ jobs:
             cd dist
 
             # Get ENV file
-            aws s3 cp s3://accuvend-bucket-configuration/test.env ./.env
+            aws s3 cp s3://accuvend-bucket-configuration/prod.env ./.env
             
             #GET DATABASE CREDENTINALS
             DB_USERNAME=$(grep DB_USER_NAME ./.env | cut -d "=" -f2) &&\

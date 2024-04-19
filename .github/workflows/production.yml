@@ -3,10 +3,10 @@ name: ci-cd - production
 on:
   push:
     branches: 
-      - build
+      - production
   pull_request: 
     branches: 
-      - build
+      - production
   workflow_dispatch:
 
 jobs:

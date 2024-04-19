@@ -21,4 +21,4 @@ CREATE TABLE IF NOT EXISTS public."MockEndpointData"
 TABLESPACE pg_default;
 
 ALTER TABLE IF EXISTS public."MockEndpointData"
-    OWNER to postgres;
+    OWNER to accuvend;

@@ -21,4 +21,4 @@ CREATE TABLE IF NOT EXISTS public."ApiKeys"
 TABLESPACE pg_default;
 
 ALTER TABLE IF EXISTS public."ApiKeys"
-    OWNER to postgres;
+    OWNER to accuvend;

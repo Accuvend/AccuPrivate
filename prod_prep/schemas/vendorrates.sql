@@ -24,4 +24,4 @@ CREATE TABLE IF NOT EXISTS public."VendorRates"
 TABLESPACE pg_default;
 
 ALTER TABLE IF EXISTS public."VendorRates"
-    OWNER to postgres;
+    OWNER to accuvend;

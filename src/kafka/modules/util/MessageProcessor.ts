@@ -1,6 +1,7 @@
 import { EachBatchPayload, EachMessagePayload, Message } from "kafkajs";
 import logger from "../../../utils/Logger";
-import { CustomMessageFormat, MessageHandler, Topic } from "./Interface";
+import { CustomMessageFormat, MessageHandler, PublisherEventAndParameters, Topic } from "./Interface";
+import { CustomError } from "../../../utils/Errors";
 
 export default class MessageProcessorFactory {
     private handlers: () => MessageHandler
@@ -21,57 +22,101 @@ export default class MessageProcessorFactory {
         try {
             await handler(messageData.value)
         } catch (error) {
-            throw error
+            logger.error((error as Error).message ?? "An Error occured while processing message", {
+                meta: {
+                    messageData,
+                    transactionId: messageData.value.transactionId
+                }
+            })
+            if (error instanceof CustomError) {
+                logger.error(error.message, error.meta)
+            } else {
+                logger.error((error as Error).message)
+            }
+
+            console.log(error)
         }
     }
 
     public async processEachMessage(messagePayload: Omit<EachMessagePayload, 'topic'> & { topic: Topic }): Promise<void> {
         const { topic, partition, message } = messagePayload;
         const prefix = `[${topic}][${partition} | ${message.offset}] / ${message.timestamp}`;
-        logger.info(`Received message => [${this.consumerName}]: ` + prefix)
-
         const data: CustomMessageFormat = {
             topic,
             partition,
-            offset: message.offset,
-            value: JSON.parse(message.value?.toString() ?? '{}'),
-            timestamp: message.timestamp,
-            headers: message.headers,
+            offset: message?.offset,
+            value: JSON.parse(message?.value?.toString() ?? '{}') as PublisherEventAndParameters[keyof PublisherEventAndParameters],
+            timestamp: message?.timestamp,
+            headers: message?.headers,
         }
 
-        return await this.processMessage(data)
+        try {
+            const shouldLogToDB = data.value.log == undefined ? 1 : data.value.log
+
+            shouldLogToDB && logger.info(`Received message => [${this.consumerName}]: ` + prefix)
+
+            await this.processMessage(data)
+
+            await messagePayload.heartbeat()
+        } catch (error) {
+            console.log(error)
+            logger.error((error as Error).message ?? "An Error occured while processing message", {
+                meta: {
+                    messaageData: messagePayload.message,
+                    transactionId: data.value.transactionId
+                }
+            })
+            if (error instanceof CustomError) {
+                logger.error(error.message, error.meta)
+            } else {
+                logger.error((error as Error).message)
+            }
+        }
     }
 
     public async processEachBatch(eachBatchPayload: EachBatchPayload): Promise<void> {
         try {
             const { batch } = eachBatchPayload;
 
+            let shouldLogToDB = 1
             for (let i = 0; i < batch.messages.length; i++) {
                 const message = batch.messages[i]
                 const prefix = `${batch.topic}[${batch.partition} | ${message.offset}] / ${message.timestamp}`;
-                logger.info(`- ${prefix} ${message.key}#${message.value}`);
 
                 const data: CustomMessageFormat = {
                     topic: batch.topic as Topic,
                     partition: batch.partition,
                     offset: message.offset,
-                    value: JSON.parse(message.value?.toString() ?? '{}'),
+                    value: JSON.parse(message.value?.toString() ?? '{}') as PublisherEventAndParameters[keyof PublisherEventAndParameters],
                     timestamp: message.timestamp,
                     headers: message.headers,
                 }
 
+                shouldLogToDB = data.value.log == undefined ? 1 : data.value.log
+
+                shouldLogToDB && logger.info(`- ${prefix} ${message.key}#${message.value}`, {
+                    meta: {
+                        transactionId: (message.value as any).transactionId
+                    }
+                });
+
                 await this.processMessage(data)
-                logger.info('Message processed successfully')
+
+                shouldLogToDB && logger.info('Message processed successfully')
                 eachBatchPayload.resolveOffset(message.offset)  // Commit offset
+                await eachBatchPayload.commitOffsetsIfNecessary()
+                await eachBatchPayload.heartbeat()
             }
 
-            await eachBatchPayload.commitOffsetsIfNecessary()
-            await eachBatchPayload.heartbeat()
-            logger.info('Committing offsets...')
 
+            shouldLogToDB && logger.info('Committing offsets...')
         } catch (error) {
-            console.error(error)
-            logger.warn((error as any).message)
+            console.log(error)
+            if (error instanceof CustomError) {
+                logger.error(error.message, error.meta)
+            } else {
+                logger.error((error as Error).message)
+            }
         }
     }
 

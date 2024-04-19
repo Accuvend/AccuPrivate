@@ -1,31 +1,139 @@
 import { AxiosError } from "axios";
-import Transaction from "../../../models/Transaction.model";
+import Transaction, { Status } from "../../../models/Transaction.model";
 import EntityService from "../../../services/Entity/Entity.service";
 import EventService from "../../../services/Event.service";
 import NotificationService from "../../../services/Notification.service";
 import TransactionService from "../../../services/Transaction.service";
-import TransactionEventService, { AirtimeTransactionEventService } from "../../../services/TransactionEvent.service";
+import TransactionEventService, {
+    AirtimeTransactionEventService,
+} from "../../../services/TransactionEvent.service";
 import WebhookService from "../../../services/Webhook.service";
 import EmailService, { EmailTemplate } from "../../../utils/Email";
 import logger from "../../../utils/Logger";
 import NotificationUtil from "../../../utils/Notification";
 import { TOPICS } from "../../Constants";
 import ConsumerFactory from "../util/Consumer";
-import { PublisherEventAndParameters, Registry, Topic } from "../util/Interface";
+import {
+    PublisherEventAndParameters,
+    Registry,
+    Topic,
+} from "../util/Interface";
 import MessageProcessor from "../util/MessageProcessor";
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from "uuid";
+import ProductService from "../../../services/Product.service";
+import { SmsService } from "../../../utils/Sms";
+import { VendorPublisher } from "../publishers/Vendor";
+import Event from "../../../models/Event.model";
+import PowerUnit from "../../../models/PowerUnit.model";
 
 class NotificationHandler extends Registry {
-    private static async handleReceivedToken(data: PublisherEventAndParameters[TOPICS.TOKEN_RECIEVED_FROM_VENDOR]) {
-        logger.info('Inside notification handler')
-        const transaction = await TransactionService.viewSingleTransaction(data.transactionId)
+    private static async handleTokenToSendToUser(
+        data: PublisherEventAndParameters[TOPICS.TOKEN_RECIEVED_FROM_REQUERY],
+    ) {
+        logger.info("Inside notification handler");
+        const transaction = await TransactionService.viewSingleTransaction(
+            data.transactionId,
+        );
         if (!transaction) {
-            throw new Error(`Error fetching transaction with id ${data.transactionId}`)
+            throw new Error(
+                `Error fetching transaction with id ${data.transactionId}`,
+            );
         }
 
-        const partnerEntity = await EntityService.viewSingleEntityByEmail(transaction.partner.email)
+        const partnerEntity = await EntityService.viewSingleEntityByEmail(
+            transaction.partner.email,
+        );
         if (!partnerEntity) {
-            throw new Error(`Error fetching partner with email ${transaction.partner.email}`)
+            throw new Error(
+                `Error fetching partner with email ${transaction.partner.email}`,
+            );
+        }
+
+        const transactionEventService = new TransactionEventService(
+            transaction,
+            {
+                meterNumber: data.meter.meterNumber,
+                vendType: transaction.meter.vendType,
+                disco: data.meter.disco,
+            },
+            transaction.superagent,
+            transaction.partner.email,
+        );
+
+        const handlers = {
+            PREPAID: new EmailTemplate().order_confirmation,
+            POSTPAID: new EmailTemplate().postpaid_order_confirmation,
+        };
+
+        const product = await ProductService.viewSingleProduct(
+            transaction.productCodeId,
+        );
+        if (!product) {
+            throw new Error(
+                `Error fetching product with id ${transaction.productCodeId}`,
+            );
+        }
+
+        transaction.disco = product.productName;
+        console.log({ productName: transaction.disco });
+
+        // If you've not notified the user before, notify them
+        const meter = await transaction.$get("meter");
+        const user = await transaction.$get("user");
+        await EmailService.sendEmail({
+            to: transaction.user.email,
+            subject: "Token Purchase",
+            html: await handlers[transaction.meter.vendType]({
+                transaction: transaction,
+                meterNumber: data.meter.meterNumber,
+                token: data.meter.token,
+                address: meter?.address ?? "",
+                name: user?.dataValues.name ?? "",
+                units: data.tokenUnits,
+            }),
+        });
+
+        const msgTemplate =
+            data.meter.vendType.toUpperCase() === "POSTPAID"
+                ? await SmsService.postpaidElectricityTemplate(transaction)
+                : await SmsService.prepaidElectricityTemplate(transaction);
+        await SmsService.sendSms(data.user.phoneNumber, msgTemplate)
+            .then(async () => {
+                await transactionEventService.addSmsTokenSentToUserEvent();
+            })
+            .catch((error: AxiosError) => {
+                console.log(error.response?.data);
+                logger.error("Error sending sms", error);
+            });
+        await transactionEventService.addTokenSentToUserEmailEvent();
+
+        await TransactionService.updateSingleTransaction(transaction.id, {
+            status: Status.COMPLETE,
+        });
+
+        return;
+    }
+
+    private static async handleReceivedToken(
+        data: PublisherEventAndParameters[TOPICS.TOKEN_RECIEVED_FROM_VENDOR],
+    ) {
+        logger.info("Inside notification handler");
+        const transaction = await TransactionService.viewSingleTransaction(
+            data.transactionId,
+        );
+        if (!transaction) {
+            throw new Error(
+                `Error fetching transaction with id ${data.transactionId}`,
+            );
+        }
+
+        const partnerEntity = await EntityService.viewSingleEntityByEmail(
+            transaction.partner.email,
+        );
+        if (!partnerEntity) {
+            throw new Error(
+                `Error fetching partner with email ${transaction.partner.email}`,
+            );
         }
 
         // Add notification successfull transaction
@@ -46,50 +154,54 @@ class NotificationHandler extends Registry {
         });
 
         // Check if notifiecations have been sent to partner and user
-        const notifyPartnerEvent = await EventService.viewSingleEventByTransactionIdAndType(transaction.id, TOPICS.TOKEN_SENT_TO_PARTNER)
-        const notifyUserEvent = await EventService.viewSingleEventByTransactionIdAndType(transaction.id, TOPICS.TOKEN_SENT_TO_EMAIL)
+        const notifyPartnerEvent =
+            await EventService.viewSingleEventByTransactionIdAndType(
+                transaction.id,
+                TOPICS.TOKEN_SENT_TO_PARTNER,
+            );
 
-        const transactionEventService = new TransactionEventService(transaction, {
-            meterNumber: data.meter.meterNumber,
-            vendType: transaction.meter.vendType,
-            disco: data.meter.disco,
-        }, transaction.superagent, transaction.partner.email)
+        const transactionEventService = new TransactionEventService(
+            transaction,
+            {
+                meterNumber: data.meter.meterNumber,
+                vendType: transaction.meter.vendType,
+                disco: data.meter.disco,
+            },
+            transaction.superagent,
+            transaction.partner.email,
+        );
 
         // If you've not notified the partner before, notify them
         if (!notifyPartnerEvent) {
             await NotificationUtil.sendNotificationToUser(
                 partnerEntity.id,
-                notification
+                notification,
             );
-            await transactionEventService.addTokenSentToPartnerEvent()
         }
 
-        // If you've not notified the user before, notify them
-        if (!notifyUserEvent) {
-            await EmailService.sendEmail({
-                to: transaction.user.email,
-                subject: "Token Purchase",
-                html: await new EmailTemplate().receipt({
-                    transaction: transaction,
-                    meterNumber: data.meter.meterNumber,
-                    token: data.meter.token,
-                }),
-            })
-            await transactionEventService.addTokenSentToUserEmailEvent()
-        }
-        return
+        return;
     }
 
-    private static async handleReceivedAirtime(data: PublisherEventAndParameters[TOPICS.AIRTIME_RECEIVED_FROM_VENDOR]) {
-        logger.info('Inside notification handler')
-        const transaction = await TransactionService.viewSingleTransaction(data.transactionId)
+    private static async handleReceivedAirtime(
+        data: PublisherEventAndParameters[TOPICS.AIRTIME_RECEIVED_FROM_VENDOR],
+    ) {
+        logger.info("Inside notification handler");
+        const transaction = await TransactionService.viewSingleTransaction(
+            data.transactionId,
+        );
         if (!transaction) {
-            throw new Error(`Error fetching transaction with id ${data.transactionId}`)
+            throw new Error(
+                `Error fetching transaction with id ${data.transactionId}`,
+            );
         }
 
-        const partnerEntity = await EntityService.viewSingleEntityByEmail(transaction.partner.email)
+        const partnerEntity = await EntityService.viewSingleEntityByEmail(
+            transaction.partner.email,
+        );
         if (!partnerEntity) {
-            throw new Error(`Error fetching partner with email ${transaction.partner.email}`)
+            throw new Error(
+                `Error fetching partner with email ${transaction.partner.email}`,
+            );
         }
 
         // Add notification successfull transaction
@@ -110,45 +222,80 @@ class NotificationHandler extends Registry {
         });
 
         // Check if notifiecations have been sent to partner and user
-        const notifyPartnerEvent = await EventService.viewSingleEventByTransactionIdAndType(transaction.id, TOPICS.TOKEN_SENT_TO_PARTNER)
-        const notifyUserEvent = await EventService.viewSingleEventByTransactionIdAndType(transaction.id, TOPICS.TOKEN_SENT_TO_EMAIL)
+        const notifyPartnerEvent =
+            await EventService.viewSingleEventByTransactionIdAndType(
+                transaction.id,
+                TOPICS.TOKEN_SENT_TO_PARTNER,
+            );
 
-        const transactionEventService = new AirtimeTransactionEventService(transaction, transaction.superagent, transaction.partner.email, data.phone.phoneNumber)
+        const transactionEventService = new AirtimeTransactionEventService(
+            transaction,
+            transaction.superagent,
+            transaction.partner.email,
+            data.phone.phoneNumber,
+        );
 
         // If you've not notified the partner before, notify them
         if (!notifyPartnerEvent) {
             await NotificationUtil.sendNotificationToUser(
                 partnerEntity.id,
-                notification
+                notification,
             );
-            await transactionEventService.addAirtimeSentToPartner()
+            await transactionEventService.addAirtimeSentToPartner();
         }
 
-        // If you've not notified the user before, notify them
-        if (!notifyUserEvent) {
-            await EmailService.sendEmail({
-                to: transaction.user.email,
-                subject: "Token Purchase",
-                html: await new EmailTemplate().airTimeReceipt({
-                    transaction: transaction,
-                    phoneNumber: data.phone.phoneNumber,
-                }),
-            })
-            await transactionEventService.addAirtimeSentToUserEmail()
+        const product = await ProductService.viewSingleProduct(
+            transaction.productCodeId,
+        );
+        if (!product) {
+            throw new Error(
+                `Error fetching product with id ${transaction.productCodeId}`,
+            );
         }
-        return
+
+        transaction.disco = product.productName;
+
+        await EmailService.sendEmail({
+            to: transaction.partner.email,
+            subject: "Token Purchase",
+            html: await new EmailTemplate().airTimeReceipt({
+                transaction: transaction,
+                phoneNumber: data.phone.phoneNumber,
+            }),
+        });
+
+        const msgTemplate = await SmsService.airtimeTemplate(transaction);
+        await SmsService.sendSms(data.phone.phoneNumber, msgTemplate).catch(
+            (error: AxiosError) => {
+                console.log(error.response?.data);
+                logger.error("Error sending sms", error);
+            },
+        );
+        await transactionEventService.addAirtimeSentToUserEmail();
+
+        return;
     }
 
-    private static async failedTokenRequest(data: PublisherEventAndParameters[TOPICS.TOKEN_REQUEST_FAILED]) {
-        logger.info('Inside notification handler')
-        const transaction = await TransactionService.viewSingleTransaction(data.transactionId)
+    private static async failedTokenRequest(
+        data: PublisherEventAndParameters[TOPICS.TOKEN_REQUEST_FAILED],
+    ) {
+        logger.info("Inside notification handler");
+        const transaction = await TransactionService.viewSingleTransaction(
+            data.transactionId,
+        );
         if (!transaction) {
-            throw new Error(`Error fetching transaction with id ${data.transactionId}`)
+            throw new Error(
+                `Error fetching transaction with id ${data.transactionId}`,
+            );
         }
 
-        const partnerEntity = await EntityService.viewSingleEntityByEmail(transaction.partner.email)
+        const partnerEntity = await EntityService.viewSingleEntityByEmail(
+            transaction.partner.email,
+        );
         if (!partnerEntity) {
-            throw new Error(`Error fetching partner with email ${transaction.partner.email}`)
+            throw new Error(
+                `Error fetching partner with email ${transaction.partner.email}`,
+            );
         }
 
         // Add notification successfull transaction
@@ -168,22 +315,35 @@ class NotificationHandler extends Registry {
         });
 
         // Check if notifiecations have been sent to partner and user
-        const notifyPartnerEvent = await EventService.viewSingleEventByTransactionIdAndType(transaction.id, TOPICS.TOKEN_REQUEST_FAILED)
-        const notifyUserEvent = await EventService.viewSingleEventByTransactionIdAndType(transaction.id, TOPICS.TOKEN_REQUEST_FAILED)
+        const notifyPartnerEvent =
+            await EventService.viewSingleEventByTransactionIdAndType(
+                transaction.id,
+                TOPICS.TOKEN_REQUEST_FAILED,
+            );
+        const notifyUserEvent =
+            await EventService.viewSingleEventByTransactionIdAndType(
+                transaction.id,
+                TOPICS.TOKEN_REQUEST_FAILED,
+            );
 
-        const transactionEventService = new TransactionEventService(transaction, {
-            meterNumber: data.meter.meterNumber,
-            vendType: transaction.meter.vendType,
-            disco: data.meter.disco,
-        }, transaction.superagent, transaction.partner.email)
+        const transactionEventService = new TransactionEventService(
+            transaction,
+            {
+                meterNumber: data.meter.meterNumber,
+                vendType: transaction.meter.vendType,
+                disco: data.meter.disco,
+            },
+            transaction.superagent,
+            transaction.partner.email,
+        );
 
         // If you've not notified the partner before, notify them
         if (!notifyPartnerEvent) {
             await NotificationUtil.sendNotificationToUser(
                 partnerEntity.id,
-                notification
+                notification,
             );
-            await transactionEventService.addTokenRequestFailedNotificationToPartnerEvent()
+            await transactionEventService.addTokenRequestFailedNotificationToPartnerEvent();
         }
 
         // If you've not notified the user before, notify them
@@ -194,23 +354,28 @@ class NotificationHandler extends Registry {
                 html: await new EmailTemplate().failedTransaction({
                     transaction: transaction,
                 }),
-            })
-            await transactionEventService.addTokenRequestFailedNotificationToPartnerEvent()
+            });
+            await transactionEventService.addTokenRequestFailedNotificationToPartnerEvent();
         }
-        return
+        return;
     }
 
     static registry = {
         [TOPICS.TOKEN_SENT_TO_PARTNER_RETRY]: this.handleReceivedToken,
         [TOPICS.TOKEN_RECIEVED_FROM_VENDOR]: this.handleReceivedToken,
+        [TOPICS.TOKEN_RECIEVED_FROM_REQUERY]: this.handleTokenToSendToUser,
         [TOPICS.TOKEN_REQUEST_FAILED]: this.failedTokenRequest,
         [TOPICS.AIRTIME_RECEIVED_FROM_VENDOR]: this.handleReceivedAirtime,
-    }
+    };
 }
 
 export default class NotificationConsumer extends ConsumerFactory {
     constructor() {
-        const messageProcessor = new MessageProcessor(NotificationHandler.registry, 'NOTIFICATION_CONSUMER')
-        super(messageProcessor)
+        const messageProcessor = new MessageProcessor(
+            NotificationHandler.registry,
+            "NOTIFICATION_CONSUMER",
+        );
+        super(messageProcessor);
     }
 }
+

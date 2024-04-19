@@ -33,9 +33,14 @@ export default class PartnerProfileService {
     }
 
     static async viewSinglePartner(uuid: string): Promise<PartnerProfile | null> {
-        const partner: PartnerProfile | null = await PartnerProfile.findByPk(uuid,{
+        const partner: PartnerProfile | null = await PartnerProfile.findByPk(uuid, {
             include: [Entity]
         })
+        return partner
+    }
+
+    static async viewSinglePartnerByPartnerCode(partnerCode: string): Promise<PartnerProfile | null> {
+        const partner: PartnerProfile | null = await PartnerProfile.findOne({ where: { partnerCode }, include: [Entity] })
         return partner
     }
 
@@ -53,9 +58,9 @@ export default class PartnerProfileService {
         return partner
     }
 
-    static async viewPartnersWithCustomQuery(query: any , attributes: any = {}): Promise<PartnerProfile[]> {
+    static async viewPartnersWithCustomQuery(query: any, attributes: any = {}): Promise<PartnerProfile[]> {
         const partners: PartnerProfile[] = await PartnerProfile.findAll({
-            ...query ,  include: [Entity]  , attributes: attributes
+            ...query, include: [Entity], attributes: attributes
         })
         return partners
     }

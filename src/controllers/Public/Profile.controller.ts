@@ -7,6 +7,7 @@ import { AuthenticatedRequest } from "../../utils/Interface";
 import EntityService from "../../services/Entity/Entity.service";
 import { AuthUtil, TokenUtil } from "../../utils/Auth/Token";
 import { RoleEnum } from "../../models/Role.model";
+require('newrelic');
 
 export default class ProfileController {
 
@@ -49,7 +50,7 @@ export default class ProfileController {
         const { entity } = req.user.user
         const { email, companyName, address } = req.body
 
-        if (entity.role === RoleEnum.Partner) {
+        if (entity.role.toUpperCase() === RoleEnum.Partner.toUpperCase()) {
             const partner = await PartnerService.viewSinglePartner(req.user.user.profile.id)
             if (!partner) {
                 return next(new InternalServerError('Authenticated Partner not found'))

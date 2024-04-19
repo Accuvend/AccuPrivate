@@ -7,6 +7,7 @@ import Notification from "../../models/Notification.model"
 import EntityService from "../../services/Entity/Entity.service"
 import { Op } from "sequelize"
 import { RoleEnum } from "../../models/Role.model"
+require('newrelic');
 
 export default class NotificationController {
     static async getNotifications(req: AuthenticatedRequest, res: Response, _next: NextFunction) {
@@ -28,7 +29,7 @@ export default class NotificationController {
         if (!requestWasMadeByAnAdmin) {
             query.where['entityId'] = id
         }
-        query.where = status === 'read' ? { ...query.where, read: true } : status === 'unread' ? { read: false, ...query.where } : query.where
+        query.where = status.toLowerCase() === 'read' ? { ...query.where, read: true } : status.toLowerCase() === 'unread' ? { read: false, ...query.where } : query.where
 
         if (limit) query.limit = parseInt(limit)
         if (page && page != '0' && limit) {

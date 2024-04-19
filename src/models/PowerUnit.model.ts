@@ -1,7 +1,7 @@
 // Import necessary modules and dependencies
 import { Table, Column, Model, DataType, IsUUID, PrimaryKey, ForeignKey, BelongsTo } from "sequelize-typescript";
 import Meter from "./Meter.model";
-import Transaction from "./Transaction.model";
+import Transaction, { ITransaction } from "./Transaction.model";
 
 // Define the Sequelize model for the "PowerUnit" table
 @Table
@@ -32,17 +32,20 @@ export default class PowerUnit extends Model<PowerUnit | IPowerUnit> {
     amount: string;
 
     // Token number associated with the power unit (with a default value)
-    @Column({ type: DataType.INTEGER, allowNull: false, defaultValue: 0 })
+    @Column({ type: DataType.INTEGER, allowNull: true, defaultValue: 0 })
     tokenNumber: number
 
     // Token number associated with the power unit (with a default value)
-    @Column({ type: DataType.STRING, allowNull: false, unique: false })
+    @Column({ type: DataType.STRING, allowNull: true, unique: false })
     token: string
 
     // Token units associated with the power unit (with a default value)
     @Column({ type: DataType.STRING, allowNull: false, defaultValue: '0' })
     tokenUnits: string
 
+    @Column({ type: DataType.STRING, allowNull: true })
+    tokenFromVend: string;
+    
     // Foreign key for the associated Meter
     @ForeignKey(() => Meter)
     @IsUUID(4)
@@ -71,13 +74,14 @@ export interface IPowerUnit {
     address: string;         // address associated with the PowerUnit.
     disco: string;           // Disco (Distribution Company) associated with the PowerUnit.
     discoLogo: string;       // Disco (Distribution Company) associated with the PowerUnit.
-    superagent: 'BUYPOWERNG' | 'BAXI';      // superagent associated with the PowerUnit.
+    superagent: ITransaction['superagent'];      // superagent associated with the PowerUnit.
     amount: string;          // amount related to the PowerUnit.
     tokenNumber: number;    // Token number associated with the PowerUnit.
-    token: String;          // Token number associated with the PowerUnit
+    token?: string | null;          // Token number associated with the PowerUnit
     tokenUnits: string;    // Token units associated with the PowerUnit.
     meterId: string;         // Unique identifier of the Meter associated with the PowerUnit.
     transactionId: string;  // Unique identifier of the Transaction associated with the PowerUnit.
+    tokenFromVend?: string;  // Token from Vend associated with the PowerUnit.
 }
 
 // Define an interface that extends the IPowerUnit interface, representing the shape of a new PowerUnit to be created.

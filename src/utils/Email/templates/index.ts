@@ -1,6 +1,6 @@
 import ejs from 'ejs';
 import fs from 'fs';
-import { LOGO_URL } from '../../Constants';
+import { ACCUVEND_RECEIPT_BASE_URL, LOGO_URL } from '../../Constants';
 import { IReceiptEmailTemplateProps } from '../../Interface';
 import Transaction from '../../../models/Transaction.model';
 import { randomUUID } from 'crypto';
@@ -18,8 +18,17 @@ class EmailTemplate {
     failedTransaction = async ({ transaction }: { transaction: Transaction }) => {
         return container(await ejs.renderFile(__dirname + '/failedtxn.ejs', { transaction }))
     }
-    receipt = async ({ transaction, meterNumber, token }: IReceiptEmailTemplateProps) => {
-        return container(await ejs.renderFile(__dirname + '/receipt.ejs', { transaction, meterNumber, token }))
+    order_confirmation = async ({ transaction, meterNumber, token, address, name, units }: IReceiptEmailTemplateProps) => {
+        return container(await ejs.renderFile(__dirname + '/order-confirmation.ejs', { transaction, meterNumber, token, address, name, unit: units, receiptUrl: ACCUVEND_RECEIPT_BASE_URL }))
+    }
+    postpaid_order_confirmation = async ({ transaction, meterNumber, token, address, name, units }: IReceiptEmailTemplateProps) => {
+        return container(await ejs.renderFile(__dirname + '/order-confirmation-postpaid.ejs', { transaction, meterNumber, token, address, name, unit: units, receiptUrl: ACCUVEND_RECEIPT_BASE_URL }))
+    }
+    receipt = async ({ transaction, meterNumber, token, address, name }: IReceiptEmailTemplateProps) => {
+        return container(await ejs.renderFile(__dirname + '/receipt.ejs', { transaction, meterNumber, token, address, name }))
+    }
+    postpaid_receipt = async ({ transaction, meterNumber, token, address, name }: IReceiptEmailTemplateProps) => {
+        return container(await ejs.renderFile(__dirname + '/postpaid_receipt.ejs', { transaction, meterNumber, token, address, name }))
     }
     airTimeReceipt = async ({ transaction, phoneNumber }: {
         transaction: Transaction,
@@ -43,6 +52,9 @@ class EmailTemplate {
         return container(await ejs.renderFile(__dirname + '/teaminvitation.ejs', { email, password }))
     }
     invitePartner = async ({ email, password }: { email: string, password: string }) => {
+        return container(await ejs.renderFile(__dirname + '/partnerinvitation.ejs', { email, password }))
+    }
+    reInvitePartner = async ({ email, password }: { email: string, password: string }) => {
         return container(await ejs.renderFile(__dirname + '/partnerinvitation.ejs', { email, password }))
     }
     suAccountActivation = async ({ email, authorizationCode }: { email: string, authorizationCode: ReturnType<typeof randomUUID> }) => {

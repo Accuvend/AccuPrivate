@@ -8,6 +8,7 @@ import { AuthUtil } from "../../utils/Auth/Token";
 import { NODE_ENV, SU_HOST_EMAIL_1, SU_HOST_EMAIL_2, SU_HOST_EMAIL_3 } from "../../utils/Constants";
 import { randomUUID } from "crypto";
 import { RoleEnum } from "../../models/Role.model";
+require('newrelic');
 
 class AuthControllerValidator {
     static async activatePartner() {
@@ -36,7 +37,7 @@ export default class AuthController {
             throw new BadRequestError('Role not found')
         }
 
-        if (role.name === RoleEnum.SuperAdmin) {
+        if (role.name.toUpperCase() === RoleEnum.SuperAdmin.toUpperCase()) {
             throw new ForbiddenError('Unauthorized access')
         }
 
@@ -75,7 +76,7 @@ export default class AuthController {
             throw new BadRequestError('Role not found')
         }
 
-        if (role.name === RoleEnum.SuperAdmin) {
+        if (role.name.toUpperCase() === RoleEnum.SuperAdmin.toUpperCase()) {
             throw new ForbiddenError('Unauthorized access')
         }
 
@@ -113,7 +114,7 @@ export default class AuthController {
             throw new BadRequestError('Role not found')
         }
 
-        if (role.name !== RoleEnum.SuperAdmin) {
+        if (role.name.toUpperCase() !== RoleEnum.SuperAdmin.toUpperCase()) {
             throw new ForbiddenError('Unauthorized access')
         }
 
@@ -246,7 +247,7 @@ export default class AuthController {
             throw new BadRequestError('Role not found')
         }
 
-        if (role.name !== RoleEnum.SuperAdmin) {
+        if (role.name.toUpperCase() !== RoleEnum.SuperAdmin.toUpperCase()) {
             throw new ForbiddenError('Unauthorized access')
         }
 

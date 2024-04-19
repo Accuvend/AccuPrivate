@@ -17,6 +17,8 @@ import { PartnerProfile } from "../../models/Entity/Profiles";
 import ResponseTrimmer from "../../utils/ResponseTrimmer";
 import { IPartnerProfile, IPartnerStatsProfile } from "../../models/Entity/Profiles/PartnerProfile.model";
 import TransactionService from "../../services/Transaction.service";
+import { randomUUID } from "crypto";
+require('newrelic');
 
 export default class PartnerProfileController {
     static async invitePartner(req: AuthenticatedRequest, res: Response, next: NextFunction) {
@@ -33,10 +35,7 @@ export default class PartnerProfileController {
             throw new BadRequestError('Email has been used before')
         }
 
-
-
         const transaction = await Database.transaction()
-
 
         try {
 
@@ -51,6 +50,7 @@ export default class PartnerProfileController {
                 id: uuidv4(),
                 email,
                 status: {
+                    passwordApproved: false,
                     activated: false,
                     emailVerified: false
                 },
@@ -104,7 +104,7 @@ export default class PartnerProfileController {
                     partner: ResponseTrimmer.trimPartner({ ...newPartner.dataValues, entity }),
                 }
             })
-            
+
         } catch (err) {
             await transaction.rollback()
             res.status(500).json({
@@ -112,6 +112,39 @@ export default class PartnerProfileController {
                 message: 'Partner invited not successfully',
             })
         }
+    }
+
+    static async reSendPartnerPassword(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+        const { email } = req.body
+
+        const partnerProfile = await PartnerService.viewSinglePartnerByEmail(email)
+        if (!partnerProfile) {
+            throw new NotFoundError('Partner not found')
+        }
+
+        const entity = await partnerProfile.$get('entity')
+        if (!entity) {
+            throw new BadRequestError('Entity not found')
+        }
+
+        if (entity.status.passwordApproved) {
+            throw new BadRequestError('Password has been approved')
+        }
+
+        const newPassword = randomUUID()
+        await PasswordService.updatePassword(entity.id, newPassword)
+
+        await EmailService.sendEmail({
+            to: partnerProfile.email,
+            subject: 'Password Reset',
+            html: await new EmailTemplate().reInvitePartner({ email: partnerProfile.email, password: newPassword })
+        })
+
+        res.status(200).json({
+            status: 'success',
+            message: 'Password sent successfully',
+        })
+
     }
 
     static async getPartnerInfo(req: AuthenticatedRequest, res: Response, next: NextFunction) {
@@ -163,45 +196,40 @@ export default class PartnerProfileController {
 
 
         const _stats: any = []
-        //adding partner Statics here        
+        //adding partner Statistics  here        
         for (let index = 0; index < partners.length; index++) {
             let failed_Transactions: number = 0
             let pending_Transactions: number = 0
             let success_Transactions: number = 0
             const element = partners[index];
 
-            const _failed_Transaction = await TransactionService.viewTransactionsWithCustomQuery({
+            const _failed_Transaction = await TransactionService.viewTransactionsCountWithCustomQuery({
                 where: {
                     partnerId: element.id,
                     status: "FAILED"
                 }
             })
-            failed_Transactions = _failed_Transaction.length
+            failed_Transactions = _failed_Transaction
 
 
-            const _pending_Transaction = await TransactionService.viewTransactionsWithCustomQuery({
+            const _pending_Transaction = await TransactionService.viewTransactionsCountWithCustomQuery({
                 where: {
                     partnerId: element.id,
                     status: "PENDING"
                 }
             })
-            pending_Transactions = _pending_Transaction.length
+            pending_Transactions = _pending_Transaction
 
 
-            const _complete_Transaction = await TransactionService.viewTransactionsWithCustomQuery({
+            const _complete_Transaction = await TransactionService.viewTransactionsCountWithCustomQuery({
                 where: {
                     partnerId: element.id,
                     status: "COMPLETE"
                 }
             })
-            success_Transactions = _complete_Transaction.length
+            success_Transactions = _complete_Transaction
 
-            // element.stats = {
-            //     success_Transactions,
-            //     failed_Transactions,
-            //     pending_Transactions
 
-            // }
             _stats.push({
                 id: element.id,
                 success_Transactions,

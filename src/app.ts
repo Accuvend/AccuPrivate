@@ -6,6 +6,8 @@ import cors from 'cors';
 import router from "./routes";
 import morgan from 'morgan'
 import helmet from 'helmet';
+require('newrelic');
+import { join } from 'path';
 
 const app = express();
 
@@ -14,6 +16,9 @@ app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: true }))
 app.use(cors())
 app.use(morgan('dev'))
+
+// ****
+/**** */
 
 app.get('/healthcheck', async (req: Request, res: Response) => {
     res.status(200).json({

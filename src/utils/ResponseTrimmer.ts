@@ -8,6 +8,14 @@ class ResponseTrimmer {
         const { amount, status, paymentType, disco, bankRefId, bankComment } = transaction
         return { amount, status, paymentType, disco, bankRefId, bankComment }
     }
+    static trimTransactionResponse(transaction: Partial<Transaction>): Partial<Transaction> {
+        delete transaction.events
+        delete transaction.previousVendors
+        delete transaction.retryRecord
+        delete transaction.superagent
+
+        return transaction
+    }
 
     static trimPowerUnit(powerUnit: PowerUnit) {
         return {
@@ -32,7 +40,8 @@ class ResponseTrimmer {
             companyName: partner.companyName,
             email: partner.email,
             profilePicture: partner.entity.profilePicture,
-            entityId: partner.entity.id
+            entityId: partner.entity.id,
+            partnerCode: partner.partnerCode
         }
     }
 }

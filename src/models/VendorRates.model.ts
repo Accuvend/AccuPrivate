@@ -1,5 +1,5 @@
 // Import necessary modules and dependencies
-import { Table, Column, Model, DataType, BelongsTo, ForeignKey, IsUUID, PrimaryKey } from "sequelize-typescript";
+import { Table, Column, Model, DataType, BelongsTo, ForeignKey, IsUUID, PrimaryKey, Unique } from "sequelize-typescript";
 import ProductCode from "./ProductCode.model";
 
 // Define the Sequelize model for the "VendorRates" table
@@ -8,12 +8,13 @@ export default class VendorRates extends Model<IVendorRates | VendorRates> {
     // Unique identifier for the vendor rates
     @IsUUID(4)
     @PrimaryKey
+    @Unique
     @Column
     id: string;
 
     // Vendor name (e.g., Baxi, BuyPower, iRecharge)
-    @Column({ type: DataType.STRING, allowNull: false })
-    vendorName: string;
+    @Column({ type: DataType.ENUM('IRECHARGE', 'BUYPOWERNG', 'BAXI'), allowNull: false })
+    vendorName: 'IRECHARGE' | 'BUYPOWERNG' | 'BAXI';
 
     // Disco code associated with the vendor
     @Column({ type: DataType.STRING, allowNull: false })
@@ -22,6 +23,15 @@ export default class VendorRates extends Model<IVendorRates | VendorRates> {
     // Commission rate for the vendor
     @Column({ type: DataType.FLOAT, allowNull: false })
     commission: number;
+
+    @Column({ type: DataType.FLOAT, allowNull: false, defaultValue: 0 })
+    bonus: number;
+
+    @Column({ type: DataType.STRING, allowNull: true })
+    title: string;
+
+    @Column({ type: DataType.STRING, allowNull: true })
+    validity: string;
 
     // Foreign key for the associated ProductCode
     @ForeignKey(() => ProductCode)
@@ -37,8 +47,11 @@ export default class VendorRates extends Model<IVendorRates | VendorRates> {
 // Define an interface representing vendor rates (IVendorRates) with various properties.
 export interface IVendorRates {
     id: string; // Unique identifier for the vendor rates
-    vendorName: string; // Vendor name (e.g., Baxi, BuyPower, iRecharge)
+    vendorName: 'IRECHARGE' | 'BUYPOWERNG' | 'BAXI'; // Vendor name (e.g., Baxi, BuyPower, iRecharge)
     discoCode: string; // Disco code associated with the vendor
     commission: number; // Commission rate for the vendor
     productCodeId: string; // Unique identifier of the associated ProductCode
+    bonus: number;
+    title: string | undefined;
+    validity: string | undefined;
 }

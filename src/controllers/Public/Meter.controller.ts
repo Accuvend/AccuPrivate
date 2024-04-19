@@ -3,6 +3,7 @@ import { ITransaction } from "../../models/Transaction.model";
 import { NotFoundError } from "../../utils/Errors";
 import MeterService from "../../services/Meter.service";
 import Meter from "../../models/Meter.model";
+require('newrelic');
 
 interface getTransactionInfoRequestBody {
     bankRefId: string

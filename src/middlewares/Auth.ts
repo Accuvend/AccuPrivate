@@ -7,6 +7,7 @@ import Cypher from "../utils/Cypher";
 import { AuthenticatedRequest } from "../utils/Interface";
 import ApiKeyService from "../services/ApiKey.service ";
 import logger from "../utils/Logger";
+require('newrelic');
 
 export const basicAuth = function (tokenType: AuthToken) {
     return async (req: Request, res: Response, next: NextFunction) => {

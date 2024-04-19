@@ -1,0 +1,700 @@
+[
+    {
+        "bundleCode": "MTN001",
+        "bundle": "MTN 20000  Xtradata 20000 Monthly Bundle ",
+        "amount": 20000,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN002",
+        "bundle": "MTN 15000  Xtradata 15000 Monthly Bundle ",
+        "amount": 15000,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN003",
+        "bundle": "MTN 10000  Xtradata 10000 Monthly Bundle ",
+        "amount": 10000,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN004",
+        "bundle": "MTN 5000  Xtradata 5000 Monthly Bundle ",
+        "amount": 5000,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN005",
+        "bundle": "MTN 2000  Xtradata 2000 Monthly Bundle ",
+        "amount": 2000,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN006",
+        "bundle": "MTN 1000  Xtradata 1000 Monthly Bundle ",
+        "amount": 1000,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN007",
+        "bundle": "MTN 500  Xtradata 500 Weekly Bundle ",
+        "amount": 500,
+        "vendors": [
+            "IRECHARGE"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN008",
+        "bundle": "MTN 20000  Xtratalk 20000 Monthly Bundle ",
+        "amount": 20000,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN009",
+        "bundle": "MTN 15000  Xtratalk 15000 Monthly Bundle ",
+        "amount": 15000,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN010",
+        "bundle": "MTN 10000  Xtratalk 10000 Monthly Bundle ",
+        "amount": 10000,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN011",
+        "bundle": "MTN 5000  Xtratalk 5000 Monthly Bundle ",
+        "amount": 5000,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN012",
+        "bundle": "MTN 2000  Xtratalk 2000 Monthly Bundle ",
+        "amount": 2000,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN013",
+        "bundle": "MTN 1000  Xtratalk 1000 Monthly Bundle ",
+        "amount": 1000,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN014",
+        "bundle": "MTN 500  Xtratalk 500 Weekly Bundle ",
+        "amount": 500,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN015",
+        "bundle": "MTN 300  Xtratalk 300 Weekly Bundle\\r\\nXtratalk 300 Weekly Bundle ",
+        "amount": 300,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN016",
+        "bundle": "MTN 300  Xtradata 300 Weekly Bundle ",
+        "amount": 300,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN017",
+        "bundle": "MTN 200  Xtratalk 200 3days Bundle\\r\\nXtratalk 200 3days Bundle ",
+        "amount": 200,
+        "vendors": [
+            "IRECHARGE",
+            "BAXI",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN018",
+        "bundle": "MTN 2000  7GB Weekly Bundle ",
+        "amount": 2000,
+        "vendors": [
+            "IRECHARGE"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN019",
+        "bundle": "MTN 350000  1TB SME 3-Months Plan ",
+        "amount": 350000,
+        "vendors": [
+            "IRECHARGE"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN020",
+        "bundle": "MTN 50000  165GB SME 2-Months Plan ",
+        "amount": 50000,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN021",
+        "bundle": "MTN 120000  400GB Yearly Plan ",
+        "amount": 120000,
+        "vendors": [
+            "IRECHARGE",
+            "BAXI",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN022",
+        "bundle": "MTN 22000  120GB Monthly Plan + 80mins. ",
+        "amount": 22000,
+        "vendors": [
+            "IRECHARGE"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN023",
+        "bundle": "MTN 3500  10GB+2GB YouTube Night+300MB YouTube Music + 20mins. ",
+        "amount": 3500,
+        "vendors": [
+            "IRECHARGE"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN024",
+        "bundle": "MTN 3000  8GB+2GB YouTube Night+200MB YouTube Music + 15mins. ",
+        "amount": 3000,
+        "vendors": [
+            "IRECHARGE"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN025",
+        "bundle": "MTN 1500  5GB Weekly Plan ",
+        "amount": 1500,
+        "vendors": [
+            "IRECHARGE"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN026",
+        "bundle": "MTN 600  1GB Weekly Plan + FREE 1GB for YouTube and 100MB for YouTube Music + 5mins. ",
+        "amount": 600,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN027",
+        "bundle": "MTN 600  2.5GB 2-Day Plan ",
+        "amount": 600,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN028",
+        "bundle": "MTN 10000  25GB SME Monthly Plan ",
+        "amount": 10000,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN029",
+        "bundle": "MTN 800  3GB 2-Days Bundle ",
+        "amount": 800,
+        "vendors": [
+            "IRECHARGE"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN030",
+        "bundle": "MTN 100000  360GB SME 3-Months Plan ",
+        "amount": 100000,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN031",
+        "bundle": "MTN 100  DataPlan 100MB Daily ",
+        "amount": 100,
+        "vendors": [
+            "IRECHARGE",
+            "BAXI",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN032",
+        "bundle": "MTN 16000  75GB Monthly Plan + 40mins. ",
+        "amount": 16000,
+        "vendors": [
+            "IRECHARGE",
+            "BAXI"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN033",
+        "bundle": "MTN 350  1GB Daily Plan + 3mins. ",
+        "amount": 350,
+        "vendors": [
+            "IRECHARGE"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN034",
+        "bundle": "MTN 6500  25GB+2GB YouTube Night + 25mins. ",
+        "amount": 6500,
+        "vendors": [
+            "IRECHARGE"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN035",
+        "bundle": "MTN 1600  3GB+2GB YouTube Night+200MB YouTube Music + 5mins. ",
+        "amount": 1600,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN036",
+        "bundle": "MTN 30000  160GB 2-Month Plan ",
+        "amount": 30000,
+        "vendors": [
+            "IRECHARGE"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN037",
+        "bundle": "MTN 450000  1-Year Plan ",
+        "amount": 450000,
+        "vendors": [
+            "IRECHARGE",
+            "BAXI"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN038",
+        "bundle": "MTN 250000  2.5TB Yearly Plan ",
+        "amount": 250000,
+        "vendors": [
+            "IRECHARGE"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN039",
+        "bundle": "MTN 100000  1 year Plan ",
+        "amount": 100000,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN040",
+        "bundle": "MTN 75000  600GB 3-Month Plan ",
+        "amount": 75000,
+        "vendors": [
+            "IRECHARGE"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN041",
+        "bundle": "MTN 50000  400GB 3-Month Plan ",
+        "amount": 50000,
+        "vendors": [
+            "IRECHARGE"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN042",
+        "bundle": "MTN 20000  100GB 2-Month Plan ",
+        "amount": 20000,
+        "vendors": [
+            "IRECHARGE"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN043",
+        "bundle": "MTN 11000  40GB Monthly Plan + 40mins. ",
+        "amount": 11000,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN044",
+        "bundle": "MTN 5500  20GB+2GB YouTube Night+300MB YouTube Music + 25mins. ",
+        "amount": 5500,
+        "vendors": [
+            "IRECHARGE",
+            "BAXI"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN045",
+        "bundle": "MTN 4000  12GB+2GB YouTube Night + 25mins. ",
+        "amount": 4000,
+        "vendors": [
+            "IRECHARGE",
+            "BAXI",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN046",
+        "bundle": "MTN 2000  4GB+2GB YouTube Night+200MB YouTube Music + 10mins. ",
+        "amount": 2000,
+        "vendors": [
+            "IRECHARGE"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN047",
+        "bundle": "MTN 200  Data Plan 200MB 3-Day Plan ",
+        "amount": 200,
+        "vendors": [
+            "IRECHARGE",
+            "BAXI",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN048",
+        "bundle": "MTN 1000  1.2GB Monthly Plan + FREE 2GB for YouTube and 200MB for YouTube Music + 5mins. ",
+        "amount": 1000,
+        "vendors": [
+            "IRECHARGE"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN049",
+        "bundle": "MTN 6500  27GB Monthly Plan + 25mins. ",
+        "amount": 6500,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN050",
+        "bundle": "MTN 5500  22GB Monthly Plan + 25mins. ",
+        "amount": 5500,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN051",
+        "bundle": "MTN 4000  13GB Monthly Plan + 25mins. ",
+        "amount": 4000,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN052",
+        "bundle": "MTN 3500  11GB Monthly Plan + 20mins. ",
+        "amount": 3500,
+        "vendors": [
+            "IRECHARGE",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN053",
+        "bundle": "MTN 1200  1.5GB+2.4GB YouTube Night+3hr-200MB-YouTube Weekly + 5mins. ",
+        "amount": 1200,
+        "vendors": [
+            "IRECHARGE",
+            "BAXI",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN054",
+        "bundle": "MTN 13500  35GB SME Monthly Plan ",
+        "amount": 13500,
+        "vendors": [
+            "IRECHARGE"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN055",
+        "bundle": "MTN 50000  150GB ",
+        "amount": 50000,
+        "vendors": [
+            "BAXI",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN056",
+        "bundle": "MTN 2500  6GB ",
+        "amount": 2500,
+        "vendors": [
+            "BAXI",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN057",
+        "bundle": "MTN 3300  10GB ",
+        "amount": 3300,
+        "vendors": [
+            "BAXI",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN058",
+        "bundle": "MTN 100000  325GB ",
+        "amount": 100000,
+        "vendors": [
+            "BAXI"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN059",
+        "bundle": "MTN 30000  120GB ",
+        "amount": 30000,
+        "vendors": [
+            "BAXI",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN060",
+        "bundle": "MTN 2200  4.5GB 1-Month All Day plan ",
+        "amount": 2200,
+        "vendors": [
+            "BAXI",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN061",
+        "bundle": "MTN 550  750MB 2-Week Plan ",
+        "amount": 550,
+        "vendors": [
+            "BAXI",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN062",
+        "bundle": "MTN 1500  6GB ",
+        "amount": 1500,
+        "vendors": [
+            "BAXI"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN063",
+        "bundle": "MTN 300  350MB ",
+        "amount": 300,
+        "vendors": [
+            "BAXI",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN064",
+        "bundle": "MTN 300000  1000GB ",
+        "amount": 300000,
+        "vendors": [
+            "BAXI"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN065",
+        "bundle": "MTN 1200  2GB ",
+        "amount": 1200,
+        "vendors": [
+            "BAXI",
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN066",
+        "bundle": "MTN 75000  250GB ",
+        "amount": 75000,
+        "vendors": [
+            "BAXI"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN067",
+        "bundle": "MTN 450000   360days ",
+        "amount": 450000,
+        "vendors": [
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN068",
+        "bundle": "MTN 20000   30days ",
+        "amount": 20000,
+        "vendors": [
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN069",
+        "bundle": "MTN 5000   30days ",
+        "amount": 5000,
+        "vendors": [
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN070",
+        "bundle": "MTN 5000   30days ",
+        "amount": 5000,
+        "vendors": [
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN071",
+        "bundle": "MTN 250000   360days ",
+        "amount": 250000,
+        "vendors": [
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    },
+    {
+        "bundleCode": "MTN072",
+        "bundle": "MTN 75000   90days ",
+        "amount": 75000,
+        "vendors": [
+            "BUYPOWERNG"
+        ],
+        "dataCodes": {}
+    }
+]

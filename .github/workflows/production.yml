@@ -1,4 +1,4 @@
-name: ci-cd - test
+name: ci-cd - production
 
 on:
   push:
@@ -31,6 +31,7 @@ jobs:
       run: |
         BAXI_TOKEN=${{ secrets.BAXI_TOKEN}}
         echo $BAXI_TOKEN
+        
   # Generates the Env file and pushes to s3 bucket 
   generate-env-file:
     name: generate-env-file

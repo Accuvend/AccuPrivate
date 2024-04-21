@@ -391,8 +391,8 @@ jobs:
             DB_USERNAME=$(grep DB_USER_NAME ./.env | cut -d "=" -f2) &&\
             DB_PASSWORD=$(grep DB_PASSWORD ./.env | cut -d "=" -f2) &&\
             DB_NAME=$(grep DB_DB_NAME ./.env | cut -d "=" -f2) &&\
-            DB_HOST=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Sand Box (Prod) DB Instance 1" --query "Reservations[].Instances[].[PublicIpAddress]" --output text)
-            LOG_DB_HOST=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Sand Box (Prod) DB Instance 2" --query "Reservations[].Instances[].[PublicIpAddress]" --output text)
+            DB_HOST=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Sand Box (Prod) DB Instance 1" --query "Reservations[].Instances[].[PrivateIpAddress]" --output text)
+            LOG_DB_HOST=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Sand Box (Prod) DB Instance 2" --query "Reservations[].Instances[].[PrivateIpAddress]" --output text)
 
             echo $DB_HOST
             echo $LOG_DB_HOST

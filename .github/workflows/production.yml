@@ -213,7 +213,7 @@ jobs:
   scan-backend: 
     name: scan-backend
     runs-on: ubuntu-latest
-    if : github.ref == 'refs/heads/sandbox'
+    if : github.ref == 'refs/heads/production'
     # needs: [test-backend]
     needs: [generate-env-file]
     steps: 
@@ -237,7 +237,7 @@ jobs:
   build-backend:
     name: build-backend
     needs: [scan-backend]
-    if : github.ref == 'refs/heads/sandbox'
+    if : github.ref == 'refs/heads/production'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -289,7 +289,7 @@ jobs:
   push-build:
     name: push-build
     needs: [build-backend]
-    if : github.ref == 'refs/heads/sandbox'
+    if : github.ref == 'refs/heads/production'
     runs-on: ubuntu-latest
     steps:
       - name: chechkout
@@ -327,7 +327,7 @@ jobs:
   deploy-build:
     name: deploy-build
     needs: [push-build]
-    if : github.ref == 'refs/heads/sandbox'
+    if : github.ref == 'refs/heads/production'
     runs-on: ubuntu-latest
     steps:
       - name: chechkout
@@ -360,13 +360,13 @@ jobs:
             cd /home/ubuntu/
             pm2 stop server #stop the server 
             # GET THE LATEST_SUCCESSFUL_RUN_ID 
-            if aws s3 cp s3://accuvend-bucket-configuration/staging_last_run.txt ./staging_last_run.txt | grep "does not exist" 
+            if aws s3 cp s3://accuvend-bucket-configuration/prod_last_run.txt ./prod_last_run.txt | grep "does not exist" 
             then
                 echo 'FILE DOES NOT EXIST'
                 LAST_SUCCESSFUL_RUN_NUMBER=0               
             else
                 echo 'FILE EXIST'
-                LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./staging_last_run.txt | cut -d "=" -f2)            
+                LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./prod_last_run.txt | cut -d "=" -f2)            
             fi
             #rename the old folder 
             echo "$LAST_SUCCESSFUL_RUN_NUMBER"
@@ -405,7 +405,7 @@ jobs:
   # Smoke Test to check if server is up and running 
   smoke-test:
     name: smoke-test
-    if : github.ref == 'refs/heads/sandbox'
+    if : github.ref == 'refs/heads/production'
     runs-on: ubuntu-latest
     needs: [deploy-build]
     outputs:
@@ -437,7 +437,7 @@ jobs:
   roll-back:
     name: roll-back
     needs: smoke-test
-    if : github.ref == 'refs/heads/sandbox'
+    if : github.ref == 'refs/heads/production'
     runs-on: ubuntu-latest
     steps: 
       - name: Configure AWS Credentials
@@ -463,13 +463,13 @@ jobs:
               cd /home/ubuntu/
               pm2 stop server #stop the server 
               # GET THE LATEST_SUCCESSFUL_RUN_ID 
-              if aws s3 cp s3://accuvend-bucket-configuration/staging_last_run.txt ./staging_last_run.txt | grep "does not exist" 
+              if aws s3 cp s3://accuvend-bucket-configuration/prod_last_run.txt ./prod_last_run.txt | grep "does not exist" 
               then
                   echo 'FILE DOES NOT EXIST'
                   LAST_SUCCESSFUL_RUN_NUMBER=0               
               else
                   echo 'FILE EXIST'
-                  LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./staging_last_run.txt | cut -d "=" -f2)            
+                  LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./prod_last_run.txt | cut -d "=" -f2)            
               fi
               #rename the old folder 
               echo "$LAST_SUCCESSFUL_RUN_NUMBER"
@@ -490,7 +490,7 @@ jobs:
   # Fail stage initiate on successful roll back 
   fail-stage-on-rollback: 
     name:  fail-stage-on-rollback
-    if : github.ref == 'refs/heads/sandbox'
+    if : github.ref == 'refs/heads/production'
     needs: [roll-back, smoke-test ]
     runs-on: ubuntu-latest
     steps: 
@@ -510,7 +510,7 @@ jobs:
   clean-up:
     name: clean-up
     needs: [roll-back, smoke-test]
-    if : github.ref == 'refs/heads/sandbox'
+    if : github.ref == 'refs/heads/production'
     runs-on: ubuntu-latest
     steps: 
       - name: Configure AWS Credentials
@@ -558,13 +558,13 @@ jobs:
               cd /home/ubuntu/
               pm2 stop server #stop the server 
               # GET THE LATEST_SUCCESSFUL_RUN_ID 
-              if aws s3 cp s3://accuvend-bucket-configuration/staging_last_run.txt ./staging_last_run.txt | grep "does not exist" 
+              if aws s3 cp s3://accuvend-bucket-configuration/prod_last_run.txt ./prod_last_run.txt | grep "does not exist" 
               then
                   echo 'FILE DOES NOT EXIST'
                   LAST_SUCCESSFUL_RUN_NUMBER=0               
               else
                   echo 'FILE EXIST'
-                  LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./staging_last_run.txt | cut -d "=" -f2)            
+                  LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./prod_last_run.txt | cut -d "=" -f2)            
               fi
               #delete the old folder 
               echo "$LAST_SUCCESSFUL_RUN_NUMBER"
@@ -586,8 +586,8 @@ jobs:
   # Add RUN_id has last successful run
   save-latest-successful_run:
     name: save-latest-successful-run
-    # if : github.ref == 'refs/heads/sandbox' && needs.smoke-test.outputs.smoke_test_result == '1'
-    if : github.ref == 'refs/heads/sandbox'
+    # if : github.ref == 'refs/heads/production' && needs.smoke-test.outputs.smoke_test_result == '1'
+    if : github.ref == 'refs/heads/production'
     needs: [fail-stage-on-rollback , clean-up]
     # needs: [roll-back, smoke-test]
     runs-on: ubuntu-latest
@@ -603,13 +603,13 @@ jobs:
           PRIVATE_KEY: ${{ secrets.SAND_BOX_SSH_KEY }}
           GITHUB_RUN_NUMBER: ${{ secrets.GITHUB_RUN_NUMBER }}
         run: |
-          echo "LAST_SUCCESSFUL_RUN_ID=$GITHUB_RUN_NUMBER" > staging_last_run.txt
-          aws s3 cp ./staging_last_run.txt s3://accuvend-bucket-configuration/staging_last_run.txt
+          echo "LAST_SUCCESSFUL_RUN_ID=$GITHUB_RUN_NUMBER" > prod_last_run.txt
+          aws s3 cp ./prod_last_run.txt s3://accuvend-bucket-configuration/prod_last_run.txt
         
   # create-update-environment:
   #   name: create-environment
   #   needs: [push-build]
-  #   if : github.ref == 'refs/heads/sandbox'
+  #   if : github.ref == 'refs/heads/production'
   #   runs-on: ubuntu-latest
   #   steps:
   #   - name: Checkout

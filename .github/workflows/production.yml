@@ -321,7 +321,7 @@ jobs:
           unzip dist.zip 
           ls -R dist
           cp ./dist.zip proddist.zip
-          aws s3 cp ./dist.zip s3://staging-bucket-deployment/ 
+          aws s3 cp ./proddist.zip s3://staging-bucket-deployment/ 
 
   # Depolys the backend to sandbox
   deploy-build:
@@ -392,6 +392,9 @@ jobs:
             DB_NAME=$(grep DB_DB_NAME ./.env | cut -d "=" -f2) &&\
             DB_HOST=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Sand Box (Prod) DB Instance 1" --query "Reservations[].Instances[].[PublicIpAddress]" --output text)
             LOG_DB_HOST=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Sand Box (Prod) DB Instance 2" --query "Reservations[].Instances[].[PublicIpAddress]" --output text)
+
+            echo $DB_HOST
+            echo $LOG_DB_HOST
             
             echo "DB_URL=postgres://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:5432/$DB_NAME" >> .env
             echo "LOG_DB_URL=postgres://$DB_USERNAME:$DB_PASSWORD@$LOG_DB_HOST:5432/$DB_NAME" >> .env

@@ -385,7 +385,7 @@ jobs:
             cd dist
 
             # Get ENV file
-            aws s3 cp s3://accuvend-bucket-configuration/.env ./.env
+            aws s3 cp s3://accuvend-bucket-configuration/prod.env ./.env
             
             #GET DATABASE CREDENTINALS
             DB_USERNAME=$(grep DB_USER_NAME ./.env | cut -d "=" -f2) &&\

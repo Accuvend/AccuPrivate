@@ -81,7 +81,7 @@ const retry = {
     count: 0,
     limit: 5,
     limitToStopRetryingWhenTransactionIsSuccessful: 20,
-    retryCountBeforeSwitchingVendor: 2,
+    retryCountBeforeSwitchingVendor: 3,
     testForSwitchingVendor: true,
 }
 

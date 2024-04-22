@@ -19,4 +19,4 @@ CREATE TABLE IF NOT EXISTS public."Passwords"
 TABLESPACE pg_default;
 
 ALTER TABLE IF EXISTS public."Passwords"
-    OWNER to postgres;
+    OWNER to accuvend;

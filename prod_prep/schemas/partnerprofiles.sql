@@ -19,4 +19,4 @@ CREATE TABLE IF NOT EXISTS public."PartnerProfiles"
 TABLESPACE pg_default;
 
 ALTER TABLE IF EXISTS public."PartnerProfiles"
-    OWNER to postgres;
+    OWNER to accuvend;

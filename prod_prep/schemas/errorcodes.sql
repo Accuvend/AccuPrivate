@@ -25,4 +25,4 @@ CREATE TABLE IF NOT EXISTS public."ErrorCodes"
 TABLESPACE pg_default;
 
 ALTER TABLE IF EXISTS public."ErrorCodes"
-    OWNER to postgres;
+    OWNER to accuvend;

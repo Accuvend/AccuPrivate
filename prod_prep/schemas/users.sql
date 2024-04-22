@@ -17,4 +17,4 @@ CREATE TABLE IF NOT EXISTS public."Users"
 TABLESPACE pg_default;
 
 ALTER TABLE IF EXISTS public."Users"
-    OWNER to postgres;
+    OWNER to accuvend;

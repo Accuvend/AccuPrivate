@@ -103,7 +103,12 @@ class NotificationHandler extends Registry {
             })
             .catch((error: AxiosError) => {
                 console.log(error.response?.data);
-                logger.error("Error sending sms", error);
+                logger.error("Error sending sms", {
+                    meta: {
+                        transactionId: transaction.id,
+                        error: error.response?.data,
+                    }
+                });
             });
         await transactionEventService.addTokenSentToUserEmailEvent();
 
@@ -173,6 +178,11 @@ class NotificationHandler extends Registry {
 
         // If you've not notified the partner before, notify them
         if (!notifyPartnerEvent) {
+            logger.info('Notification sent to partner', {
+                meta: {
+                    transactionId: transaction.id,
+                }
+            })
             await NotificationUtil.sendNotificationToUser(
                 partnerEntity.id,
                 notification,

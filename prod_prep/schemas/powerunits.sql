@@ -32,4 +32,4 @@ CREATE TABLE IF NOT EXISTS public."PowerUnits"
 TABLESPACE pg_default;
 
 ALTER TABLE IF EXISTS public."PowerUnits"
-    OWNER to postgres;
+    OWNER to accuvend;

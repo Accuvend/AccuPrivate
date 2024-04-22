@@ -178,6 +178,11 @@ class NotificationHandler extends Registry {
 
         // If you've not notified the partner before, notify them
         if (!notifyPartnerEvent) {
+            logger.info('Notification sent to partner', {
+                meta: {
+                    transactionId: transaction.id,
+                }
+            })
             await NotificationUtil.sendNotificationToUser(
                 partnerEntity.id,
                 notification,

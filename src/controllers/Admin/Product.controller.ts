@@ -54,24 +54,24 @@ export default class ProductController {
             throw new BadRequestError('Product ID is required');
         }
 
-        if (masterProductCode) {
-            const existingProductWithSameMasterProductCode = await ProductService.viewSingleProductByMasterProductCode(masterProductCode);
-            if (existingProductWithSameMasterProductCode) {
-                throw new BadRequestError('Product with same master product code already exists');
-            }
-        }
+        // if (masterProductCode) {
+        //     const existingProductWithSameMasterProductCode = await ProductService.viewSingleProductByMasterProductCode(masterProductCode);
+        //     if (existingProductWithSameMasterProductCode) {
+        //         throw new BadRequestError('Product with same master product code already exists');
+        //     }
+        // }
 
         const product = await ProductService.viewSingleProduct(productId);
         if (!product) {
             throw new NotFoundError('Product not found');
         }
 
-        if ((category === 'DATA' || category === 'AIRTIME') && productName) {
-            const existingProductcodeWithSameName = await ProductService.viewProductCodeByProductName(productName);
-            if (existingProductcodeWithSameName) {
-                throw new BadRequestError('Product with same name already exists');
-            }
-        }
+        // if ((category === 'DATA' || category === 'AIRTIME') && productName) {
+        //     const existingProductcodeWithSameName = await ProductService.viewProductCodeByProductName(productName);
+        //     if (existingProductcodeWithSameName) {
+        //         throw new BadRequestError('Product with same name already exists');
+        //     }
+        // }
 
         const data = { masterProductCode, category, type, productName };
         const updatedProduct = await ProductService.updateProduct(productId, data);

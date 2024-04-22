@@ -19,4 +19,4 @@ CREATE TABLE IF NOT EXISTS public."ResponsePaths"
 TABLESPACE pg_default;
 
 ALTER TABLE IF EXISTS public."ResponsePaths"
-    OWNER to postgres;
+    OWNER to accuvend;

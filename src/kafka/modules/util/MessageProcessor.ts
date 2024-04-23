@@ -25,6 +25,7 @@ export default class MessageProcessorFactory {
             logger.error((error as Error).message ?? "An Error occured while processing message", {
                 meta: {
                     messageData,
+                    errorData: error,
                     transactionId: messageData.value.transactionId
                 }
             })
@@ -62,7 +63,8 @@ export default class MessageProcessorFactory {
             console.log(error)
             logger.error((error as Error).message ?? "An Error occured while processing message", {
                 meta: {
-                    messaageData: messagePayload.message,
+                    messageData: messagePayload.message,
+                    errorData: error,
                     transactionId: data.value.transactionId
                 }
             })

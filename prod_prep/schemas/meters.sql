@@ -22,4 +22,4 @@ CREATE TABLE IF NOT EXISTS public."Meters"
 TABLESPACE pg_default;
 
 ALTER TABLE IF EXISTS public."Meters"
-    OWNER to postgres;
+    OWNER to accuvend;

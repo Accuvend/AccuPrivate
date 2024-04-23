@@ -25,4 +25,4 @@ CREATE TABLE IF NOT EXISTS public."ComplaintReplies"
 TABLESPACE pg_default;
 
 ALTER TABLE IF EXISTS public."ComplaintReplies"
-    OWNER to postgres;
+    OWNER to accuvend;

@@ -20,4 +20,4 @@ CREATE TABLE IF NOT EXISTS public."SysLogs"
 TABLESPACE pg_default;
 
 ALTER TABLE IF EXISTS public."SysLogs"
-    OWNER to postgres;
+    OWNER TO accuvend;

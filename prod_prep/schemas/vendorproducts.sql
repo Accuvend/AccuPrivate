@@ -39,4 +39,4 @@ CREATE TABLE IF NOT EXISTS public."VendorProducts"
 TABLESPACE pg_default;
 
 ALTER TABLE IF EXISTS public."VendorProducts"
-    OWNER to postgres;
+    OWNER to accuvend;

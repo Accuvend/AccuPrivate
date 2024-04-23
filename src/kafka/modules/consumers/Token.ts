@@ -1209,10 +1209,10 @@ class TokenHandler extends Registry {
                     existingTransaction.superagent,
                     data.scheduledMessagePayload.superAgent,
                 )
-                await transactionEventService.addScheduleRequeryEvent({
-                    timeStamp: new Date().toString(),
-                    waitTime: delayInSeconds
-                })
+                await transactionEventService.addGetTransactionTokenRequestedFromVendorRetryEvent({
+                    cause: TransactionErrorCause.RESCHEDULED_BEFORE_WAIT_TIME,
+                    code: 202,
+                }, data.scheduledMessagePayload.retryCount + 1);
                 return await VendorPublisher.publishEventForGetTransactionTokenRequestedFromVendorRetry(data.scheduledMessagePayload)
             }
 

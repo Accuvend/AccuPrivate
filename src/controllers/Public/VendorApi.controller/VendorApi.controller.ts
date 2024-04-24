@@ -54,6 +54,14 @@ import PowerUnitService from "../../../services/PowerUnit.service";
 import { TokenUtil } from "../../../utils/Auth/Token";
 import ResponsePath from "../../../models/ResponsePath.model";
 import { Op } from "sequelize";
+
+enum MessageType {
+    INFORMATION = 'INFORMATION',
+    TOKEN = 'TOKEN',
+    WARNING = 'WARNING',
+    ERROR = 'ERROR',
+    SUCCESS = 'SUCCESS'
+}
 interface valideMeterRequestBody {
     meterNumber: string;
     superagent: "BUYPOWERNG" | "BAXI";
@@ -546,6 +554,7 @@ export default class VendorController {
         const responseData = {
             status: 'success',
             message: 'Meter validated successfully',
+            messageType: MessageType.INFORMATION,
             data: {
                 transaction: {
                     "id": transaction?.id
@@ -574,7 +583,7 @@ export default class VendorController {
         console.log({ transactionId, bankComment, vendType })
 
         const errorMeta = { transactionId: transactionId };
-        
+
         const transaction: Transaction | null =
             await TransactionService.viewSingleTransaction(transactionId);
         if (!transaction) {
@@ -686,6 +695,7 @@ export default class VendorController {
             const responseData = {
                 status: 'success',
                 message: 'Token purchase initiated successfully',
+                messageType: MessageType.INFORMATION,
                 data: {
                     transaction: {
                         disco: _product?.productName,
@@ -714,6 +724,8 @@ export default class VendorController {
                     // Send response if token has been gotten from vendor
                     responseData.data.meter = meterInfo
                     responseData.data.token = tokenFromVendor
+
+                    responseData.messageType = MessageType.TOKEN
                     res.status(200).json(responseData)
                     logger.info('Vend response sent to partner', {
                         meta: {
@@ -734,6 +746,7 @@ export default class VendorController {
                         // Send response if token has not been gotten from vendor
                         Logger.apiRequest.info('Token purchase initiated successfully', { meta: { transactionId: transaction.id, ...responseData } })
                         responseData.message = 'Transaction is being processed'
+                        responseData.messageType = MessageType.INFORMATION
                         res.status(200).json(responseData)
                         logger.info('Vend response sent to partner', {
                             meta: {
@@ -750,6 +763,7 @@ export default class VendorController {
             const responseData = {
                 status: 'success',
                 message: 'Token purchase initiated successfully',
+                messageType: MessageType.TOKEN,
                 data: {
                     transaction: {
                         disco: transaction.disco,

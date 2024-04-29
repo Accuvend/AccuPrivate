@@ -22,7 +22,7 @@ export default class MessageProcessorFactory {
         try {
             await handler(messageData.value)
         } catch (error) {
-            logger.error((error as Error).message ?? "An Error occured while processing message", {
+            logger.error('MESSAGE_PROCESSING_ERROR: ' + (error as Error).message ?? "An Error occured while processing message", {
                 meta: {
                     messageData,
                     errorData: error,
@@ -61,7 +61,7 @@ export default class MessageProcessorFactory {
             await messagePayload.heartbeat()
         } catch (error) {
             console.log(error)
-            logger.error((error as Error).message ?? "An Error occured while processing message", {
+            logger.error('MESSAGE_PROCESSING_ERROR: ' + (error as Error).message ?? "An Error occured while processing message", {
                 meta: {
                     messageData: messagePayload.message,
                     errorData: error,

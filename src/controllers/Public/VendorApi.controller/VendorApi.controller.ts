@@ -364,389 +364,370 @@ export default class VendorController {
 
     static async validateMeter(req: Request, res: Response, next: NextFunction) {
         // setting transaction name for validate meter in new relic
-        newrelic.setTransactionName('ValidateMeter')
-        const {
-            meterNumber,
-            email,
-            vendType,
-            channel,
-            amount
-        }: valideMeterRequestBody = req.body;
-        let { disco } = req.body;
-        const partnerId = (req as any).key;
+        return newrelic.startBackgroundTransaction('ValidateMeter', async function () {
+            const {
+                meterNumber,
+                email,
+                vendType,
+                channel,
+                amount
+            }: valideMeterRequestBody = req.body;
+            let { disco } = req.body;
+            const partnerId = (req as any).key;
 
-        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-        if (!emailRegex.test(email)) {
-            throw new BadRequestError("Invalid email address");
-        }
+            const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            if (!emailRegex.test(email)) {
+                throw new BadRequestError("Invalid email address");
+            }
 
-        let phoneNumber = req.body.phoneNumber
-        phoneNumber = transformPhoneNumber(phoneNumber)
+            let phoneNumber = req.body.phoneNumber
+            phoneNumber = transformPhoneNumber(phoneNumber)
 
-        const transactionId = uuidv4()
-        const errorMeta = { transactionId: transactionId }
-        const existingProductCodeForDisco = await ProductService.viewSingleProductByProductNameAndVendType(disco, vendType)
-        if (!existingProductCodeForDisco) {
-            throw new NotFoundError('Product code not found for disco', errorMeta)
-        }
+            const transactionId = uuidv4()
+            const errorMeta = { transactionId: transactionId }
+            const existingProductCodeForDisco = await ProductService.viewSingleProductByProductNameAndVendType(disco, vendType)
+            if (!existingProductCodeForDisco) {
+                throw new NotFoundError('Product code not found for disco', errorMeta)
+            }
 
-        if (parseInt(amount.toString()) < 1000) {
-            logger.error('Mininum vend amount is 1000', { meta: { transactionId } })
-            throw new BadRequestError("Mininum vend amount is 1000");
-        }
+            if (parseInt(amount.toString()) < 1000) {
+                logger.error('Mininum vend amount is 1000', { meta: { transactionId } })
+                throw new BadRequestError("Mininum vend amount is 1000");
+            }
 
-        disco = existingProductCodeForDisco.masterProductCode
+            disco = existingProductCodeForDisco.masterProductCode
 
-        if (existingProductCodeForDisco.category.toUpperCase() !== 'ELECTRICITY') {
-            throw new BadRequestError('Invalid product code for electricity', errorMeta)
-        }
+            if (existingProductCodeForDisco.category.toUpperCase() !== 'ELECTRICITY') {
+                throw new BadRequestError('Invalid product code for electricity', errorMeta)
+            }
 
-        const superagent = await TokenHandlerUtil.getBestVendorForPurchase(existingProductCodeForDisco.id, 1000);
-        const transactionTypes = {
-            'ELECTRICITY': TransactionType.ELECTRICITY,
-            'AIRTIME': TransactionType.AIRTIME,
-            'DATA': TransactionType.DATA,
-            'CABLE': TransactionType.CABLE,
-        }
-        const transactionReference = generateRandomString(10)
-        const transaction: Transaction =
-            await TransactionService.addTransactionWithoutValidatingUserRelationship({
-                id: transactionId,
-                amount: amount.toString(),
-                status: Status.PENDING,
-                superagent: superagent,
-                paymentType: PaymentType.PAYMENT,
-                transactionTimestamp: new Date(),
-                disco: disco,
-                partnerId: partnerId,
-                reference: transactionId,
-                transactionType: transactionTypes[existingProductCodeForDisco.category],
-                productCodeId: existingProductCodeForDisco.id,
-                retryRecord: [],
-                previousVendors: [superagent],
-                vendorReferenceId: await generateVendorReference(),
-                productType: transactionTypes[existingProductCodeForDisco.category],
-                channel
+            const superagent = await TokenHandlerUtil.getBestVendorForPurchase(existingProductCodeForDisco.id, 1000);
+            const transactionTypes = {
+                'ELECTRICITY': TransactionType.ELECTRICITY,
+                'AIRTIME': TransactionType.AIRTIME,
+                'DATA': TransactionType.DATA,
+                'CABLE': TransactionType.CABLE,
+            }
+            const transactionReference = generateRandomString(10)
+            const transaction: Transaction =
+                await TransactionService.addTransactionWithoutValidatingUserRelationship({
+                    id: transactionId,
+                    amount: amount.toString(),
+                    status: Status.PENDING,
+                    superagent: superagent,
+                    paymentType: PaymentType.PAYMENT,
+                    transactionTimestamp: new Date(),
+                    disco: disco,
+                    partnerId: partnerId,
+                    reference: transactionId,
+                    transactionType: transactionTypes[existingProductCodeForDisco.category],
+                    productCodeId: existingProductCodeForDisco.id,
+                    retryRecord: [],
+                    previousVendors: [superagent],
+                    vendorReferenceId: await generateVendorReference(),
+                    productType: transactionTypes[existingProductCodeForDisco.category],
+                    channel
+                })
+
+            Logger.apiRequest.info("Validate meter requested", { meta: { transactionId: transaction.id, ...req.body } })
+            const transactionEventService = new EventService.transactionEventService(
+                transaction, { meterNumber, disco, vendType }, superagent, transaction.partner.email
+            );
+
+            await transactionEventService.addMeterValidationRequestedEvent();
+            await VendorPublisher.publishEventForMeterValidationRequested({
+                meter: { meterNumber, disco, vendType },
+                transactionId: transaction.id,
+                superAgent: superagent
+            });
+
+            const vendor = await Vendor.findOne({ where: { name: superagent } })
+            if (!vendor) throw new InternalServerError('Vendor not found', errorMeta)
+
+            const vendorProduct = await VendorProduct.findOne({
+                where: {
+                    productId: existingProductCodeForDisco.id,
+                    vendorId: vendor?.id
+                }
+            })
+            if (!vendorProduct) {
+                throw new NotFoundError('Vendor product not found', errorMeta)
+            }
+
+            const vendorDiscoCode = (vendorProduct.schemaData as VendorProductSchemaData.BUYPOWERNG).code
+            // We Check for Meter User *
+            const response = await VendorControllerValdator.validateMeter({ meterNumber, disco: vendorDiscoCode, vendType, transaction })
+            const userInfo = {
+                name: (response as any).name,
+                email: email,
+                address: (response as any).address,
+                phoneNumber: phoneNumber,
+                id: uuidv4(),
+            };
+
+            await transactionEventService.addMeterValidationReceivedEvent({ user: userInfo });
+            await VendorPublisher.publishEventForMeterValidationReceived({
+                meter: { meterNumber, disco, vendType },
+                transactionId: transaction.id,
+                user: userInfo,
+            });
+
+            await transactionEventService.addCRMUserInitiatedEvent({ user: userInfo });
+            await CRMPublisher.publishEventForInitiatedUser({
+                user: userInfo,
+                transactionId: transaction.id,
             })
 
-        Logger.apiRequest.info("Validate meter requested", { meta: { transactionId: transaction.id, ...req.body } })
-        const transactionEventService = new EventService.transactionEventService(
-            transaction, { meterNumber, disco, vendType }, superagent, transaction.partner.email
-        );
+            // // Add User if no record of user in db
+            const user = await UserService.addUserIfNotExists({
+                id: userInfo.id,
+                address: (response as any).address,
+                email: email,
+                name: (response as any).name,
+                phoneNumber: phoneNumber,
+            });
 
-        await transactionEventService.addMeterValidationRequestedEvent();
-        await VendorPublisher.publishEventForMeterValidationRequested({
-            meter: { meterNumber, disco, vendType },
-            transactionId: transaction.id,
-            superAgent: superagent
-        });
+            if (!user)
+                throw new InternalServerError("An error occured while validating meter", errorMeta);
 
-        const vendor = await Vendor.findOne({ where: { name: superagent } })
-        if (!vendor) throw new InternalServerError('Vendor not found', errorMeta)
-
-        const vendorProduct = await VendorProduct.findOne({
-            where: {
-                productId: existingProductCodeForDisco.id,
-                vendorId: vendor?.id
-            }
-        })
-        if (!vendorProduct) {
-            throw new NotFoundError('Vendor product not found', errorMeta)
-        }
-
-        const vendorDiscoCode = (vendorProduct.schemaData as VendorProductSchemaData.BUYPOWERNG).code
-        // We Check for Meter User *
-        const response = await VendorControllerValdator.validateMeter({ meterNumber, disco: vendorDiscoCode, vendType, transaction })
-        const userInfo = {
-            name: (response as any).name,
-            email: email,
-            address: (response as any).address,
-            phoneNumber: phoneNumber,
-            id: uuidv4(),
-        };
-
-        await transactionEventService.addMeterValidationReceivedEvent({ user: userInfo });
-        await VendorPublisher.publishEventForMeterValidationReceived({
-            meter: { meterNumber, disco, vendType },
-            transactionId: transaction.id,
-            user: userInfo,
-        });
-
-        await transactionEventService.addCRMUserInitiatedEvent({ user: userInfo });
-        await CRMPublisher.publishEventForInitiatedUser({
-            user: userInfo,
-            transactionId: transaction.id,
-        })
-
-        // // Add User if no record of user in db
-        const user = await UserService.addUserIfNotExists({
-            id: userInfo.id,
-            address: (response as any).address,
-            email: email,
-            name: (response as any).name,
-            phoneNumber: phoneNumber,
-        });
-
-        if (!user)
-            throw new InternalServerError("An error occured while validating meter", errorMeta);
-
-        await TransactionService.updateSingleTransaction(transaction.id, { userId: user?.id, irechargeAccessToken: (response as any).access_token, });
-        await transactionEventService.addCRMUserConfirmedEvent({ user: userInfo });
-        await CRMPublisher.publishEventForConfirmedUser({
-            user: userInfo,
-            transactionId: transaction.id,
-        })
-
-        // Check if disco is up
-        const discoUp =
-            superagent.toUpperCase() === "BUYPOWERNG"
-                ? await VendorService.buyPowerCheckDiscoUp(vendorDiscoCode).catch((e) => e)
-                : await VendorService.baxiCheckDiscoUp(vendorDiscoCode).catch((e) => e);
-
-        const discoUpEvent = discoUp instanceof Boolean ? await transactionEventService.addDiscoUpEvent() : false
-        discoUpEvent && await VendorPublisher.publishEventForDiscoUpCheckConfirmedFromVendor({
-            transactionId: transaction.id,
-            meter: { meterNumber, disco, vendType },
-        })
-
-        const retryRecord = {
-            retryCount: 1,
-            attempt: 1,
-            reference: [transactionReference],
-            vendor: superagent,
-        } as ITransaction['retryRecord'][number]
-
-        await transaction.update({
-            retryRecord: [retryRecord]
-        })
-
-        // // TODO: Publish event for disco up to kafka
-        const meter: Meter = await MeterService.addMeter({
-            id: uuidv4(),
-            address: (response as any).address,
-            meterNumber: meterNumber,
-            userId: user.id,
-            disco: disco,
-            vendType,
-        });
-
-        logger.info('Meter validation info', {
-            meta: {
+            await TransactionService.updateSingleTransaction(transaction.id, { userId: user?.id, irechargeAccessToken: (response as any).access_token, });
+            await transactionEventService.addCRMUserConfirmedEvent({ user: userInfo });
+            await CRMPublisher.publishEventForConfirmedUser({
+                user: userInfo,
                 transactionId: transaction.id,
-                user: {
-                    phoneNumber,
-                    email,
-                },
-                meter: meter
-            }
-        })
-        const update = await TransactionService.updateSingleTransaction(transaction.id, { meterId: meter.id })
-        console.log({ update: update?.superagent })
-        const successful =
-            transaction instanceof Transaction &&
-            user instanceof User &&
-            meter instanceof Meter;
-        if (!successful)
-            throw new InternalServerError("An error occured while validating meter", errorMeta);
+            })
 
-        // const responseData = { status: 'success', message: 'Meter validated successfully', data: { transaction: transaction, meter: meter } }
-        // updated to allow proper mapping
-        const responseData = {
-            status: 'success',
-            message: 'Meter validated successfully',
-            messageType: MessageType.INFORMATION,
-            data: {
-                transaction: {
-                    "id": transaction?.id
-                },
-                meter: {
-                    "address": meter?.address,
-                    "meterNumber": meter?.meterNumber,
-                    "vendType": meter?.vendType,
+            // Check if disco is up
+            const discoUp =
+                superagent.toUpperCase() === "BUYPOWERNG"
+                    ? await VendorService.buyPowerCheckDiscoUp(vendorDiscoCode).catch((e) => e)
+                    : await VendorService.baxiCheckDiscoUp(vendorDiscoCode).catch((e) => e);
+
+            const discoUpEvent = discoUp instanceof Boolean ? await transactionEventService.addDiscoUpEvent() : false
+            discoUpEvent && await VendorPublisher.publishEventForDiscoUpCheckConfirmedFromVendor({
+                transactionId: transaction.id,
+                meter: { meterNumber, disco, vendType },
+            })
+
+            const retryRecord = {
+                retryCount: 1,
+                attempt: 1,
+                reference: [transactionReference],
+                vendor: superagent,
+            } as ITransaction['retryRecord'][number]
+
+            await transaction.update({
+                retryRecord: [retryRecord]
+            })
+
+            // // TODO: Publish event for disco up to kafka
+            const meter: Meter = await MeterService.addMeter({
+                id: uuidv4(),
+                address: (response as any).address,
+                meterNumber: meterNumber,
+                userId: user.id,
+                disco: disco,
+                vendType,
+            });
+
+            logger.info('Meter validation info', {
+                meta: {
+                    transactionId: transaction.id,
+                    user: {
+                        phoneNumber,
+                        email,
+                    },
+                    meter: meter
+                }
+            })
+            const update = await TransactionService.updateSingleTransaction(transaction.id, { meterId: meter.id })
+            console.log({ update: update?.superagent })
+            const successful =
+                transaction instanceof Transaction &&
+                user instanceof User &&
+                meter instanceof Meter;
+            if (!successful)
+                throw new InternalServerError("An error occured while validating meter", errorMeta);
+
+            // const responseData = { status: 'success', message: 'Meter validated successfully', data: { transaction: transaction, meter: meter } }
+            // updated to allow proper mapping
+            const responseData = {
+                status: 'success',
+                message: 'Meter validated successfully',
+                messageType: MessageType.INFORMATION,
+                data: {
+                    transaction: {
+                        "id": transaction?.id
+                    },
+                    meter: {
+                        "address": meter?.address,
+                        "meterNumber": meter?.meterNumber,
+                        "vendType": meter?.vendType,
+                    }
                 }
             }
-        }
-        res.status(200).json(responseData);
+            res.status(200).json(responseData);
 
-        Logger.apiRequest.info("Meter validated successfully", { meta: { transactionId: transaction.id, ...responseData } })
-        await transactionEventService.addMeterValidationSentEvent(meter.id);
-        await VendorPublisher.publishEventForMeterValidationSentToPartner({
-            transactionId: transaction.id,
-            meter: { meterNumber, disco, vendType, id: meter.id },
+            Logger.apiRequest.info("Meter validated successfully", { meta: { transactionId: transaction.id, ...responseData } })
+            await transactionEventService.addMeterValidationSentEvent(meter.id);
+            await VendorPublisher.publishEventForMeterValidationSentToPartner({
+                transactionId: transaction.id,
+                meter: { meterNumber, disco, vendType, id: meter.id },
+            })
         })
     }
 
     static async requestToken(req: Request, res: Response, next: NextFunction) {
-        newrelic.setTransactionName('RequestToken')
-        const { transactionId, bankComment, vendType, bankRefId } =
-            req.query as Record<string, any>;
-        console.log({ transactionId, bankComment, vendType })
+        return newrelic.startBackgroundTransaction('RequestToken', async function () {
 
-        const errorMeta = { transactionId: transactionId };
+            const { transactionId, bankComment, vendType, bankRefId } =
+                req.query as Record<string, any>;
+            console.log({ transactionId, bankComment, vendType })
 
-        const transaction: Transaction | null =
-            await TransactionService.viewSingleTransaction(transactionId);
-        if (!transaction) {
-            throw new NotFoundError("Transaction not found", errorMeta);
-        }
+            const errorMeta = { transactionId: transactionId };
 
-        const amount = transaction.amount
-
-        if (transaction.status.toUpperCase() === Status.COMPLETE.toUpperCase() as any) {
-            throw new BadRequestError("Transaction already completed");
-        }
-
-        if (transaction.status.toUpperCase() !== Status.PENDING.toUpperCase()) {
-            throw new BadRequestError("Transaction not in pending state");
-        }
-
-        Logger.apiRequest.info('Requesting token for transaction', { meta: { transactionId: transaction.id, ...req.query } })
-
-        const meter = await transaction.$get("meter");
-        if (!meter) {
-            throw new InternalServerError("Transaction does not have a meter", errorMeta);
-        }
-
-        const vendor = await Vendor.findOne({ where: { name: transaction.superagent } })
-        if (!vendor) throw new InternalServerError('Vendor not found', errorMeta)
-
-        const vendorProduct = await VendorProduct.findOne({
-            where: {
-                productId: transaction.productCodeId,
-                vendorId: vendor.id
-            }
-        })
-        if (!vendorProduct) {
-            throw new NotFoundError('Vendor product not found', errorMeta)
-        }
-
-        const vendorDiscoCode = (vendorProduct.schemaData as VendorProductSchemaData.BUYPOWERNG).code
-
-        const meterInfo = {
-            meterNumber: meter.meterNumber,
-            disco: vendorDiscoCode,
-            vendType: meter.vendType,
-            id: meter.id,
-        }
-        let updatedTransaction = await TransactionService.viewSingleTransaction(transactionId)
-        if (!updatedTransaction) { throw new NotFoundError('Transaction not found') }
-
-        const transactionEventService = new EventService.transactionEventService(updatedTransaction, meterInfo, transaction.superagent, transaction.partner.email);
-        await transactionEventService.addPowerPurchaseInitiatedEvent(bankRefId, amount);
-
-        const { user, partnerEntity } = await VendorControllerValdator.requestToken({ bankRefId, transactionId, vendorDiscoCode, transaction });
-        await transaction.update({
-            bankRefId: bankRefId,
-            bankComment,
-            amount,
-            status: Status.INPROGRESS,
-        }).catch(e => {
-            if (e.name === 'SequelizeUniqueConstraintError') {
-                // Check if the key is the bankRefId
-                if (e.errors[0].message.includes('bankRefId')) {
-                    throw new BadRequestError('BankRefId should be a unique id')
-                }
+            const transaction: Transaction | null =
+                await TransactionService.viewSingleTransaction(transactionId);
+            if (!transaction) {
+                throw new NotFoundError("Transaction not found", errorMeta);
             }
 
-            throw e
-        });
+            const amount = transaction.amount
 
-        console.log({ transaction: transaction.superagent })
-        const response = await newrelic.startBackgroundTransaction('KafkaPublish:PowePurchaseInitiated', function () {
-            return VendorPublisher.publishEventForInitiatedPowerPurchase({
-                transactionId: transaction.id,
-                user: {
-                    name: user.name as string,
-                    email: user.email,
-                    address: user.address,
-                    phoneNumber: user.phoneNumber,
-                },
-                partner: {
-                    email: partnerEntity.email,
-                },
-                meter: meterInfo,
-                superAgent: transaction.superagent,
-                vendorRetryRecord: {
-                    retryCount: 1,
+            if (transaction.status.toUpperCase() === Status.COMPLETE.toUpperCase() as any) {
+                throw new BadRequestError("Transaction already completed");
+            }
+
+            if (transaction.status.toUpperCase() !== Status.PENDING.toUpperCase()) {
+                throw new BadRequestError("Transaction not in pending state");
+            }
+
+            Logger.apiRequest.info('Requesting token for transaction', { meta: { transactionId: transaction.id, ...req.query } })
+
+            const meter = await transaction.$get("meter");
+            if (!meter) {
+                throw new InternalServerError("Transaction does not have a meter", errorMeta);
+            }
+
+            const vendor = await Vendor.findOne({ where: { name: transaction.superagent } })
+            if (!vendor) throw new InternalServerError('Vendor not found', errorMeta)
+
+            const vendorProduct = await VendorProduct.findOne({
+                where: {
+                    productId: transaction.productCodeId,
+                    vendorId: vendor.id
                 }
             })
-        })
-
-        if (response instanceof Error) {
-            throw error
-        }
-
-        updatedTransaction = await TransactionService.viewSingleTransaction(transactionId)
-        if (!updatedTransaction) { throw new NotFoundError('Transaction not found') }
-        const logMeta = {
-            transactionId: transaction.id,
-        } as Record<string, any>
-
-        const _transaction = updatedTransaction.dataValues as Partial<Transaction>
-        delete _transaction.meter
-        delete _transaction.powerUnit
-        delete _transaction.events
-
-        const tokenFromVendor = await TokenUtil.getTokenFromCache('transaction_token:' + _transaction.id)
-        if (!tokenFromVendor) {
-            // removed to update endpoint reponse mapping
-            // const responseData = { status: 'success', message: 'Token purchase initiated successfully', data: { transaction: ResponseTrimmer.trimTransactionResponse(_transaction)}}
-            const _product = await ProductService.viewSingleProduct(_transaction.productCodeId || "")
-            const responseData = {
-                status: 'success',
-                message: 'Token purchase initiated successfully',
-                messageType: MessageType.INFORMATION,
-                data: {
-                    transaction: {
-                        disco: _product?.productName,
-                        "amount": _transaction?.amount,
-                        "transactionId": _transaction?.id,
-                        "id": _transaction?.id,
-                        "productType": _transaction?.productType,
-                        "transactionTimestamp": _transaction?.transactionTimestamp,
-                    }
-                } as Record<string, any>
+            if (!vendorProduct) {
+                throw new NotFoundError('Vendor product not found', errorMeta)
             }
 
-            const start = Date.now()
-            //  Ping redis every 20 seconds for the token
-            const intervalId = setInterval(async () => {
-                logger.info('Pinging redis for token')
-                const tokenFromVendor = await TokenUtil.getTokenFromCache('transaction_token:' + _transaction.id)
-                if (tokenFromVendor) {
-                    // Clear interval
-                    clearInterval(intervalId)
+            const vendorDiscoCode = (vendorProduct.schemaData as VendorProductSchemaData.BUYPOWERNG).code
 
-                    await TokenUtil.deleteTokenFromCache('transaction_token:' + _transaction.id)
+            const meterInfo = {
+                meterNumber: meter.meterNumber,
+                disco: vendorDiscoCode,
+                vendType: meter.vendType,
+                id: meter.id,
+            }
+            let updatedTransaction = await TransactionService.viewSingleTransaction(transactionId)
+            if (!updatedTransaction) { throw new NotFoundError('Transaction not found') }
 
-                    logger.info('Token from interval received => ' + tokenFromVendor)
+            const transactionEventService = new EventService.transactionEventService(updatedTransaction, meterInfo, transaction.superagent, transaction.partner.email);
+            await transactionEventService.addPowerPurchaseInitiatedEvent(bankRefId, amount);
 
-                    // Send response if token has been gotten from vendor
-                    responseData.data.meter = meterInfo
-                    responseData.data.token = tokenFromVendor
+            const { user, partnerEntity } = await VendorControllerValdator.requestToken({ bankRefId, transactionId, vendorDiscoCode, transaction });
+            await transaction.update({
+                bankRefId: bankRefId,
+                bankComment,
+                amount,
+                status: Status.INPROGRESS,
+            }).catch(e => {
+                if (e.name === 'SequelizeUniqueConstraintError') {
+                    // Check if the key is the bankRefId
+                    if (e.errors[0].message.includes('bankRefId')) {
+                        throw new BadRequestError('BankRefId should be a unique id')
+                    }
+                }
 
-                    responseData.messageType = MessageType.TOKEN
-                    res.status(200).json(responseData)
-                    logger.info('Vend response sent to partner', {
-                        meta: {
-                            transactionId: transaction.id,
-                            response: responseData
+                throw e
+            });
+
+            console.log({ transaction: transaction.superagent })
+            const response = await newrelic.startBackgroundTransaction('KafkaPublish:PowePurchaseInitiated', function () {
+                return VendorPublisher.publishEventForInitiatedPowerPurchase({
+                    transactionId: transaction.id,
+                    user: {
+                        name: user.name as string,
+                        email: user.email,
+                        address: user.address,
+                        phoneNumber: user.phoneNumber,
+                    },
+                    partner: {
+                        email: partnerEntity.email,
+                    },
+                    meter: meterInfo,
+                    superAgent: transaction.superagent,
+                    vendorRetryRecord: {
+                        retryCount: 1,
+                    }
+                })
+            })
+
+            if (response instanceof Error) {
+                throw error
+            }
+
+            updatedTransaction = await TransactionService.viewSingleTransaction(transactionId)
+            if (!updatedTransaction) { throw new NotFoundError('Transaction not found') }
+            const logMeta = {
+                transactionId: transaction.id,
+            } as Record<string, any>
+
+            const _transaction = updatedTransaction.dataValues as Partial<Transaction>
+            delete _transaction.meter
+            delete _transaction.powerUnit
+            delete _transaction.events
+
+            const tokenFromVendor = await TokenUtil.getTokenFromCache('transaction_token:' + _transaction.id)
+            if (!tokenFromVendor) {
+                // removed to update endpoint reponse mapping
+                // const responseData = { status: 'success', message: 'Token purchase initiated successfully', data: { transaction: ResponseTrimmer.trimTransactionResponse(_transaction)}}
+                const _product = await ProductService.viewSingleProduct(_transaction.productCodeId || "")
+                const responseData = {
+                    status: 'success',
+                    message: 'Token purchase initiated successfully',
+                    messageType: MessageType.INFORMATION,
+                    data: {
+                        transaction: {
+                            disco: _product?.productName,
+                            "amount": _transaction?.amount,
+                            "transactionId": _transaction?.id,
+                            "id": _transaction?.id,
+                            "productType": _transaction?.productType,
+                            "transactionTimestamp": _transaction?.transactionTimestamp,
                         }
-                    })
+                    } as Record<string, any>
+                }
 
-                    const existingEvent = await EventService.viewSingleEventByTransactionIdAndType(transactionId, TOPICS.TOKEN_SENT_TO_PARTNER)
-                    if (!existingEvent) await transactionEventService.addTokenSentToPartnerEvent();
-
-                } else {
-                    // Check if 5 minutes has passed
-                    const timeDifference = Date.now() - start
-                    if (timeDifference > 60000) {
+                const start = Date.now()
+                //  Ping redis every 20 seconds for the token
+                const intervalId = setInterval(async () => {
+                    logger.info('Pinging redis for token')
+                    const tokenFromVendor = await TokenUtil.getTokenFromCache('transaction_token:' + _transaction.id)
+                    if (tokenFromVendor) {
                         // Clear interval
                         clearInterval(intervalId)
-                        // Send response if token has not been gotten from vendor
-                        Logger.apiRequest.info('Token purchase initiated successfully', { meta: { transactionId: transaction.id, ...responseData } })
-                        responseData.message = 'Transaction is being processed'
-                        responseData.messageType = MessageType.INFORMATION
+
+                        await TokenUtil.deleteTokenFromCache('transaction_token:' + _transaction.id)
+
+                        logger.info('Token from interval received => ' + tokenFromVendor)
+
+                        // Send response if token has been gotten from vendor
+                        responseData.data.meter = meterInfo
+                        responseData.data.token = tokenFromVendor
+
+                        responseData.messageType = MessageType.TOKEN
                         res.status(200).json(responseData)
                         logger.info('Vend response sent to partner', {
                             meta: {
@@ -754,46 +735,68 @@ export default class VendorController {
                                 response: responseData
                             }
                         })
+
+                        const existingEvent = await EventService.viewSingleEventByTransactionIdAndType(transactionId, TOPICS.TOKEN_SENT_TO_PARTNER)
+                        if (!existingEvent) await transactionEventService.addTokenSentToPartnerEvent();
+
+                    } else {
+                        // Check if 5 minutes has passed
+                        const timeDifference = Date.now() - start
+                        if (timeDifference > 60000) {
+                            // Clear interval
+                            clearInterval(intervalId)
+                            // Send response if token has not been gotten from vendor
+                            Logger.apiRequest.info('Token purchase initiated successfully', { meta: { transactionId: transaction.id, ...responseData } })
+                            responseData.message = 'Transaction is being processed'
+                            responseData.messageType = MessageType.INFORMATION
+                            res.status(200).json(responseData)
+                            logger.info('Vend response sent to partner', {
+                                meta: {
+                                    transactionId: transaction.id,
+                                    response: responseData
+                                }
+                            })
+                        }
+                    }
+                }, 3000)
+
+                return
+            } else {
+                const responseData = {
+                    status: 'success',
+                    message: 'Token purchase initiated successfully',
+                    messageType: MessageType.TOKEN,
+                    data: {
+                        transaction: {
+                            disco: transaction.disco,
+                            "amount": transaction.amount,
+                            "transactionId": transaction.id,
+                            "id": transaction.id,
+                            "bankRefId": transaction.bankRefId,
+                            "bankComment": transaction.bankComment,
+                            "productType": transaction.productType,
+                            "transactionTimestamp": transaction.transactionTimestamp,
+                        },
+                        meter: { ...meterInfo },
+                        token: tokenFromVendor
                     }
                 }
-            }, 3000)
+                // Send response if token has been gotten from vendor
+                res.status(200).json(responseData)
+                logger.info('Vend response sent to partner', {
+                    meta: {
+                        transactionId: transaction.id,
+                        response: responseData
+                    }
+                })
 
-            return
-        } else {
-            const responseData = {
-                status: 'success',
-                message: 'Token purchase initiated successfully',
-                messageType: MessageType.TOKEN,
-                data: {
-                    transaction: {
-                        disco: transaction.disco,
-                        "amount": transaction.amount,
-                        "transactionId": transaction.id,
-                        "id": transaction.id,
-                        "bankRefId": transaction.bankRefId,
-                        "bankComment": transaction.bankComment,
-                        "productType": transaction.productType,
-                        "transactionTimestamp": transaction.transactionTimestamp,
-                    },
-                    meter: { ...meterInfo },
-                    token: tokenFromVendor
-                }
+                // TODO: Add Code to send response if token has been gotten from vendor
+                await transactionEventService.addTokenSentToPartnerEvent();
+                await TokenUtil.deleteTokenFromCache('transaction_token:' + _transaction.id)
+
+                return
             }
-            // Send response if token has been gotten from vendor
-            res.status(200).json(responseData)
-            logger.info('Vend response sent to partner', {
-                meta: {
-                    transactionId: transaction.id,
-                    response: responseData
-                }
-            })
-
-            // TODO: Add Code to send response if token has been gotten from vendor
-            await transactionEventService.addTokenSentToPartnerEvent();
-            await TokenUtil.deleteTokenFromCache('transaction_token:' + _transaction.id)
-
-            return
-        }
+        })
     }
 
     static async checkDisco(req: Request, res: Response) {

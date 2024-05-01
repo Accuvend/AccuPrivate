@@ -16,7 +16,17 @@ export const basicAuth = function (tokenType: AuthToken) {
             return next(new Error('Invalid authorization header'));
 
         const jwtToken = authHeader.split(' ')[1];
-        const payload = jwt.verify(jwtToken, JWT_SECRET) as string;
+        let payload: string | undefined
+        try {
+            payload = jwt.verify(jwtToken, JWT_SECRET) as string;
+        } catch (error) {
+            // Check if token is expired
+            if (error instanceof jwt.TokenExpiredError) {
+                return next(new UnauthenticatedError('Token expired'))
+            }
+
+            throw error
+        }
 
         const tokenData = payload as unknown as DecodedTokenData
         tokenData.token = jwtToken

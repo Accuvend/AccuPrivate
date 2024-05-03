@@ -26,39 +26,39 @@ export default class ZohoIntegrationSettings extends Model<ZohoIntegrationSettin
   /**
    * Refresh token to call zoho Endpoint
    */
-  @Column({ type: DataType.STRING, allowNull: false })
+  @Column({ type: DataType.STRING, allowNull: false , defaultValue : '' })
   refreshtoken: string;
 
 
   /**
    * Authorization Code to call zoho Endpoint
    */
-  @Column({ type: DataType.STRING, allowNull: false })
+  @Column({ type: DataType.STRING, allowNull: false , defaultValue : '' })
   authorizationcode: string;
 
   /**
    * Access token to call Zoho Endpoint
    */
-  @Column({ type: DataType.STRING, allowNull: false })
+  @Column({ type: DataType.STRING, allowNull: false , defaultValue : '' })
   accesstoken: string;
 
   /**
    * Client Id to call Zoho Endpoint
    */
-  @Column({ type: DataType.STRING, allowNull: false })
+  @Column({ type: DataType.STRING, allowNull: false , defaultValue : '' })
   clientid: string;
 
 
   /**
    * Client Secret to call Zoho Endpoint
    */
-  @Column({ type: DataType.STRING, allowNull: false })
+  @Column({ type: DataType.STRING, allowNull: false , defaultValue : '' })
   clientsecret: string;
 
   /**
    * RedirectUrl to call Zoho Endpoint
    */
-  @Column({ type: DataType.STRING, allowNull: false })
+  @Column({ type: DataType.STRING, allowNull: false , defaultValue : '' })
   redirecturl: string;
 
   /**

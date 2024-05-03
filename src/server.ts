@@ -11,7 +11,7 @@ async function startServer(): Promise<void> {
         // Initialize the database (You may want to add a comment describing what "initiateDB" does)
         await initiateDB(Database);
 
-        // await Database.sync();
+        await Database.sync();
 
         await KafkaService.start();
         console.log("Kafka Connected Successfully");

@@ -22,7 +22,7 @@ export default class ZohoIntegrationService {
     try {
       const zohoSettings: ZohoIntegrationSettings | null = await ZohoIntegrationSettings.findOne()
       if(zohoSettings == null) throw Error('Empty Zoho Setting')
-      const AccessToken = await fetch(`https://accounts.zoho.com/oauth/v2/token?code=${zohoSettings?.authorizationcode}&grant_type=authorization_code
+      const apiresponse = await fetch(`https://accounts.zoho.com/oauth/v2/token?code=${zohoSettings?.authorizationcode}&grant_type=authorization_code
       &client_id=${zohoSettings?.clientid}
       &client_secret=${zohoSettings?.clientsecret}
       &redirect_uri=${zohoSettings?.redirecturl}`, {
@@ -30,9 +30,16 @@ export default class ZohoIntegrationService {
         mode: "no-cors", 
         headers: {
           "Content-Type": "application/json",
-          // 'Content-Type': 'application/x-www-form-urlencoded',
         },
       })
+
+      const apidata = await apiresponse.json()
+
+      zohoSettings.update({
+        
+      })
+
+
 
     } catch (err) {
       logger.error("Error Generation Acccess Token");

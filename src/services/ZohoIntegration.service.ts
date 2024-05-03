@@ -3,18 +3,49 @@ import Entity from "../models/Entity/Entity.model";
 import ComplaintReply, {ICreateComplaintReply , IUpdateComplaintReply} from "../models/ComplaintReply.model";
 import logger from "../utils/Logger";
 import { v4 as uuidv4 } from 'uuid';
+import ZohoIntegrationSettings from "../models/ZohoIntegrationSettings.model";
+
 
 /**
- * Service class for handling operations related to complaints and their replies.
+ * Service class for handling operations related to Zoho Integrations 
  */
-export default class ComplaintService {
+export default class ZohoIntegrationService {
   
+
   /**
    * Adds a new complaint.
    * @param complaint The complaint data to be added.
    * @returns A Promise resolving to the added complaint or void if an error occurs.
    */
-  static async addComplaint(
+  static async generateAccessToken(
+  ): Promise<Complaint | void> {
+    try {
+      const zohoSettings: ZohoIntegrationSettings | null = await ZohoIntegrationSettings.findOne()
+      if(zohoSettings == null) throw Error('Empty Zoho Setting')
+      const AccessToken = await fetch(`https://accounts.zoho.com/oauth/v2/token?code=${zohoSettings?.authorizationcode}&grant_type=authorization_code
+      &client_id=${zohoSettings?.clientid}
+      &client_secret=${zohoSettings?.clientsecret}
+      &redirect_uri=${zohoSettings?.redirecturl}`, {
+        method: "POST", 
+        mode: "no-cors", 
+        headers: {
+          "Content-Type": "application/json",
+          // 'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      })
+
+    } catch (err) {
+      logger.error("Error Generation Acccess Token");
+      throw err;
+    }
+  }
+
+  /**
+   * Adds a new complaint.
+   * @param complaint The complaint data to be added.
+   * @returns A Promise resolving to the added complaint or void if an error occurs.
+   */
+  static async refreshAccessToken(
     complaint: ICreateComplaint
   ): Promise<Complaint | void> {
     try {
@@ -25,10 +56,14 @@ export default class ComplaintService {
       await newComplaint.save();
       return newComplaint;
     } catch (err) {
-      logger.error("Error Logging Event");
+      logger.error("Error Generating Refresh Token");
       throw err;
     }
   }
+
+
+
+
 
   /**
    * Retrieves a single complaint by its UUID.

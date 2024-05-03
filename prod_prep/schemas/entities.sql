@@ -41,3 +41,7 @@ TABLESPACE pg_default;
 
 ALTER TABLE IF EXISTS public."Entities"
     OWNER to accuvend;
+
+ALTER TABLE IF EXISTS public."Entities"
+    ADD "zohoContactId" character varying(255) COLLATE pg_catalog."default" ;
+

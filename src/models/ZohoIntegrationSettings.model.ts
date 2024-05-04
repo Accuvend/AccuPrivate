@@ -66,6 +66,12 @@ export default class ZohoIntegrationSettings extends Model<ZohoIntegrationSettin
    */
   @Column({ type: DataType.STRING, allowNull: false , defaultValue : '' })
   organizationId: string;
+
+  /**
+   *  Department Id to call Zoho Endpoint
+   */
+  @Column({ type: DataType.STRING, allowNull: false , defaultValue : '' })
+  departmentId: string;
 }
 
 /**
@@ -109,6 +115,13 @@ export interface IZohoIntegrationSettings {
    *  Organization Id to call Zoho Endpoint
    */
   organizationId: string;
+
+  /**
+   *  Department Id to call Zoho Endpoint
+   */
+  departmentId: string;
+
+
 }
 
 /**

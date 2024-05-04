@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public."ZohoIntegrationSettings"
     clientsecret character varying(255) COLLATE pg_catalog."default" NOT NULL DEFAULT ''::character varying,
     redirecturl character varying(255) COLLATE pg_catalog."default" NOT NULL DEFAULT ''::character varying,
     "organizationId" character varying(255) COLLATE pg_catalog."default" NOT NULL DEFAULT ''::character varying,
+    "departmentId" character varying(255) COLLATE pg_catalog."default" NOT NULL DEFAULT ''::character varying,
     "createdAt" timestamp with time zone NOT NULL,
     "updatedAt" timestamp with time zone NOT NULL,
     CONSTRAINT "ZohoIntegrationSettings_pkey" PRIMARY KEY (id)

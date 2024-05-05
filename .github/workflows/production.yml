@@ -116,6 +116,11 @@ jobs:
         CYBER_PAY_API_KEY=${{secrets.CYBER_PAY_API_KEY}}
         CYBER_PAY_BASE_URL=${{secrets.CYBER_PAY_BASE_URL}}
         CYBER_PAY_SENDER_ID=${{secrets.CYBER_PAY_SENDER_ID}}
+        ZOHO_BASE_URL=${{ secrets.ZOHO_BASE_URL}}
+
+        
+
+        echo "ZOHO_BASE_URL=$ZOHO_BASE_URL" >> .env
 
 
         echo "CYBER_PAY_USERNAME=$CYBER_PAY_USERNAME" >> .env

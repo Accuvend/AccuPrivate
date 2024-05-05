@@ -5943,6 +5943,7 @@ export const HTTP_URL = {
 }
 
 export const ACCUVEND_RECEIPT_BASE_URL = process.env.ACCUVEND_RECEIPT_BASE_URL as string
+export const ZOHO_BASE_URL  = process.env.ZOHO_BASE_URL  as string
 
 interface Bundle {
     bundleCode: string;
@@ -5952,3 +5953,5 @@ interface Bundle {
     vendors: string[];
     dataCodes: { [key in 'IRECHARGE' | 'BAXI' | 'BUYPOWERNG']: string };
 }
+
+

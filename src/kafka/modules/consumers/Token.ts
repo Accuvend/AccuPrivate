@@ -1118,6 +1118,9 @@ class TokenHandler extends Registry {
                                 address: transaction.meter.address,
                             });
 
+                        const twoMinsExpiry = 2 * 60
+                        tokenInResponse && await TokenUtil.saveTokenToCache({ key: 'transaction_token:' + transaction.id, token: (response as any).token ?? '', expiry: twoMinsExpiry })
+
                         await TransactionService.updateSingleTransaction(data.transactionId, {
                             powerUnitId: powerUnit?.id,
                         });

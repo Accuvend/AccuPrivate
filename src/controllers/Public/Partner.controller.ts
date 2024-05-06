@@ -18,12 +18,40 @@ import ResponseTrimmer from "../../utils/ResponseTrimmer";
 import { IPartnerProfile, IPartnerStatsProfile } from "../../models/Entity/Profiles/PartnerProfile.model";
 import TransactionService from "../../services/Transaction.service";
 import { randomUUID } from "crypto";
+import ZohoIntegrationService from "../../services/ZohoIntegration.service";
 require('newrelic');
 
 export default class PartnerProfileController {
     static async invitePartner(req: AuthenticatedRequest, res: Response, next: NextFunction) {
         // The partner is the entity that is inviting the team member
         const { email, companyName, address } = req.body
+
+        // create use contact using the zohoAPI
+
+        let zohoId : string | undefined
+
+        try {
+            const zohodata = await ZohoIntegrationService.zohoEndpoint('/api/v1/contacts' , 'POST' , {
+                firstName: companyName,
+                lastName: companyName,
+                email,
+                description: `${companyName} zoho contact`,
+                street: address || ""
+            })
+            console.log(zohodata)
+            if(zohodata?.errorCode) throw Error('Error Creating Zoho Contact')
+
+            zohoId = zohodata.id
+            
+        } catch (error) {
+           res.status(500).json({
+                status: 'failed',
+                message: 'Partner invited not successfully',
+            })
+            return ;
+        }
+
+
 
         const role = await RoleService.viewRoleByName(RoleEnum.Partner)
         if (!role) {
@@ -49,6 +77,7 @@ export default class PartnerProfileController {
             const entity = await EntityService.addEntity({
                 id: uuidv4(),
                 email,
+                zohoContactId: zohoId,
                 status: {
                     passwordApproved: false,
                     activated: false,
@@ -111,6 +140,7 @@ export default class PartnerProfileController {
                 status: 'failed',
                 message: 'Partner invited not successfully',
             })
+            return ;
         }
     }
 

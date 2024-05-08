@@ -67,7 +67,9 @@ class Mailer {
 
         this.mailOptions.from = this.mailOptions.from ?? EMAIL_HOST_ADDRESS;
 
-        const response = await transporter.sendMail(this.mailOptions);
+        const response = await transporter
+        .sendMail(this.mailOptions)
+        .then(console.log);
     }
 }
 

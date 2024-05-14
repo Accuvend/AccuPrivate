@@ -8,6 +8,9 @@ export const router: Router = express.Router();
 router
     .get("/info", TransactionController.getTransactionInfo)
     .use(basicAuth("access"))
+    .get("/latest/:phoneNumber" ,basicAuth("access"), AuthenticatedController(TransactionController.getTransactionsLatest))
+    .get("/api/latest/:phoneNumber",validateApiKey,AuthenticatedController(TransactionController.getTransactionsLatest))
+    .get("/v2/all",basicAuth("access"),AuthenticatedController(TransactionController.getTransactionsFiltered))
     .get(
         "/",
         basicAuth("access"),

@@ -12,6 +12,8 @@ import ComplaintService, {
 } from "../../services/ComplaintV2.Service";
 import { PartnerProfileService } from "../../services/Entity/Profiles";
 import Entity from "../../models/Entity/Entity.model";
+import Transaction from "../../models/Transaction.model";
+import TransactionService from "../../services/Transaction.service";
 require("newrelic");
 
 
@@ -74,12 +76,114 @@ export class ComplaintController {
         next: NextFunction
     ) {
         // Extracting necessary data from request body
-        const { title, description , category }: { title: string; description: string , category: string } =
+        const { title, description , category , transactionId }: { title: string; description: string , category: string, transactionId : string} =
             req.body;
+
+        //     res.status(200).json({
+        //                 status: "success",
+        //                 message: "complaint created successfully",
+        //                 data: {title , description , category , transactionId}
+        //             });
+        // return ;
         // Extracting the entity ID from the authenticated user data
         const {
             entity: { id },
         } = req.user.user;
+
+        const transaction: Transaction | null = await TransactionService.viewSingleTransaction(transactionId)
+        try {
+            // Validation of inputs
+            if (!title) {
+                next(new BadRequestError("title of Complaint is required"));
+                return;
+            }
+
+            if (!description) {
+                next(new BadRequestError("Description of complaint is required"));
+                return;
+            }
+
+            if (!category) {
+                next(new BadRequestError("Category of complaint is required"));
+                return;
+            }
+
+            if (!transaction) {
+                next(new BadRequestError("Transaction of complaint is required"));
+                return;
+            }
+
+            // Fetching entity details
+            const entity: Entity | null = await EntityService.viewSingleEntity(
+                id
+            );
+            if (!entity) throw new Error("Entity doesn't exist ");
+
+            // Creating complaint schema based on request data
+            const complaintSchema: ICreateComplaint = {
+                subject: title, // The subject of the complaint.
+                channel: "WEB", // The channel through which the complaint is received.
+                contactId: entity.zohoContactId, // The ID of the contact associated with the complaint.
+                description: description, // The description of the complaint.
+                status: "Open", // The status of the complaint, typically either 'Open' or another custom status.
+                email: entity.email, // The email address associated with the complaint (optional).
+                category : category, // The category of the complaint (optional)
+                cf: {
+                    // Additional custom fields related to the complaint (optional).
+                    cf_transanction_id: transaction.id, // The transaction ID associated with the complaint.
+                    cf_complain_type: category , // The type of complaint.
+                    cf_customer_email: transaction.user.email, // The email address of the customer associated with the complaint.
+                    cf_customer_phone: transaction.user.phoneNumber, // The phone of the customer associated with the complaint.
+                    cf_customer_name: transaction.user.name, // The name of the customer associated with the complaint.
+                    cf_product_code: transaction.disco // The Product Code Attached to the transaction
+                }
+            };
+
+            // Creating the complaint
+            const complaint = await ComplaintService.createComplain(
+                complaintSchema
+            );
+
+            // Sending success response
+            res.status(200).json({
+                status: "success",
+                message: "complaint created successfully",
+                data: {
+                    complaint,
+                },
+            });
+
+            return;
+        } catch (err) {
+            // Handling errors
+            next(
+                new InternalServerError(
+                    "Sorry an error occurred, couldn't create complaint"
+                )
+            );
+        }
+    }
+
+
+    /**
+     * Controller method for creating a new complaint from the vendor API
+     * @param req The request object containing the authenticated user data and complaint details.
+     * @param res The response object to send back to the client.
+     * @param next The next middleware function in the request-response cycle.
+     */
+    static async createComplaintApi(
+        req: AuthenticatedRequest,
+        res: Response,
+        next: NextFunction
+    ) {
+        // Extracting necessary data from request body
+        const { title, description , category }: { title: string; description: string , category: string } =
+            req.body;
+        // Extracting the entity ID from the authent
+        // Extracting the partner  ID from the authenticated user data
+        const partnerId = (req as any).key;
+
+        const partner = await PartnerProfileService.viewSinglePartner(partnerId)
         try {
             // Validation of inputs
             if (!title) {
@@ -98,9 +202,7 @@ export class ComplaintController {
             }
 
             // Fetching entity details
-            const entity: Entity | null = await EntityService.viewSingleEntity(
-                id
-            );
+            const entity: Entity | undefined =   partner?.entity
             if (!entity) throw new Error("Entity doesn't exist ");
 
             // Creating complaint schema based on request data

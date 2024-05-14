@@ -15,9 +15,12 @@ export interface IComplaint {
     status: string | "Open"; // The status of the complaint, typically either 'Open' or another custom status.
     cf?: {
         // Additional custom fields related to the complaint (optional).
-        cf_transanctionId?: string; // The transaction ID associated with the complaint.
-        cf_complaintType?: string; // The type of complaint.
+        cf_transanction_id?: string; // The transaction ID associated with the complaint.
+        cf_complain_type?: string; // The type of complaint.
         cf_customer_email?: string; // The email address of the customer associated with the complaint.
+        cf_customer_phone?: string; // The phone of the customer associated with the complaint.
+        cf_customer_name?: string; // The name of the customer associated with the complaint.
+        cf_product_code?: string // The Product Code Attached to the transaction
     };
     category ?: string // The category of the complaint (optional)
     email?: string; // The email address associated with the complaint (optional).

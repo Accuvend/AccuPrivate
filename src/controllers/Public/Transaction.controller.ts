@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { NextFunction, Request, Response } from "express";
 import Transaction, { ITransaction } from "../../models/Transaction.model";
 import TransactionService from "../../services/Transaction.service";
 import {
@@ -6,7 +6,6 @@ import {
     InternalServerError,
     NotFoundError,
 } from "../../utils/Errors";
-import { Status } from "../../models/Event.model";
 import ResponseTrimmer from "../../utils/ResponseTrimmer";
 import VendorService from "../../services/VendorApi.service";
 import { AuthenticatedRequest } from "../../utils/Interface";
@@ -16,7 +15,13 @@ import TransactionEventService from "../../services/TransactionEvent.service";
 import { VendorPublisher } from "../../kafka/modules/publishers/Vendor";
 import { Op } from "sequelize";
 import { TeamMemberProfileService } from "../../services/Entity/Profiles";
-require('newrelic');
+import Event, { Status } from "../../models/Event.model";
+import PowerUnit from "../../models/PowerUnit.model";
+import Partner from "../../models/Entity/Profiles/PartnerProfile.model";
+import User from "../../models/User.model";
+import Meter from "../../models/Meter.model";
+import Bundle from "../../models/Bundle.model";
+require("newrelic");
 
 interface getTransactionsRequestBody extends ITransaction {
     page: `${number}`;
@@ -27,7 +32,8 @@ interface getTransactionsRequestBody extends ITransaction {
     userId: string;
     meterId: string;
     disco: string;
-    superagent: "BUYPOWERNG" | "BAXI";
+    superagent: "BUYPOWERNG" | "BAXI" | "IRECHARGE";
+    includes?: string;
 }
 
 export default class TransactionController {
@@ -39,8 +45,8 @@ export default class TransactionController {
 
         const transaction: Transaction | null = bankRefId
             ? await TransactionService.viewSingleTransactionByBankRefID(
-                bankRefId
-            )
+                  bankRefId
+              )
             : await TransactionService.viewSingleTransaction(transactionId);
         if (!transaction) {
             throw new NotFoundError("Transaction not found");
@@ -52,7 +58,7 @@ export default class TransactionController {
             status: "success",
             message: "Transaction info retrieved successfully",
             // data: { transaction: { ...ResponseTrimmer.trimTransactionResponse(transaction.dataValues), powerUnit, disco: transaction.productType == 'AIRTIME' ? undefined : transaction.disco } },
-            data: { transaction}
+            data: { transaction },
         });
     }
 
@@ -113,8 +119,6 @@ export default class TransactionController {
 
         //To show Partner Data to Teammember
 
-
-
         const transactions: Transaction[] =
             await TransactionService.viewTransactionsWithCustomQuery(query);
         if (!transactions) {
@@ -134,7 +138,13 @@ export default class TransactionController {
         };
 
         const response = {
-            transactions: transactions.map((transaction) => ({ ...transaction.dataValues, disco: transaction?.productType?.toUpperCase() == 'AIRTIME' ? undefined : transaction.disco })),
+            transactions: transactions.map((transaction) => ({
+                ...transaction.dataValues,
+                disco:
+                    transaction?.productType?.toUpperCase() == "AIRTIME"
+                        ? undefined
+                        : transaction.disco,
+            })),
             totalAmount,
         } as any;
 
@@ -148,6 +158,213 @@ export default class TransactionController {
             data: response,
         });
     }
+
+    /**
+     * Retrieves filtered transactions based on the request parameters.
+     * @param req The request object containing parameters for filtering transactions and user authentication data.
+     * @param res The response object to send back to the client.
+     */
+    static async getTransactionsFiltered(
+        req: AuthenticatedRequest,
+        res: Response
+    ) {
+        // Extracting request query parameters
+        const {
+            page,
+            limit,
+            status,
+            startDate,
+            endDate,
+            userId,
+            disco,
+            superagent,
+            partnerId,
+            includes,
+        } = req.query as any as getTransactionsRequestBody;
+
+        // Initializing query object
+        
+        const query = { where: {} , include: [] } as any;
+        if(includes){
+            const include = includes.split(",")
+            include.map((item)=>{
+                switch (item) {
+                    case "PowerUnit":
+                        query.include.push(PowerUnit)
+                        break;
+                    case "User":
+                        query.include.push(User)
+                        break;
+                    case "Event":
+                        query.include.push(Event)
+                        break;
+                    case "Partner":
+                        query.include.push(Partner)
+                        break;
+                    case "Bundle":
+                        query.include.push(Bundle)
+                        break;
+                    case "Meter":
+                        query.include.push(Meter)
+                        break;
+                
+                    default:
+                        break;
+                }
+            })
+        }
+
+        // Applying filters based on query parameters
+        if (status) query.where.status = status;
+        if (startDate && endDate)
+            query.where.transactionTimestamp = {
+                [Op.between]: [new Date(startDate), new Date(endDate)],
+            };
+        if (userId) query.where.userId = userId;
+        if (disco) query.where.disco = disco;
+        if (superagent) query.where.superagent = superagent;
+        if (limit) query.limit = parseInt(limit);
+        if (page && page != "0" && limit) {
+            query.offset = Math.abs(parseInt(page) - 1) * parseInt(limit);
+        }
+        if (partnerId) query.where.partnerId = partnerId;
+        if (userId) query.where.userId = userId;
+
+        // Handling access control based on user roles
+        const requestWasMadeByAnAdmin =
+            [RoleEnum.Admin].includes(req.user.user.entity.role) ||
+            [RoleEnum.SuperAdmin].includes(req.user.user.entity.role);
+        if (!requestWasMadeByAnAdmin) {
+            const requestMadeByEnduser = [RoleEnum.EndUser].includes(
+                req.user.user.entity.role
+            );
+            const requestWasMadeByTeamMember = [RoleEnum.TeamMember].includes(
+                req.user.user.entity.role
+            );
+
+            if (requestMadeByEnduser) {
+                query.where.userId = req.user.user.entity.userId;
+            } else if (requestWasMadeByTeamMember) {
+                // To show Partner Data to Teammember
+                const _teamMember =
+                    await TeamMemberProfileService.viewSingleTeamMember(
+                        req.user.user.entity.teamMemberProfileId || ""
+                    );
+                query.where.partnerId = _teamMember?.partnerId;
+            } else {
+                query.where.partnerId = req.user.user.profile.id;
+            }
+        }
+
+        // Retrieving transactions based on the constructed query
+        const transactions: Transaction[] =
+            await TransactionService.viewTransactionsWithCustomQueryAndInclude(query);
+        if (!transactions) {
+            throw new NotFoundError("Transactions not found");
+        }
+
+        // Calculating total amount of transactions
+        const totalAmount = transactions.reduce(
+            (acc, curr) => acc + parseInt(curr.amount),
+            0
+        );
+
+        // Constructing pagination data
+        const paginationData = {
+            page: parseInt(page),
+            limit: parseInt(limit),
+            totalCount: transactions.length,
+            totalPages: Math.ceil(transactions.length / parseInt(limit)),
+        };
+
+        // Constructing response data
+        const response = {
+            transactions: transactions.map((transaction) => ({
+                ...transaction.dataValues,
+                disco:
+                    transaction?.productType?.toUpperCase() == "AIRTIME"
+                        ? undefined
+                        : transaction.disco,
+            })),
+            totalAmount,
+        } as any;
+
+        // Adding pagination data to response if pagination is applied
+        if (page && page != "0" && limit) {
+            response["pagination"] = paginationData;
+        }
+
+        // Sending success response with data
+        res.status(200).json({
+            status: "success",
+            message: "Transactions retrieved successfully",
+            data: response,
+        });
+    }
+
+    static async getTransactionsLatest(
+        req: AuthenticatedRequest,
+        res: Response,
+        next: NextFunction
+    ) {
+
+        const { phoneNumber} = req.params as any as {phoneNumber: string}
+        const {
+            profile: { id },
+        } = req.user.user;
+
+        const partner = await PartnerService.viewSinglePartner(id);
+        if (!partner) {
+            throw new BadRequestError("User must be a partner");
+        }
+
+        if(!phoneNumber){
+            return next(new BadRequestError('No number provided'))
+        }
+        
+        // Retrieving transactions based on the constructed query
+        const transactions: Transaction[] = await TransactionService.viewTransactionsWithCustomQueryAndInclude({
+            offset: 0,
+            limit: 7,
+            include: [Meter, {
+                model: User,
+                where: {
+                    phoneNumber,
+                }
+            }, {
+                model: Partner,
+                where: {
+                    id
+                }
+            }, Bundle, PowerUnit ]
+        });
+        if (!transactions) {
+            throw new NotFoundError("Transactions not found");
+        }
+
+
+        
+        // Constructing response data
+        const response = {
+            transactions: transactions.map((transaction) => ({
+                ...transaction.dataValues,
+                disco:
+                    transaction?.productType?.toUpperCase() == "AIRTIME"
+                        ? undefined
+                        : transaction.disco,
+            })),
+        } as any;
+
+        
+
+        // Sending success response with data
+        res.status(200).json({
+            status: "success",
+            message: "Transactions retrieved successfully 2",
+            data: response,
+        });
+    }
+
     static async getTransactionsKPI(req: AuthenticatedRequest, res: Response) {
         const {
             page,
@@ -167,8 +384,8 @@ export default class TransactionController {
         //     {amount: " "}
         // ]
         query.where.amount = {
-            [Op.notIn]: ["", " "],  
-        }
+            [Op.notIn]: ["", " "],
+        };
         if (status) query.where.status = status.toUpperCase();
         if (startDate && endDate)
             query.where.transactionTimestamp = {
@@ -201,9 +418,10 @@ export default class TransactionController {
             );
 
             if (requestWasMadeByTeamMember) {
-                const _teamMember = await TeamMemberProfileService.viewSingleTeamMember(
-                    req.user.user.entity.teamMemberProfileId || ""
-                );
+                const _teamMember =
+                    await TeamMemberProfileService.viewSingleTeamMember(
+                        req.user.user.entity.teamMemberProfileId || ""
+                    );
                 query.where.partnerId = _teamMember?.partnerId;
             } else {
                 query.where.partnerId = req.user.user.profile.id;
@@ -358,9 +576,9 @@ export default class TransactionController {
 
         const transactions = status
             ? await TransactionService.viewTransactionsForYesterdayByStatus(
-                partner.id,
-                status.toUpperCase() as typeof status
-            )
+                  partner.id,
+                  status.toUpperCase() as typeof status
+              )
             : await TransactionService.viewTransactionForYesterday(partner.id);
 
         const totalAmount = transactions.reduce(

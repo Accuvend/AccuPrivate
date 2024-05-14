@@ -19,6 +19,7 @@ import { IPartnerProfile, IPartnerStatsProfile } from "../../models/Entity/Profi
 import TransactionService from "../../services/Transaction.service";
 import { randomUUID } from "crypto";
 import ZohoIntegrationService from "../../services/ZohoIntegration.service";
+import { getUniquePartnerCode } from "./Auth.controller";
 require('newrelic');
 
 export default class PartnerProfileController {
@@ -28,28 +29,28 @@ export default class PartnerProfileController {
 
         // create use contact using the zohoAPI
 
-        let zohoId : string | undefined
+        // let zohoId : string | undefined
 
-        try {
-            const zohodata = await ZohoIntegrationService.zohoEndpoint('/api/v1/contacts' , 'POST' , {
-                firstName: companyName,
-                lastName: companyName,
-                email,
-                description: `${companyName} zoho contact`,
-                street: address || ""
-            })
-            console.log(zohodata)
-            if(zohodata?.errorCode) throw Error('Error Creating Zoho Contact')
+        // try {
+        //     const zohodata = await ZohoIntegrationService.zohoEndpoint('/api/v1/contacts' , 'POST' , {
+        //         firstName: companyName,
+        //         lastName: companyName,
+        //         email,
+        //         description: `${companyName} zoho contact`,
+        //         street: address || ""
+        //     })
+        //     console.log(zohodata)
+        //     if(zohodata?.errorCode) throw Error('Error Creating Zoho Contact')
 
-            zohoId = zohodata.id
+        //     zohoId = zohodata.id
             
-        } catch (error) {
-           res.status(500).json({
-                status: 'failed',
-                message: 'Partner invited not successfully',
-            })
-            return ;
-        }
+        // } catch (error) {
+        //    res.status(500).json({
+        //         status: 'failed',
+        //         message: 'Partner invited not successfully',
+        //     })
+        //     return ;
+        // }
 
 
 
@@ -71,13 +72,14 @@ export default class PartnerProfileController {
                 id: uuidv4(),
                 email,
                 companyName,
-                address
+                address,
+                partnerCode: await getUniquePartnerCode(companyName.split('@')[0]),
             }, transaction)
 
             const entity = await EntityService.addEntity({
                 id: uuidv4(),
                 email,
-                zohoContactId: zohoId,
+                // zohoContactId: zohoId,
                 status: {
                     passwordApproved: false,
                     activated: false,

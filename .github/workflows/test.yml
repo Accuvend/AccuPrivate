@@ -98,6 +98,7 @@ jobs:
         KAFKA_INSTANCE_TYPE=${{ secrets.KAFKA_INSTANCE_TYPE}}
         KAFKA_USERNAME=${{ secrets.KAFKA_USERNAME}}
         KAFKA_ENV=${{ secrets.KAFKA_ENV}}
+        ACCUVEND_RECEIPT_BASE_URL=${{ secrets.ACCUVEND_RECEIPT_BASE_URL }}
 
         IRECHARGE_DEV_URL=${{ secrets.IRECHARGE_DEV_URL}}
         IRECHARGE_PROD_URL=${{ secrets.IRECHARGE_PROD_URL}}
@@ -111,6 +112,11 @@ jobs:
         AFRICASTALKING_API_KEY=${{ secrets.AFRICASTALKING_API_KEY}}
         AFRICASTALKING_SENDER=${{ secrets.AFRICASTALKING_SENDER}}
         AFRICASTALKING_USERNAME=${{ secrets.AFRICASTALKING_USERNAME}}
+        ZOHO_BASE_URL=${{ secrets.ZOHO_BASE_URL}}
+
+        
+
+        echo "ZOHO_BASE_URL=$ZOHO_BASE_URL" >> .env
 
         echo "AFRICASTALKING_API_KEY=$AFRICASTALKING_API_KEY" >> .env
         echo "AFRICASTALKING_SENDER=$AFRICASTALKING_SENDER" >> .env
@@ -187,6 +193,8 @@ jobs:
         echo "SU_HOST_EMAIL_2=$SU_HOST_EMAIL_2" >> .env
         echo "SU_HOST_EMAIL_3=$SU_HOST_EMAIL_3" >> .env
         echo "NODE_TLS_REJECT_UNAUTHORIZED=0" >> .env
+        echo "ACCUVEND_RECEIPT_BASE_URL=$ACCUVEND_RECEIPT_BASE_URL" >> .env
+        
         cat .env
     - name: push to state to s3
       run: |

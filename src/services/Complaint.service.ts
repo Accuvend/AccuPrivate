@@ -4,24 +4,37 @@ import ComplaintReply, {ICreateComplaintReply , IUpdateComplaintReply} from "../
 import logger from "../utils/Logger";
 import { v4 as uuidv4 } from 'uuid';
 
+/**
+ * Service class for handling operations related to complaints and their replies.
+ */
 export default class ComplaintService {
+  
+  /**
+   * Adds a new complaint.
+   * @param complaint The complaint data to be added.
+   * @returns A Promise resolving to the added complaint or void if an error occurs.
+   */
   static async addComplaint(
     complaint: ICreateComplaint
   ): Promise<Complaint | void> {
     try {
-        console.log(complaint)
       const newComplaint: Complaint = await Complaint.build({
         id: uuidv4(),
         ...complaint
-        });
+      });
       await newComplaint.save();
       return newComplaint;
     } catch (err) {
       logger.error("Error Logging Event");
-      throw err
+      throw err;
     }
   }
 
+  /**
+   * Retrieves a single complaint by its UUID.
+   * @param uuid The UUID of the complaint to be retrieved.
+   * @returns A Promise resolving to the complaint or void if an error occurs.
+   */
   static async viewSingleComplaint(
     uuid: string
   ): Promise<Complaint | void | null> {
@@ -32,12 +45,19 @@ export default class ComplaintService {
       });
       return complaint;
     } catch (err) {
-      
       logger.error("Error Reading Complaint");
-      throw err
+      throw err;
     }
   }
 
+  /**
+   * Retrieves a paginated and filtered list of complaints.
+   * @param limit The maximum number of complaints to retrieve.
+   * @param offset The number of complaints to skip.
+   * @param entityId The ID of the entity related to the complaints.
+   * @param status The status of the complaints to filter by.
+   * @returns A Promise resolving to an object containing the complaints and pagination info, or void if an error occurs.
+   */
   static async viewAllComplainsPaginatedFiltered(
     limit: number | null,
     offset: number | null,
@@ -54,21 +74,19 @@ export default class ComplaintService {
   } | void | null> {
     let _limit = 9;
     let _offset = 1;
-    // const where: { entityId?: string } = {};
-    const findAllObject: { where? : { entityId?: string , status?: string } , limt: number , offset: number} | any =  {}
-    if (limit) findAllObject.limt = limit;
+    const findAllObject: { where?: { entityId?: string , status?: string } , limit: number , offset: number} | any =  {}
+    if (limit) findAllObject.limit = limit;
     if (offset) findAllObject.offset = offset - 1;
     if(entityId || status ) findAllObject.where = {}
     if (entityId) findAllObject.where.entityId = entityId;
-    if(status) findAllObject.where.status = status
-    console.log(findAllObject)
+    if(status) findAllObject.where.status = status;
     
     try {
       const complaints: {
-        rows: Complaint[]
-        count: number
+        rows: Complaint[];
+        count: number;
        } | null = await Complaint.findAndCountAll(findAllObject);
-      const totalItems  = complaints.count
+      const totalItems  = complaints.count;
       const totalPages = Math.ceil(totalItems / _limit);
       return {
         complaint : complaints.rows,
@@ -80,73 +98,79 @@ export default class ComplaintService {
         }
       };
     } catch (err) {
-        console.log(err)
       logger.error("Error Reading Complaints");
-      throw err
+      throw err;
     }
   }
 
-
+  /**
+   * Updates a complaint by its UUID.
+   * @param uuid The UUID of the complaint to be updated.
+   * @param complaint The updated complaint data.
+   * @returns A Promise resolving to an object containing the update result and the updated complaint, or void if an error occurs.
+   */
   static async updateAComplaint(uuid: string,complaint: IUpdateComplaint){
     try{
-      const result : [number] = await Complaint.update(complaint,{ where : {id : uuid}})
-      let _complaint : Complaint | null = null
-      if(result[0] > 1) _complaint = await Complaint.findByPk(uuid)
+      const result : [number] = await Complaint.update(complaint,{ where : {id : uuid}});
+      let _complaint : Complaint | null = null;
+      if(result[0] > 1) _complaint = await Complaint.findByPk(uuid);
       return {
         result,
         _complaint
-      }
-    }catch (error) {
-      console.log(error)
+      };
+    } catch (error) {
       logger.error("Error Reading Complaints");
-      throw error
+      throw error;
     }
   }
 
+  /**
+   * Adds a new reply to a complaint.
+   * @param uuid The UUID of the complaint to add the reply to.
+   * @param complaintReply The reply data to be added.
+   * @returns A Promise resolving to the added reply or void if an error occurs.
+   */
   static async addComplaintReply(uuid: string , complaintReply : ICreateComplaintReply){
     try {
-      // const complaint : Complaint | null = await Complaint.findByPk(uuid)
-      // const ComplaintReply =  await complaint?.$create('complaintReplies', complaintReply )
-      // return ComplaintReply
       const newComplaintRely: ComplaintReply = await ComplaintReply.build({
         id: uuidv4(),
         complaintId: uuid,
         ...complaintReply
-        });
+      });
       await newComplaintRely.save();
       return newComplaintRely; 
-
     } catch (error) {
-      console.log(error)
       logger.error("Error Reading Complaints");
-      throw error
+      throw error;
     }
-    
-
   }
 
+  /**
+   * Retrieves a paginated list of replies for a complaint.
+   * @param uuid The UUID of the complaint to retrieve replies for.
+   * @param limit The maximum number of replies to retrieve.
+   * @param offset The number of replies to skip.
+   * @returns A Promise resolving to an object containing the replies and pagination info, or void if an error occurs.
+   */
   static async viewListOfComplaintPaginatedRelies(uuid: string , limit?: number | null, offset?: number | null) {
-      let _limit = 9;
-      let _offset = 1;
-      const findAllObject: { where? : { complaintId? : string } , limt?: number , offset?: number} | any =  {}
-      console.log(uuid,'inner')
-      if (limit) findAllObject.limt = limit;
-      if (offset) findAllObject.offset = offset - 1;
-      try {
+    let _limit = 9;
+    let _offset = 1;
+    const findAllObject: { where? : { complaintId? : string } , limit?: number , offset?: number} | any =  {};
+    if (limit) findAllObject.limit = limit;
+    if (offset) findAllObject.offset = offset - 1;
+    try {
       const complaint : Complaint | null = await Complaint.findByPk(uuid,{
         include: [{
           model: ComplaintReply,
           ...findAllObject,
           include: [Entity]
         }]
-        
-      })
+      });
       if(uuid){
-        findAllObject.where = {}
-        findAllObject.where.complaintId = uuid
+        findAllObject.where = {};
+        findAllObject.where.complaintId = uuid;
       }
       const totalItems = await ComplaintReply.count({ where : findAllObject.where });
-      console.log(totalItems)
       const totalPages = Math.ceil(totalItems / _limit);
       return {
           complaint: complaint,
@@ -157,16 +181,9 @@ export default class ComplaintService {
               totalPages
           }
         };
-        
-      } catch (error) {
-        console.log(error)
-        logger.error("Error Reading Complaints Relpies");
-        throw error
-      }
-
+    } catch (error) {
+      logger.error("Error Reading Complaints Replies");
+      throw error;
+    }
   }
-
-  
-
-
 }

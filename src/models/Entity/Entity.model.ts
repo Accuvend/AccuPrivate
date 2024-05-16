@@ -70,6 +70,11 @@ export default class Entity extends Model<Entity | IEntity> {
     @Column({ type: DataType.STRING, allowNull: true })
     phoneNumber: string
 
+
+    // Zoho1 Customer Care Contact Id utilized for Integration
+    @Column({ type: DataType.STRING, allowNull: true })
+    zohoContactId: string
+
     @BelongsTo(() => Role)
     role: Role;
 
@@ -92,6 +97,7 @@ export default class Entity extends Model<Entity | IEntity> {
 
     @HasMany(() => Complaint)
     complaintReplies: ComplaintReply[];
+
 
 
     @BeforeValidate
@@ -131,6 +137,7 @@ export interface IEntity {
     complaints?: Complaint[],
     requireOTPOnLogin: boolean,
     phoneNumber?: string
+    zohoContactId?: string
 }
 
 // Interface representing the structure for creating a new Entity (inherits from IEntity)

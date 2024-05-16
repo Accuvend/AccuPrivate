@@ -23,7 +23,7 @@ class PostgresTransport extends winston.Transport {
             logType: meta?.logType,
             transactionId: meta?.transactionId,
             createdAt: new Date(),
-            description: meta?.description ?? {}
+            description: meta?.description ?? {},
         })
             .then(() => {
                 callback();
@@ -44,8 +44,9 @@ const logFormat = printf((info) => {
 
     try {
         return info.meta
-            ? `${info.timestamp} [${info.level
-            }][${info.meta?.logType ?? "default"}]: ${message} | meta: ${JSON.stringify(info.meta)}`
+            ? `${info.timestamp} [${
+                  info.level
+              }][${info.meta?.logType ?? "default"}]: ${message} | meta: ${JSON.stringify(info.meta)}`
             : `${info.timestamp} [${info.level}]: ${message}`;
     } catch (error) {
         // Check for circular references
@@ -91,33 +92,34 @@ const fileTransports = [
 const transports =
     NODE_ENV === "development"
         ? [
-            new winston.transports.Console({
-                level: "info",
-                format: combine(
-                    timestamp(),
-                    colorize({
-                        colors: { info: "cyan", error: "red" },
-                    }),
-                    logFormat,
-                    enumerateErrorFormat(),
-                ),
-            }),
-            // ...fileTransports,
-            new PostgresTransport(), // Replace this with your custom transport
-        ]
+              new winston.transports.Console({
+                  level: "info",
+                  format: combine(
+                      timestamp(),
+                      colorize({
+                          colors: { info: "cyan", error: "red" },
+                      }),
+                      logFormat,
+                      enumerateErrorFormat(),
+                  ),
+              }),
+              // ...fileTransports,
+              new PostgresTransport(), // Replace this with your custom transport
+          ]
         : [
-            new winston.transports.Console({
-                level: "info",
-                format: combine(
-                    timestamp(),
-                    colorize({
-                        colors: { info: "cyan", error: "red" },
-                    }),
-                    logFormat,
-                    enumerateErrorFormat(),
-                ),
-            }),
-        ];
+              new winston.transports.Console({
+                  level: "info",
+                  format: combine(
+                      timestamp(),
+                      colorize({
+                          colors: { info: "cyan", error: "red" },
+                      }),
+                      logFormat,
+                      enumerateErrorFormat(),
+                  ),
+              }),
+              new PostgresTransport(), // Replace this with your custom transport
+          ];
 
 const productionLogger = winston.createLogger({
     level: "info",

@@ -132,9 +132,9 @@ export default class ComplaintService {
             if (!entity) throw new Error("Entity is required");
 
             // Constructing URL for Zoho API call with query parameters
-            const url =
-                `/api/v1/contacts/${entity.zohoContactId}/tickets` +
-                (limit || offset || status ? "?" : "") +
+            const url = `/api/v1/tickets/search?contactId=${entity.zohoContactId}&` +//&fields=cf_ticket_status,cf_transanction_id,cf_customer_email,cf_customer_name,cf_customer_phone,cf_complain_channel&` +
+                // `/api/v1/contacts/${entity.zohoContactId}/tickets?fields=cf_ticket_status,cf_transanction_id,cf_customer_email,cf_customer_name,cf_customer_phone,cf_complain_channel&` +
+                // (limit || offset || status ? "?" : "") +
                 (limit ? "limit=" + limit + "&" : "") +
                 (offset || offset === 0 ? "from=" + offset + "&" : "") +
                 (status ? "status=" + status : "");

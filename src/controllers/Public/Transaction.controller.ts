@@ -160,7 +160,7 @@ export default class TransactionController {
     }
 
     /**
-     * Retrieves filtered transactions based on the request parameters.
+     * Retrieves filtered transactions based on the request parameters
      * @param req The request object containing parameters for filtering transactions and user authentication data.
      * @param res The response object to send back to the client.
      */
@@ -183,35 +183,35 @@ export default class TransactionController {
         } = req.query as any as getTransactionsRequestBody;
 
         // Initializing query object
-        
-        const query = { where: {} , include: [] } as any;
-        if(includes){
-            const include = includes.split(",")
-            include.map((item)=>{
+
+        const query = { where: {}, include: [] } as any;
+        if (includes) {
+            const include = includes.split(",");
+            include.map((item) => {
                 switch (item) {
                     case "PowerUnit":
-                        query.include.push(PowerUnit)
+                        query.include.push(PowerUnit);
                         break;
                     case "User":
-                        query.include.push(User)
+                        query.include.push(User);
                         break;
                     case "Event":
-                        query.include.push(Event)
+                        query.include.push(Event);
                         break;
                     case "Partner":
-                        query.include.push(Partner)
+                        query.include.push(Partner);
                         break;
                     case "Bundle":
-                        query.include.push(Bundle)
+                        query.include.push(Bundle);
                         break;
                     case "Meter":
-                        query.include.push(Meter)
+                        query.include.push(Meter);
                         break;
-                
+
                     default:
                         break;
                 }
-            })
+            });
         }
 
         // Applying filters based on query parameters
@@ -258,7 +258,9 @@ export default class TransactionController {
 
         // Retrieving transactions based on the constructed query
         const transactions: Transaction[] =
-            await TransactionService.viewTransactionsWithCustomQueryAndInclude(query);
+            await TransactionService.viewTransactionsWithCustomQueryAndInclude(
+                query
+            );
         if (!transactions) {
             throw new NotFoundError("Transactions not found");
         }
@@ -302,52 +304,89 @@ export default class TransactionController {
         });
     }
 
+    /**
+     * Retrieves the latest transactions associated with a specific phone number within a given date range.
+     * @param req - The authenticated request object containing request parameters.
+     * @param res - The response object to send back to the client.
+     * @param next - The next function to call middleware in the request-response cycle.
+     * @returns A JSON response containing the latest transactions for the specified phone number.
+     * @throws BadRequestError if the user is not a partner or if no phone number is provided.
+     * @throws NotFoundError if no transactions are found.
+     */
     static async getTransactionsLatest(
         req: AuthenticatedRequest,
         res: Response,
         next: NextFunction
     ) {
+        // Extracts parameters from the request
+        const { phoneNumber } = req.params as any as { phoneNumber: string };
+        const { startDate, endDate } = req.query as any as {
+            startDate: string | null | void;
+            endDate: string | null | void;
+        };
 
-        const { phoneNumber} = req.params as any as {phoneNumber: string}
+        // Constructs a query for date range filtering
+        const dateQuery: { transactionTimestamp?: Object } = {};
+        if (startDate && endDate) {
+            dateQuery.transactionTimestamp = {
+                [Op.between]: [new Date(startDate), new Date(endDate)],
+            };
+        }
+
+        // Retrieves the ID of the authenticated user's partner profile
         const {
             profile: { id },
         } = req.user.user;
 
+        // Retrieves the partner profile based on the ID
         const partner = await PartnerService.viewSinglePartner(id);
         if (!partner) {
             throw new BadRequestError("User must be a partner");
         }
 
-        if(!phoneNumber){
-            return next(new BadRequestError('No number provided'))
+        // Throws an error if no phone number is provided
+        if (!phoneNumber) {
+            return next(new BadRequestError("No number provided"));
         }
-        
-        // Retrieving transactions based on the constructed query
-        const transactions: Transaction[] = await TransactionService.viewTransactionsWithCustomQueryAndInclude({
-            offset: 0,
-            limit: 7,
-            include: [Meter, {
-                model: User,
-                where: {
-                    phoneNumber,
-                }
-            }, {
-                model: Partner,
-                where: {
-                    id
-                }
-            }, Bundle, PowerUnit ]
-        });
+
+        // Retrieves transactions based on the constructed query and includes related models
+        const transactions: Transaction[] =
+            await TransactionService.viewTransactionsWithCustomQueryAndInclude({
+                offset: 0,
+                limit: 7,
+                query: {
+                    ...dateQuery
+                },
+                include: [
+                    Meter,
+                    {
+                        model: User,
+                        where: {
+                            phoneNumber,
+                        },
+                    },
+                    {
+                        model: Partner,
+                        where: {
+                            id,
+                        },
+                    },
+                    Bundle,
+                    PowerUnit,
+                ],
+                where: dateQuery,
+            });
+
+        // Throws an error if no transactions are found
         if (!transactions) {
             throw new NotFoundError("Transactions not found");
         }
 
-
-        
-        // Constructing response data
+        // Constructs the response data
         const response = {
             transactions: transactions.map((transaction) => ({
                 ...transaction.dataValues,
+                // Removes "disco" field if the product type is "AIRTIME"
                 disco:
                     transaction?.productType?.toUpperCase() == "AIRTIME"
                         ? undefined
@@ -355,17 +394,22 @@ export default class TransactionController {
             })),
         } as any;
 
-        
-
-        // Sending success response with data
+        // Sends a success response with the retrieved data
         res.status(200).json({
             status: "success",
-            message: "Transactions retrieved successfully 2",
+            message: "Transactions retrieved successfully",
             data: response,
         });
     }
 
+    /**
+     * Retrieves transaction Key Performance Indicators (KPIs) based on specified query parameters.
+     * @param req - The authenticated request object containing query parameters.
+     * @param res - The response object to send back to the client.
+     * @returns A JSON response containing transaction KPIs such as total transaction amount and count.
+     */
     static async getTransactionsKPI(req: AuthenticatedRequest, res: Response) {
+        // Extracts query parameters from the request
         const {
             page,
             limit,
@@ -378,13 +422,10 @@ export default class TransactionController {
             partnerId,
         } = req.query as any as getTransactionsRequestBody;
 
+        // Constructs the query object for Sequelize
         const query = { where: {} } as any;
-        // query.where[Op.and] = [
-        //     {amount: ""},
-        //     {amount: " "}
-        // ]
         query.where.amount = {
-            [Op.notIn]: ["", " "],
+            [Op.notIn]: ["", " "], // Filters out empty or whitespace amounts
         };
         if (status) query.where.status = status.toUpperCase();
         if (startDate && endDate)
@@ -400,23 +441,24 @@ export default class TransactionController {
         }
         if (partnerId) query.where.partnerId = partnerId;
 
+        // Checks if the request was made by an admin
         const requestWasMadeByAnAdmin =
             [RoleEnum.Admin].includes(req.user.user.entity.role) ||
             [RoleEnum.SuperAdmin].includes(req.user.user.entity.role);
 
+        // Checks if the request was made by a customer
         const requestWasMadeByCustomer = [RoleEnum.EndUser].includes(
             req.user.user.entity.role
         );
         if (requestWasMadeByCustomer) {
+            // Restricts data access to the current user's transactions if they are a customer
             query.where.userId = req.user.user.entity.userId;
         }
         if (!requestWasMadeByAnAdmin && !requestWasMadeByCustomer) {
-            //To show Partner Data to Teammember
-
+            // If the request was made by a team member, restricts data access to their partner's transactions
             const requestWasMadeByTeamMember = [RoleEnum.TeamMember].includes(
                 req.user.user.entity.role
             );
-
             if (requestWasMadeByTeamMember) {
                 const _teamMember =
                     await TeamMemberProfileService.viewSingleTeamMember(
@@ -424,10 +466,12 @@ export default class TransactionController {
                     );
                 query.where.partnerId = _teamMember?.partnerId;
             } else {
+                // If the request was made by a partner, restricts data access to their own transactions
                 query.where.partnerId = req.user.user.profile.id;
             }
         }
 
+        // Retrieves the total transaction amount and count based on the constructed query
         const totalTransactionAmount: any =
             await TransactionService.viewTransactionsAmountWithCustomQuery(
                 query
@@ -437,11 +481,13 @@ export default class TransactionController {
                 query
             );
 
+        // Constructs the response object
         const response = {
             totalTransactionAmount,
             totalTransactionCount,
         };
 
+        // Sends a JSON response containing the transaction KPIs
         res.status(200).json({
             status: "success",
             message: "Transactions retrieved successfully",
@@ -558,22 +604,33 @@ export default class TransactionController {
     //     });
     // }
 
+    /**
+     * Retrieves yesterday's transactions for a given partner.
+     * @param req - The authenticated request object containing query parameters.
+     * @param res - The response object to send back to the client.
+     * @returns A JSON response containing yesterday's transactions and their total amount.
+     */
     static async getYesterdaysTransactions(
         req: AuthenticatedRequest,
         res: Response
     ) {
+        // Extracts the transaction status from the request query parameters
         const { status } = req.query as any as {
             status: "COMPLETED" | "FAILED" | "PENDING";
         };
+
+        // Extracts the partner's profile ID from the authenticated user object
         const {
             profile: { id },
         } = req.user.user;
 
+        // Retrieves the partner information from the PartnerService
         const partner = await PartnerService.viewSinglePartner(id);
         if (!partner) {
             throw new InternalServerError("Authenticated partner not found");
         }
 
+        // Retrieves yesterday's transactions based on the provided status (if any)
         const transactions = status
             ? await TransactionService.viewTransactionsForYesterdayByStatus(
                   partner.id,
@@ -581,11 +638,13 @@ export default class TransactionController {
               )
             : await TransactionService.viewTransactionForYesterday(partner.id);
 
+        // Calculates the total amount of yesterday's transactions
         const totalAmount = transactions.reduce(
             (acc, curr) => acc + parseInt(curr.amount),
             0
         );
 
+        // Sends a JSON response containing the retrieved transactions and total amount
         res.status(200).json({
             status: "success",
             message: "Transactions retrieved successfully",

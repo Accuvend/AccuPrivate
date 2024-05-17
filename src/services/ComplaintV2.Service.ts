@@ -21,6 +21,8 @@ export interface IComplaint {
         cf_customer_phone?: string; // The phone of the customer associated with the complaint.
         cf_customer_name?: string; // The name of the customer associated with the complaint.
         cf_product_code?: string // The Product Code Attached to the transaction
+        cf_ticket_status?: string // The Ticket Status 
+        cf_complain_channel?: string | 'PARTNER PORTAL' | 'PARTNER API' //The Channel which the complaint is coming from
     };
     category ?: string // The category of the complaint (optional)
     email?: string; // The email address associated with the complaint (optional).

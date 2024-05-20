@@ -354,9 +354,6 @@ export default class TransactionController {
             await TransactionService.viewTransactionsWithCustomQueryAndInclude({
                 offset: 0,
                 limit: 7,
-                query: {
-                    ...dateQuery
-                },
                 include: [
                     Meter,
                     {

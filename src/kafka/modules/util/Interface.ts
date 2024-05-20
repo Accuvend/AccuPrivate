@@ -30,7 +30,7 @@ interface MeterValidationRequested {
     user: User;
     meter: MeterInfo;
     transactionId: string;
-    log?: 1 | 0
+    log?: 1 | 0;
 }
 
 interface Partner {
@@ -52,58 +52,77 @@ export interface VendorRetryRecord {
     retryCount: number;
 }
 
-export interface PublisherEventAndParameters extends Record<TOPICS, { log?: 1 | 0 } & any> {
+export interface PublisherEventAndParameters
+    extends Record<TOPICS, { log?: 1 | 0 } & any> {
+    [TOPICS.SCHEDULE_REQUERY_FOR_AIRTIME_TRANSACTION]: {
+        log?: 1 | 0;
+        timeStamp: string;
+        delayInSeconds: number;
+        scheduledMessagePayload: PublisherEventAndParameters[TOPICS.GET_AIRTIME_FROM_VENDOR_REQUERY];
+    };
+    [TOPICS.SCHEDULE_RETRY_FOR_AIRTIME_TRANSACTION]: {
+        log?: 1 | 0;
+        timeStamp: string;
+        delayInSeconds: number;
+        scheduledMessagePayload: PublisherEventAndParameters[TOPICS.AIRTIME_PURCHASE_INITIATED_BY_CUSTOMER] & {
+            retryRecord: Transaction["retryRecord"];
+            newVendor: Transaction["superagent"];
+            newTransactionReference: string;
+            irechargeAccessToken: string;
+            previousVendors: Transaction["superagent"][];
+        };
+    };
     [TOPICS.SCHEDULE_REQUERY_FOR_TRANSACTION]: {
-        log?: 1 | 0,
-        timeStamp: string,
-        delayInSeconds: number,
-        scheduledMessagePayload: PublisherEventAndParameters[TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_REQUERY]
-    }
+        log?: 1 | 0;
+        timeStamp: string;
+        delayInSeconds: number;
+        scheduledMessagePayload: PublisherEventAndParameters[TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_REQUERY];
+    };
     [TOPICS.SCHEDULE_RETRY_FOR_TRANSACTION]: {
-        log?: 1 | 0,
-        timeStamp: string,
-        delayInSeconds: number,
+        log?: 1 | 0;
+        timeStamp: string;
+        delayInSeconds: number;
         scheduledMessagePayload: PublisherEventAndParameters[TOPICS.POWER_PURCHASE_INITIATED_BY_CUSTOMER] & {
-            retryRecord: Transaction['retryRecord'],
-            newVendor: Transaction['superagent'],
-            newTransactionReference: string,
-            irechargeAccessToken: string,
-            previousVendors: Transaction['superagent'][],
-        }
-    }
+            retryRecord: Transaction["retryRecord"];
+            newVendor: Transaction["superagent"];
+            newTransactionReference: string;
+            irechargeAccessToken: string;
+            previousVendors: Transaction["superagent"][];
+        };
+    };
     [TOPICS.METER_VALIDATION_REQUEST_SENT_TO_VENDOR]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         meter: MeterInfo;
         transactionId: string;
-        superAgent: Transaction['superagent']
+        superAgent: Transaction["superagent"];
     };
     [TOPICS.METER_VALIDATION_RECIEVED_FROM_VENDOR]: MeterValidationRequested;
     [TOPICS.POWER_PURCHASE_INITIATED_BY_CUSTOMER]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         meter: MeterInfo & { id: string };
         user: User;
         partner: Partner;
         transactionId: string;
-        superAgent: Transaction['superagent'],
-        vendorRetryRecord: VendorRetryRecord
+        superAgent: Transaction["superagent"];
+        vendorRetryRecord: VendorRetryRecord;
     };
     [TOPICS.RETRY_PURCHASE_FROM_VENDOR]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         meter: MeterInfo & { id: string };
         user: User;
         partner: Partner;
         transactionId: string;
-        superAgent: Transaction['superagent'],
-        newVendor: Transaction['superagent'],
+        superAgent: Transaction["superagent"];
+        newVendor: Transaction["superagent"];
     };
     [TOPICS.VEND_ELECTRICITY_REQUESTED_FROM_VENDOR]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         meter: MeterInfo & { id: string };
         transactionId: string;
-        superAgent: Transaction['superagent'],
+        superAgent: Transaction["superagent"];
     };
     [TOPICS.TOKEN_RECIEVED_FROM_VENDOR]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         meter: MeterInfo & { id: string; token: string };
         user: User;
         partner: Partner;
@@ -111,7 +130,7 @@ export interface PublisherEventAndParameters extends Record<TOPICS, { log?: 1 | 
         tokenUnits: string;
     };
     [TOPICS.TOKEN_RECIEVED_FROM_REQUERY]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         meter: MeterInfo & { id: string; token: string };
         user: User;
         partner: Partner;
@@ -119,125 +138,119 @@ export interface PublisherEventAndParameters extends Record<TOPICS, { log?: 1 | 
         tokenUnits: string;
     };
     [TOPICS.WEBHOOK_NOTIFICATION_TO_PARTNER_RETRY]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         meter: MeterInfo & { id: string; token: string };
         user: User;
         partner: Partner;
         transactionId: string;
         retryCount: number;
-        superAgent: Transaction['superagent'],
+        superAgent: Transaction["superagent"];
     };
     [TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_REQUERY]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         meter: MeterInfo & { id: string };
         transactionId: string;
         timeStamp: Date;
         error: { code: number; cause: TransactionErrorCause };
         retryCount: number;
-        superAgent: Transaction['superagent'],
-        waitTime: number,
-        vendorRetryRecord: VendorRetryRecord
+        superAgent: Transaction["superagent"];
+        waitTime: number;
+        vendorRetryRecord: VendorRetryRecord;
     };
     [TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_INITIATED]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         meter: MeterInfo & { id: string };
         transactionId: string;
         timeStamp: Date;
-        superAgent: Transaction['superagent']
+        superAgent: Transaction["superagent"];
     };
     [TOPICS.PARTNER_TRANSACTION_COMPLETE]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         meter: MeterInfo & { id: string };
         user: User;
         partner: Partner;
         transactionId: string;
     };
     [TOPICS.TOKEN_SENT_TO_PARTNER]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         meter: MeterInfo & { id: string };
         partner: Partner;
         transactionId: string;
     };
     [TOPICS.TOKEN_SENT_TO_EMAIL]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         meter: MeterInfo & { id: string };
         user: User & { id: string };
         transactionId: string;
     };
     [TOPICS.TOKEN_SENT_TO_PARTNER_RETRY]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         meter: MeterInfo & { id: string; token: string };
         user: User;
         partner: Partner;
         transactionId: string;
-        tokenUnits: string
+        tokenUnits: string;
     };
     [TOPICS.CREATE_USER_INITIATED]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         user: User;
         transactionId: string;
     };
     [TOPICS.CREATE_USER_CONFIRMED]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         user: User & { id: string };
         transactionId: string;
     };
     [TOPICS.TOKEN_REQUEST_FAILED]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         transactionId: string;
         meter: MeterInfo;
     };
 
-
     // Airtime
     [TOPICS.AIRTIME_PURCHASE_INITIATED_BY_CUSTOMER]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         phone: {
             phoneNumber: string;
             amount: number;
-        },
+        };
+        vendorRetryRecord: {
+            retryCount: number;
+        };
         user: User;
         partner: Partner;
         transactionId: string;
-        superAgent: Transaction['superagent']
+        superAgent: Transaction["superagent"];
     };
     [TOPICS.AIRTIME_TRANSACTION_COMPLETE]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         phone: {
             phoneNumber: string;
             amount: number;
-        },
+        };
         user: User;
         partner: Partner;
-        superAgent: Transaction['superagent']
+        superAgent: Transaction["superagent"];
         transactionId: string;
     };
     [TOPICS.RETRY_AIRTIME_PURCHASE_FROM_NEW_VENDOR]: {
-        log?: 1 | 0,
-        phone: { phoneNumber: string; amount: number; },
+        log?: 1 | 0;
+        phone: { phoneNumber: string; amount: number };
         user: User;
         partner: Partner;
         transactionId: string;
-        superAgent: Transaction['superagent'],
-        newVendor: Transaction['superagent'],
-    };
-    [TOPICS.AIRTIME_PURCHASE_INITIATED_BY_CUSTOMER]: {
-        log?: 1 | 0,
-        phone: { phoneNumber: string; amount: number; },
-        user: User;
-        partner: Partner;
-        transactionId: string;
-        superAgent: Transaction['superagent']
+        superAgent: Transaction["superagent"];
+        newVendor: Transaction["superagent"];
     };
     [TOPICS.AIRTIME_RECEIVED_FROM_VENDOR]: {
-        log?: 1 | 0,
-        phone: { phoneNumber: string; amount: number; },
+        log?: 1 | 0;
+        phone: { phoneNumber: string; amount: number };
         user: User;
         partner: Partner;
         transactionId: string;
     };
-    [TOPICS.GET_AIRTIME_FROM_VENDOR_RETRY]: {
-        log?: 1 | 0,
+    [TOPICS.GET_AIRTIME_FROM_VENDOR_REQUERY]: {
+        log?: 1 | 0;
         phone: {
             phoneNumber: string;
             amount: number;
@@ -246,73 +259,73 @@ export interface PublisherEventAndParameters extends Record<TOPICS, { log?: 1 | 
         timeStamp: Date;
         error: { code: number; cause: TransactionErrorCause };
         retryCount: number;
-        superAgent: Transaction['superagent'],
-        waitTime: number,
+        superAgent: Transaction["superagent"];
+        waitTime: number;
     };
     [TOPICS.AIRTIME_PURCHASE_RETRY_FROM_NEW_VENDOR]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         phone: {
             phoneNumber: string;
             amount: number;
-        },
+        };
         user: User;
         partner: Partner;
         transactionId: string;
-        superAgent: Transaction['superagent'],
-        newVendor: Transaction['superagent'],
+        superAgent: Transaction["superagent"];
+        newVendor: Transaction["superagent"];
     };
 
     // Data
     [TOPICS.DATA_PURCHASE_INITIATED_BY_CUSTOMER]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         phone: {
             phoneNumber: string;
             amount: number;
-        },
+        };
         user: User;
         partner: Partner;
         transactionId: string;
-        superAgent: Transaction['superagent'],
-        vendorRetryRecord: VendorRetryRecord
+        superAgent: Transaction["superagent"];
+        vendorRetryRecord: VendorRetryRecord;
     };
     [TOPICS.DATA_TRANSACTION_COMPLETE]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         phone: {
             phoneNumber: string;
             amount: number;
-        },
+        };
         user: User;
         partner: Partner;
-        superAgent: Transaction['superagent']
+        superAgent: Transaction["superagent"];
         transactionId: string;
     };
     [TOPICS.RETRY_DATA_PURCHASE_FROM_NEW_VENDOR]: {
-        log?: 1 | 0,
-        phone: { phoneNumber: string; amount: number; },
+        log?: 1 | 0;
+        phone: { phoneNumber: string; amount: number };
         user: User;
         partner: Partner;
         transactionId: string;
-        superAgent: Transaction['superagent'],
-        newVendor: Transaction['superagent'],
+        superAgent: Transaction["superagent"];
+        newVendor: Transaction["superagent"];
     };
     [TOPICS.DATA_PURCHASE_INITIATED_BY_CUSTOMER]: {
-        log?: 1 | 0,
-        phone: { phoneNumber: string; amount: number; },
+        log?: 1 | 0;
+        phone: { phoneNumber: string; amount: number };
         user: User;
         partner: Partner;
         transactionId: string;
-        superAgent: Transaction['superagent'],
-        vendorRetryRecord: VendorRetryRecord
+        superAgent: Transaction["superagent"];
+        vendorRetryRecord: VendorRetryRecord;
     };
     [TOPICS.DATA_RECEIVED_FROM_VENDOR]: {
-        log?: 1 | 0,
-        phone: { phoneNumber: string; amount: number; },
+        log?: 1 | 0;
+        phone: { phoneNumber: string; amount: number };
         user: User;
         partner: Partner;
         transactionId: string;
     };
     [TOPICS.GET_DATA_FROM_VENDOR_RETRY]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         phone: {
             phoneNumber: string;
             amount: number;
@@ -321,21 +334,21 @@ export interface PublisherEventAndParameters extends Record<TOPICS, { log?: 1 | 
         timeStamp: Date;
         error: { code: number; cause: TransactionErrorCause };
         retryCount: number;
-        superAgent: Transaction['superagent'],
-        waitTime: number,
-        vendorRetryRecord: VendorRetryRecord
+        superAgent: Transaction["superagent"];
+        waitTime: number;
+        vendorRetryRecord: VendorRetryRecord;
     };
     [TOPICS.DATA_PURCHASE_RETRY_FROM_NEW_VENDOR]: {
-        log?: 1 | 0,
+        log?: 1 | 0;
         phone: {
             phoneNumber: string;
             amount: number;
-        },
+        };
         user: User;
         partner: Partner;
         transactionId: string;
-        superAgent: Transaction['superagent'],
-        newVendor: Transaction['superagent'],
+        superAgent: Transaction["superagent"];
+        newVendor: Transaction["superagent"];
     };
 }
 
@@ -359,4 +372,3 @@ export abstract class Registry {
 }
 
 export type MessagePayload = EachMessagePayload & { topic: TOPICS };
-

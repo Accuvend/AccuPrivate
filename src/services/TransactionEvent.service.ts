@@ -64,6 +64,49 @@ export class AirtimeTransactionEventService {
         this.phoneNumber = phoneNumber
     }
 
+    public async addScheduleRequeryEvent({ timeStamp, waitTime }: { timeStamp: string, waitTime: number }): Promise<Event> {
+        const event: ICreateEvent = {
+            transactionId: this.transaction.id,
+            eventType: TOPICS.SCHEDULE_REQUERY_FOR_AIRTIME_TRANSACTION,
+            eventText: TOPICS.SCHEDULE_REQUERY_FOR_TRANSACTION_INITIATED,
+            payload: JSON.stringify({
+                timeStamp,
+                waitTime,
+                phone: this.phoneNumber,
+                superagent: this.superAgent,
+                partnerEmail: this.partner,
+            }),
+            source: 'API',
+            eventTimestamp: new Date(),
+            id: uuidv4(),
+            status: Status.PENDING,
+        }
+
+        return await EventService.addEvent(event);
+    }
+
+    public async addScheduleRetryEvent({ timeStamp, waitTime, retryRecord }: { timeStamp: string, waitTime: number, retryRecord: Transaction['retryRecord'][number] }): Promise<Event> {
+        const event: ICreateEvent = {
+            transactionId: this.transaction.id,
+            eventType: TOPICS.SCHEDULE_RETRY_FOR_AIRTIME_TRANSACTION,
+            eventText: TOPICS.SCHEDULE_RETRY_FOR_AIRTIME_TRANSACTION,
+            payload: JSON.stringify({
+                timeStamp,
+                waitTime,
+                phone: this.phoneNumber,
+                superagent: this.superAgent,
+                partnerEmail: this.partner,
+                retryRecord: retryRecord
+            }),
+            source: 'API',
+            eventTimestamp: new Date(),
+            id: uuidv4(),
+            status: Status.PENDING,
+        }
+
+        return await EventService.addEvent(event);
+    }
+
     public async addPhoneNumberValidationRequestedEvent(): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
@@ -257,8 +300,8 @@ export class AirtimeTransactionEventService {
     }): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
-            eventType: TOPICS.RETRY_AIRTIME_PURCHASE_FROM_NEW_VENDOR,
-            eventText: TOPICS.RETRY_AIRTIME_PURCHASE_FROM_NEW_VENDOR,
+            eventText: TOPICS.RETRY_AIRTIME_PURCHASE_FROM_VENDOR,
+            eventType: TOPICS.RETRY_AIRTIME_PURCHASE_FROM_VENDOR,
             payload: JSON.stringify({
                 transactionId: this.transaction.id,
                 phoneNumber: this.phoneNumber,
@@ -860,7 +903,7 @@ export default class TransactionEventService {
                 vendType: this.meterInfo.vendType,
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
-                retryRecord:  retryRecord
+                retryRecord: retryRecord
             }),
             source: 'API',
             eventTimestamp: new Date(),

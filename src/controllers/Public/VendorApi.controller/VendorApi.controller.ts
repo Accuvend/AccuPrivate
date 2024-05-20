@@ -29,22 +29,20 @@ import { AuthenticatedRequest } from "../../../utils/Interface";
 import Event, { TokenRetryEventPayload } from "../../../models/Event.model";
 import { VendorPublisher } from "../../../kafka/modules/publishers/Vendor";
 import { CRMPublisher } from "../../../kafka/modules/publishers/Crm";
-import { TokenHandlerUtil } from "../../../kafka/modules/consumers/Token";
+import {
+    ResponseValidationUtil,
+    TokenHandlerUtil,
+} from "../../../kafka/modules/consumers/Token";
 import { TOPICS } from "../../../kafka/Constants";
 import {
     PublisherEventAndParameters,
     Registry,
     TransactionErrorCause,
 } from "../../../kafka/modules/util/Interface";
-import { randomUUID } from "crypto";
-import ConsumerFactory from "../../../kafka/modules/util/Consumer";
-import MessageProcessorFactory from "../../../kafka/modules/util/MessageProcessor";
 import logger, { Logger } from "../../../utils/Logger";
 import { error } from "console";
 import TransactionEventService from "../../../services/TransactionEvent.service";
-import WebhookService from "../../../services/Webhook.service";
 import { AirtimeVendController } from "./Airtime.controller";
-import VendorRates from "../../../models/VendorRates.model";
 import ProductService from "../../../services/Product.service";
 import VendorProduct, {
     VendorProductSchemaData,
@@ -58,13 +56,9 @@ import {
     generateRandonNumbers,
     generateVendorReference,
 } from "../../../utils/Helper";
-import ResponseTrimmer from "../../../utils/ResponseTrimmer";
-import PowerUnit from "../../../models/PowerUnit.model";
-import PowerUnitService from "../../../services/PowerUnit.service";
 import { TokenUtil } from "../../../utils/Auth/Token";
-import ResponsePath from "../../../models/ResponsePath.model";
-import { Op } from "sequelize";
-import { token } from "morgan";
+import VendorModelService from "../../../services/Vendor.service";
+import { AxiosError } from "axios";
 
 enum MessageType {
     INFORMATION = "INFORMATION",
@@ -102,14 +96,15 @@ interface RequestTokenValidatorParams {
 
 interface RequestTokenValidatorResponse {
     user: User;
-    meter: Meter;
+    meter: Meter | null;
     transaction: Transaction;
     partnerEntity: Entity;
 }
 
 // Validate request parameters for each controller
-class VendorControllerValdator {
-    static async requestToken({
+export  class VendorControllerValdator {
+
+    static async validateRequest({
         bankRefId,
         transactionId,
         transaction: transactionRecord,
@@ -128,6 +123,7 @@ class VendorControllerValdator {
             );
         }
 
+        console.log({ partner: partner.dataValues });
         if (!partner.partnerCode) {
             throw new InternalServerError("Partner code not found");
         }
@@ -153,7 +149,7 @@ class VendorControllerValdator {
 
         //  Get Meter
         const meter: Meter | null = await transactionRecord.$get("meter");
-        if (!meter) {
+        if (!meter && transactionRecord.transactionType=== TransactionType.ELECTRICITY) {
             throw new InternalServerError(
                 `Transaction ${transactionRecord.id} does not have a meter`,
             );
@@ -877,7 +873,7 @@ export default class VendorController {
                 );
 
                 const { user, partnerEntity } =
-                    await VendorControllerValdator.requestToken({
+                    await VendorControllerValdator.validateRequest({
                         bankRefId,
                         transactionId,
                         vendorDiscoCode,
@@ -1188,6 +1184,125 @@ export default class VendorController {
         });
     }
 
+    static async cusRe(req: Request, res: Response, next: NextFunction) {
+        const { transactionId } = req.body;
+
+        // TODO: Change from viewbyid to vendor refer id
+        const transaction =
+            await TransactionService.viewSingleTransaction(transactionId);
+        if (!transaction) {
+            throw new NotFoundError("Transaction not found");
+        }
+        const logMeta = { transactionId: transaction.id };
+        const user = await transaction.$get("user");
+        const meter = await transaction.$get("meter");
+        const partner = await transaction.$get("partner");
+        if (!user || !meter || !partner) {
+            throw new InternalServerError(
+                "Transaction  required relations not found",
+            );
+        }
+
+        logger.info("Requery initiated from customer", logMeta);
+        // Check if disco is up
+        const vendor = await VendorModelService.viewSingleVendorByName(
+            transaction.superagent,
+        );
+        if (!vendor) throw new InternalServerError("Vendor not found");
+
+        const product =
+            await ProductService.viewSingleProductByMasterProductCode(
+                transaction.disco,
+            );
+        if (!product) throw new InternalServerError("Product not found");
+
+        const vendorProduct =
+            await VendorProductService.viewSingleVendorProductByVendorIdAndProductId(
+                vendor.id,
+                product.id,
+            );
+        if (!vendorProduct)
+            throw new InternalServerError("Vendor product not found");
+
+        logger.info("Intiating transaction requery", logMeta);
+        const discoCode = vendorProduct.schemaData.code;
+        const requeryResult =
+            await TokenHandlerUtil.requeryTransactionFromVendor(
+                transaction,
+            ).catch((e) => e ?? {});
+
+        logger.info("Requeried transaction successfully", logMeta);
+        console.log({ requeryResult: requeryResult });
+        const response =
+            await ResponseValidationUtil.validateTransactionCondition({
+                requestType: "REQUERY",
+                vendor: vendor.name,
+                transactionType: transaction.transactionType,
+                httpCode:
+                    requeryResult instanceof AxiosError
+                        ? requeryResult.status
+                        : requeryResult.httpStatusCode,
+                responseObject:
+                    requeryResult instanceof AxiosError
+                        ? requeryResult.response?.data
+                        : requeryResult,
+                vendType: meter.vendType,
+                disco: discoCode,
+                transactionId: transaction.id,
+                isError: requeryResult instanceof AxiosError,
+            });
+
+        logger.info("Response validation completed", {
+            ...logMeta,
+            validationResponse: response,
+        });
+        if (response.action != 1) {
+            throw new BadRequestError("Transaction requery unsuccessfull");
+        }
+
+        const tokenInResponse =
+            response.vendType === "PREPAID" ? response.token : undefined;
+        await VendorPublisher.publishEventForTokenReceivedFromRequery({
+            transactionId: transaction!.id,
+            user: {
+                name: user.name as string,
+                email: user.email,
+                address: user.address,
+                phoneNumber: user.phoneNumber,
+            },
+            partner: {
+                email: partner.email,
+            },
+            meter: {
+                id: meter.id,
+                meterNumber: meter.meterNumber,
+                disco: transaction!.disco,
+                vendType: meter.vendType,
+                token: tokenInResponse ?? "",
+            },
+            tokenUnits: response.tokenUnits,
+        });
+
+        res.status(200).send({
+            status: "success",
+            message: "Requery successful",
+            data: {
+                transaction: {
+                    transactionId: transaction.id,
+                    status: transaction.status,
+                },
+                meter: {
+                    disco: meter.disco,
+                    number: meter.meterNumber,
+                    address: meter.address,
+                    phone: meter.userId,
+                    vendType: meter.vendType,
+                    name: meter.userId,
+                },
+            },
+        });
+    }
+
     static async initManualRequeryTransaction(
         req: AuthenticatedRequest,
         res: Response,
@@ -1217,10 +1332,6 @@ export default class VendorController {
         );
         if (!_product) throw new InternalServerError("Product not found");
 
-        const discoLogo =
-            DISCO_LOGO[_product.productName as keyof typeof DISCO_LOGO] ??
-            LOGO_URL;
-        let tokenInResponse: string | null = null;
         const meter = await transaction.$get("meter");
         if (!meter) {
             throw new InternalServerError("Meter not found");

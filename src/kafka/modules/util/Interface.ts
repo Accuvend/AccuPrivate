@@ -164,6 +164,7 @@ export interface PublisherEventAndParameters
         timeStamp: Date;
         superAgent: Transaction["superagent"];
     };
+
     [TOPICS.PARTNER_TRANSACTION_COMPLETE]: {
         log?: 1 | 0;
         meter: MeterInfo & { id: string };
@@ -260,6 +261,7 @@ export interface PublisherEventAndParameters
         error: { code: number; cause: TransactionErrorCause };
         retryCount: number;
         superAgent: Transaction["superagent"];
+        vendorRetryRecord: VendorRetryRecord;
         waitTime: number;
     };
     [TOPICS.AIRTIME_PURCHASE_RETRY_FROM_NEW_VENDOR]: {

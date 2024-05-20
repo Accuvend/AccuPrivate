@@ -295,6 +295,33 @@ export class AirtimeTransactionEventService {
         return await EventService.addEvent(event);
     }
 
+
+    public async addGetAirtimeTokenRequestedFromVendorRequeryEvent(error: { cause: TransactionErrorCause, code: number, }, retryCount: number): Promise<Event> {
+        const event: ICreateEvent = {
+            transactionId: this.transaction.id,
+            eventType: TOPICS.GET_AIRTIME_FROM_VENDOR_REQUERY,
+            eventText: TOPICS.GET_AIRTIME_FROM_VENDOR_REQUERY,
+            payload: JSON.stringify({
+                transactionId: this.transaction.id,
+                superAgent: this.transaction.superagent,
+                amount: this.transaction.amount,
+                disco: this.transaction.disco,
+                phone: this.phoneNumber,
+                timestamp: new Date(),
+                superagent: this.superAgent,
+                partnerEmail: this.partner,
+                error,
+                retryCount
+            }),
+            source: this.transaction.superagent.toUpperCase(),
+            eventTimestamp: new Date(),
+            id: uuidv4(),
+            status: Status.COMPLETE,
+        }
+
+        return await EventService.addEvent(event);
+    }
+
     public async addAirtimePurchaseWithNewVendorEvent({ currentVendor, newVendor }: {
         currentVendor: Transaction['superagent'], newVendor: Transaction['superagent']
     }): Promise<Event> {

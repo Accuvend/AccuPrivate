@@ -1052,20 +1052,20 @@ class TokenHandler extends Registry {
                         return;
                     }
 
-                    const transactionEventService = new TransactionEventService(
+                    const transactionEventService = new AirtimeTransactionEventService(
                         existingTransaction,
-                        data.scheduledMessagePayload.meter,
                         existingTransaction.superagent,
+                        data.scheduledMessagePayload.phone.phoneNumber,
                         data.scheduledMessagePayload.superAgent,
                     );
-                    await transactionEventService.addGetTransactionTokenRequestedFromVendorRetryEvent(
+                    await transactionEventService.addGetAirtimeTokenRequestedFromVendorRequeryEvent(
                         {
                             cause: TransactionErrorCause.RESCHEDULED_BEFORE_WAIT_TIME,
                             code: 202,
                         },
                         data.scheduledMessagePayload.retryCount + 1,
                     );
-                    return await VendorPublisher.publishEventForGetTransactionTokenRequestedFromVendorRetry(
+                    return await VendorPublisher.publishEventForGetAirtimeRequestedFromVendorRequery(
                         data.scheduledMessagePayload,
                     );
                 }
@@ -1149,16 +1149,8 @@ class TokenHandler extends Registry {
                         },
                     );
 
-                    await VendorPublisher.publishEventForRetryPowerPurchaseWithNewVendor(
-                        {
-                            meter: data.scheduledMessagePayload.meter,
-                            partner: data.scheduledMessagePayload.partner,
-                            transactionId:
-                                data.scheduledMessagePayload.transactionId,
-                            superAgent: data.scheduledMessagePayload.superAgent,
-                            user: data.scheduledMessagePayload.user,
-                            newVendor: data.scheduledMessagePayload.newVendor,
-                        },
+                    await VendorPublisher.publishEventForAirtimePurchaseRetryFromVendorWithNewVendor(
+                        data.scheduledMessagePayload
                     );
 
                     await transactionEventService.addPowerPurchaseInitiatedEvent(

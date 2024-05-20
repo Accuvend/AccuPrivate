@@ -345,6 +345,25 @@ export class VendorPublisher extends ProducerFactory {
         });
     }
 
+    static async publishEventForGetAirtimeRequestedFromVendorRequery(
+        data: PublisherEventAndParameters[TOPICS.GET_AIRTIME_FROM_VENDOR_REQUERY],
+    ) {
+        return ProducerFactory.sendMessage({
+            topic: TOPICS.GET_AIRTIME_FROM_VENDOR_REQUERY,
+            message: {
+                log: data.log,
+                error: data.error,
+                transactionId: data.transactionId,
+                timeStamp: data.timeStamp,
+                retryCount: data.retryCount,
+                superAgent: data.superAgent,
+                waitTime: data.waitTime,
+                vendorRetryRecord: data.vendorRetryRecord,
+                phone: data.phone,
+            },
+        });
+    }
+
     static async publishEventForGetTransactionTokenFromVendorInitiated(
         data: PublisherEventAndParameters[TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_INITIATED],
     ) {

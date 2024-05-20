@@ -21,6 +21,8 @@ export interface IComplaint {
         cf_customer_phone?: string; // The phone of the customer associated with the complaint.
         cf_customer_name?: string; // The name of the customer associated with the complaint.
         cf_product_code?: string // The Product Code Attached to the transaction
+        cf_ticket_status?: string // The Ticket Status 
+        cf_complain_channel?: string | 'PARTNER PORTAL' | 'PARTNER API' //The Channel which the complaint is coming from
     };
     category ?: string // The category of the complaint (optional)
     email?: string; // The email address associated with the complaint (optional).
@@ -130,9 +132,9 @@ export default class ComplaintService {
             if (!entity) throw new Error("Entity is required");
 
             // Constructing URL for Zoho API call with query parameters
-            const url =
-                `/api/v1/contacts/${entity.zohoContactId}/tickets` +
-                (limit || offset || status ? "?" : "") +
+            const url = `/api/v1/tickets/search?contactId=${entity.zohoContactId}&` +//&fields=cf_ticket_status,cf_transanction_id,cf_customer_email,cf_customer_name,cf_customer_phone,cf_complain_channel&` +
+                // `/api/v1/contacts/${entity.zohoContactId}/tickets?fields=cf_ticket_status,cf_transanction_id,cf_customer_email,cf_customer_name,cf_customer_phone,cf_complain_channel&` +
+                // (limit || offset || status ? "?" : "") +
                 (limit ? "limit=" + limit + "&" : "") +
                 (offset || offset === 0 ? "from=" + offset + "&" : "") +
                 (status ? "status=" + status : "");

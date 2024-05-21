@@ -225,7 +225,8 @@ class NotificationHandler extends Registry {
                 Bank Ref: ${transaction.bankRefId}
                 Bank Comment: ${transaction.bankComment}
                 Transaction Id: ${transaction.id},
-                Phone number: ${data.phone.phoneNumber}                    
+                Phone number: ${data.phone.phoneNumber}        e
+                Network provider: ${transaction.networkProvider}
                 `,
             entityId: partnerEntity.id,
             read: false,
@@ -267,7 +268,7 @@ class NotificationHandler extends Registry {
 
         await EmailService.sendEmail({
             to: transaction.partner.email,
-            subject: "Token Purchase",
+            subject: "Successful Airtime Purchase",
             html: await new EmailTemplate().airTimeReceipt({
                 transaction: transaction,
                 phoneNumber: data.phone.phoneNumber,
@@ -281,6 +282,74 @@ class NotificationHandler extends Registry {
                 logger.error("Error sending sms", error);
             },
         );
+        await transactionEventService.addAirtimeSentToUserEmail();
+
+        return;
+    }
+
+    private static async handleAirtimeSendToUser(
+        data: PublisherEventAndParameters[TOPICS.AIRTIME_RECEIVED_FROM_VENDOR],
+    ) {
+        logger.info("Inside notification handler");
+        const transaction = await TransactionService.viewSingleTransaction(
+            data.transactionId,
+        );
+        if (!transaction) {
+            throw new Error(
+                `Error fetching transaction with id ${data.transactionId}`,
+            );
+        }
+
+        const partnerEntity = await EntityService.viewSingleEntityByEmail(
+            transaction.partner.email,
+        );
+        if (!partnerEntity) {
+            throw new Error(
+                `Error fetching partner with email ${transaction.partner.email}`,
+            );
+        }
+
+        const transactionEventService = new AirtimeTransactionEventService(
+            transaction,
+            transaction.superagent,
+            transaction.partner.email,
+            data.phone.phoneNumber,
+        );
+
+        const product = await ProductService.viewSingleProduct(
+            transaction.productCodeId,
+        );
+        if (!product) {
+            throw new Error(
+                `Error fetching product with id ${transaction.productCodeId}`,
+            );
+        }
+
+        transaction.disco = product.productName;
+
+        await EmailService.sendEmail({
+            to: transaction.partner.email,
+            subject: "Successful Airtime Purchase",
+            html: await new EmailTemplate().airTimeReceipt({
+                transaction: transaction,
+                phoneNumber: data.phone.phoneNumber,
+            }),
+        });
+
+        const msgTemplate = await SmsService.airtimeTemplate(transaction);
+        await SmsService.sendSms(data.phone.phoneNumber, msgTemplate)
+            .then(async () => {
+                await transactionEventService.addAirtimeSentToUserEmail();
+            })
+            .catch((error: AxiosError) => {
+                console.log(error.response?.data);
+                logger.error("Error sending sms", {
+                    meta: {
+                        transactionId: transaction.id,
+                        error: error.response?.data,
+                    }
+                });
+            });
         await transactionEventService.addAirtimeSentToUserEmail();
 
         return;
@@ -376,6 +445,7 @@ class NotificationHandler extends Registry {
         [TOPICS.TOKEN_RECIEVED_FROM_REQUERY]: this.handleTokenToSendToUser,
         [TOPICS.TOKEN_REQUEST_FAILED]: this.failedTokenRequest,
         [TOPICS.AIRTIME_RECEIVED_FROM_VENDOR]: this.handleReceivedAirtime,
+        [TOPICS.AIRTIME_RECEIVED_FROM_VENDOR_REQUERY]: this.handleAirtimeSendToUser,
     };
 }
 

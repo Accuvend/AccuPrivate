@@ -572,6 +572,7 @@ export class VendorPublisher extends ProducerFactory {
                 superAgent: data.superAgent,
                 newVendor: data.newVendor,
                 partner: data.partner,
+                vendorRetryRecord: data.vendorRetryRecord,
                 user: data.user,
             },
         });

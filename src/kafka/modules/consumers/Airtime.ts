@@ -34,7 +34,10 @@ import VendorService, {
     Vendor,
     VendorAirtimeService,
 } from "../../../services/VendorApi.service";
-import { generateRandomToken, generateVendorReference } from "../../../utils/Helper";
+import {
+    generateRandomToken,
+    generateVendorReference,
+} from "../../../utils/Helper";
 import BuypowerApi from "../../../services/VendorApi.service/Buypower";
 import { IRechargeApi } from "../../../services/VendorApi.service/Irecharge";
 import ProductService from "../../../services/Product.service";
@@ -43,9 +46,14 @@ import { VendorProductSchemaData } from "../../../models/VendorProduct.model";
 import BaxiApi from "../../../services/VendorApi.service/Baxi";
 import { token } from "morgan";
 import { CustomError } from "../../../utils/Errors";
-import { getCurrentWaitTimeForSwitchEvent, ResponseValidationUtil, TokenHandlerUtil } from "./Token";
+import {
+    getCurrentWaitTimeForRequeryEvent,
+    getCurrentWaitTimeForSwitchEvent,
+    ResponseValidationUtil,
+    TokenHandlerUtil,
+} from "./Token";
 import { transferableAbortSignal } from "util";
-import newrelic from 'newrelic'
+import newrelic from "newrelic";
 import { randomUUID } from "crypto";
 
 interface EventMessage {
@@ -103,12 +111,6 @@ const TransactionErrorCodeAndCause = {
     202: TransactionErrorCause.TRANSACTION_TIMEDOUT,
 };
 
-export function getCurrentWaitTimeForRequeryEvent(retryCount: number) {
-    // Use geometric progression  calculate wait time, where R = 2
-    const waitTime = 2 ** (retryCount - 1);
-    return waitTime;
-}
-
 export class AirtimeHandlerUtil {
     static async triggerEventToRequeryTransactionTokenFromVendor({
         eventService,
@@ -163,20 +165,11 @@ export class AirtimeHandlerUtil {
             logMeta,
         );
 
+
         await eventService.addGetAirtimeFromVendorRetryEvent(
             _eventMessage.error,
             retryCount,
         );
-        const eventMetaData = {
-            transactionId: eventData.transactionId,
-            phone: eventData.phone,
-            error: eventData.error,
-            timeStamp: new Date(),
-            retryCount,
-            superAgent,
-            waitTime: getCurrentWaitTimeForRequeryEvent(retryCount),
-        };
-
         const transaction = await TransactionService.viewSingleTransaction(
             eventData.transactionId,
         );
@@ -184,6 +177,20 @@ export class AirtimeHandlerUtil {
             throw new CustomError("Transaction not found", {
                 transactionId: eventData.transactionId,
             });
+
+        const eventMetaData = {
+            transactionId: eventData.transactionId,
+            phone: eventData.phone,
+            error: eventData.error,
+            timeStamp: new Date(),
+            retryCount,
+            superAgent,
+            waitTime: await getCurrentWaitTimeForRequeryEvent(retryCount, superAgent),
+            vendorRetryRecord: transaction.retryRecord[
+                transaction.retryRecord.length - 1
+            ],
+        };
+
 
         const partner = await transaction.$get("partner");
         if (!partner)
@@ -209,23 +216,13 @@ export class AirtimeHandlerUtil {
             timeStamp: new Date().toString(),
             delayInSeconds: eventMetaData.waitTime,
         });
-
-
-        // Publish event in increasing intervals of seconds i.e 1, 2, 4, 8, 16, 32, 64, 128, 256, 512
-        // TODO: Use an external service to schedule this task
-        setTimeout(async () => {
-            logger.info("Retrying transaction from vendor", logMeta);
-            await VendorPublisher.publishEventForGetAirtimeFromVendorRetry(
-                eventMetaData,
-            );
-        }, eventMetaData.waitTime * 1000);
     }
 
     static async triggerEventToRetryTransactionWithNewVendor({
         transaction,
         transactionEventService,
         phone,
-        vendorRetryRecord
+        vendorRetryRecord,
     }: {
         eventData: EventMessage & {
             error: {
@@ -370,6 +367,7 @@ export class AirtimeHandlerUtil {
             scheduledMessagePayload: {
                 partner: partner,
                 transactionId: transaction.id,
+                phone: phone,
                 superAgent: newVendor,
                 user: {
                     name: user.name as string,
@@ -554,7 +552,6 @@ export class AirtimeHandlerUtil {
 }
 
 class AirtimeHandler extends Registry {
-
     private static async handleAirtimeRequest(
         data: PublisherEventAndParameters[TOPICS.AIRTIME_PURCHASE_INITIATED_BY_CUSTOMER],
     ) {
@@ -622,6 +619,7 @@ class AirtimeHandler extends Registry {
                 serviceProvider:
                     transaction.networkProvider as TokenPurchaseData["serviceProvider"],
             });
+            console.log({ tokenInfo })
 
             console.log({
                 point: "Airtime purchase initiated",
@@ -630,13 +628,50 @@ class AirtimeHandler extends Registry {
             logger.info("Vend request processed", logMeta);
             const error = { code: 202, cause: TransactionErrorCause.UNKNOWN };
 
+            // For irecharge airtime access token is gotten after vend, this token will be required to requery transaction later 
+            if (!(tokenInfo instanceof AxiosError) && tokenInfo.source === 'IRECHARGE') {
+                // Update the access token in the retry record
+                const vendorRetryRecord = transaction.retryRecord
+                    .slice()
+                    .pop();
+
+                let updatedRetryRecord = transaction.retryRecord;
+
+                if (vendorRetryRecord) {
+                    vendorRetryRecord.accessToken = tokenInfo.ref;
+                    vendorRetryRecord.data = {
+                        ...vendorRetryRecord.data,
+                        accessToken: tokenInfo.ref,
+                    };
+
+                    updatedRetryRecord = transaction.retryRecord.map((record) => {
+                        if (record.vendor === vendorRetryRecord.vendor) {
+                            return vendorRetryRecord;
+                        }
+
+                        return record;
+                    });
+                } else {
+                    logger.warn("Vendor retry record not found", logMeta)
+                }
+
+
+                await TransactionService.updateSingleTransaction(
+                    transaction.id,
+                    {
+                        irechargeAccessToken:
+                            tokenInfo.ref,
+                        retryRecord: updatedRetryRecord,
+                    },
+                );
+            }
+
             const eventMessage = {
                 phone: data.phone,
                 disco: disco,
                 transactionId: transaction.id,
                 error: error,
             };
-            await transactionEventService.addAirtimeReceivedFromVendorEvent();
             const validationResponse =
                 await ResponseValidationUtil.validateTransactionCondition({
                     requestType: "VENDREQUEST",
@@ -679,9 +714,12 @@ class AirtimeHandler extends Registry {
                             vendorRetryRecord: data.vendorRetryRecord,
                         },
                     );
-                    break
+                    break;
                 case 0:
-                    logger.error("Transaction condition failed - Retry", logMeta);
+                    logger.error(
+                        "Transaction condition failed - Retry",
+                        logMeta,
+                    );
                     await AirtimeHandlerUtil.triggerEventToRetryTransactionWithNewVendor(
                         {
                             eventData: eventMessage,
@@ -693,12 +731,15 @@ class AirtimeHandler extends Registry {
                     );
                     break;
                 case 1:
-                    logger.error("Transaction condition passed - Complete", logMeta);
+                    logger.error(
+                        "Transaction condition passed - Complete",
+                        logMeta,
+                    );
                     // await TransactionService.updateSingleTransaction(
                     //     transaction.id,
                     //     { status: Status.COMPLETE },
                     // );
-                    await transactionEventService.addAirtimeReceivedFromVendorEvent()
+                    await transactionEventService.addAirtimeReceivedFromVendorEvent();
                     await AirtimeHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
                         {
                             eventData: {
@@ -752,191 +793,6 @@ class AirtimeHandler extends Registry {
         }
     }
 
-    private static async handleAirtimeRecievd(
-        data: PublisherEventAndParameters[TOPICS.AIRTIME_RECEIVED_FROM_VENDOR],
-    ) {
-        try {
-            const logMeta = {
-                meta: { transactionId: data.transactionId },
-            };
-            logger.warn("Requerying transaction from vendor", logMeta);
-            retry.count = data.retryCount;
-            console.log({
-                data: data.vendorRetryRecord,
-                retyrCount: data.retryCount,
-            });
-
-            // Check if token has been found
-            const transaction =
-                await TransactionService.viewSingleTransaction(
-                    data.transactionId,
-                );
-            if (!transaction) {
-                logger.error("Transaction not found", logMeta);
-                return;
-            }
-            // Get the current timestamp in milliseconds
-            const now = Date.now();
-
-            // Assuming you have another timestamp stored in a variable called 'previousTimestamp'
-            // For example:
-            const previousTimestamp = new Date(
-                transaction.transactionTimestamp,
-            ).getTime(); // This represents a timestamp for April 1, 2022
-
-            // Calculate the difference between the current timestamp and the previous timestamp in milliseconds
-            const differenceInMilliseconds = now - previousTimestamp;
-
-            // Convert milliseconds to hours
-            const differenceInHours =
-                differenceInMilliseconds / (1000 * 60 * 60); // 1000 milliseconds * 60 seconds * 60 minutes
-
-            // Check if the difference is greater than two hours
-            // if (differenceInHours > 2) {
-
-            //check if transaction is greater than 2hrs then stop
-            if (differenceInHours > 2) {
-                logger.info(
-                    `Flagged transaction with id ${transaction.id} after hitting requery limit`,
-                    {
-                        meta: { transactionId: transaction.id },
-                    },
-                );
-                return await TransactionService.updateSingleTransaction(
-                    transaction.id,
-                    { status: Status.FLAGGED },
-                );
-            }
-
-            const user = await transaction.$get("user");
-            const meter = await transaction.$get("meter");
-            const partner = await transaction.$get("partner");
-            if (!user || !meter || !partner) {
-                throw new CustomError(
-                    "Transaction  required relations not found",
-                );
-            }
-
-            // Check if disco is up
-            const vendor =
-                await VendorModelService.viewSingleVendorByName(
-                    data.superAgent,
-                );
-            if (!vendor) throw new CustomError("Vendor not found");
-
-            const product =
-                await ProductService.viewSingleProductByMasterProductCode(
-                    transaction.disco,
-                );
-            if (!product) throw new CustomError("Product not found");
-
-            const vendorProduct =
-                await VendorProductService.viewSingleVendorProductByVendorIdAndProductId(
-                    vendor.id,
-                    product.id,
-                );
-            if (!vendorProduct)
-                throw new CustomError("Vendor product not found");
-
-            const discoCode = vendorProduct.schemaData.code;
-            //     const logMeta = { meta: { transactionId: data.transactionId } };
-            //
-            //     logger.info("Airtime received from vendor", logMeta);
-            //     const transaction = await TransactionService.viewSingleTransaction(
-            //         data.transactionId,
-            //     );
-            //     if (!transaction) {
-            //         throw new CustomError(
-            //             `CustomError fetching transaction with id ${data.transactionId}`,
-            //         );
-            //     }
-            //
-            //     // Check if transaction is already complete
-            //     if (transaction.status === Status.COMPLETE) {
-            //         throw new CustomError(
-            //             `Transaction with id ${data.transactionId} is already complete`,
-            //         );
-            //     }
-            //
-            //     logger.info("Processing airtime received from vendor", logMeta);
-            //     // Requery transaction from provider and update transaction status
-            //     const requeryResult =
-            //         await AirtimeHandlerUtil.requeryTransactionFromVendor(
-            //             transaction,
-            //         );
-            //     const requeryResultFromBuypower = requeryResult as Awaited<
-            //         ReturnType<typeof VendorService.buyPowerRequeryTransaction>
-            //     >;
-            //     const requeryResultFromIrecharge = requeryResult as Awaited<
-            //         ReturnType<typeof VendorService.irechargeRequeryTransaction>
-            //     >;
-            //     const requeryResultFromBaxi = requeryResult as Awaited<
-            //         ReturnType<typeof VendorService.baxiRequeryTransaction>
-            //     >;
-            //
-            //     const transactionSuccessFromBuypower =
-            //         requeryResultFromBuypower.source === "BUYPOWERNG"
-            //             ? requeryResultFromBuypower.responseCode === 200
-            //             : false;
-            //     const transactionSuccessFromIrecharge =
-            //         requeryResultFromIrecharge.source === "IRECHARGE"
-            //             ? requeryResultFromIrecharge.status === "00" &&
-            //               requeryResultFromIrecharge.vend_status === "successful"
-            //             : false;
-            //     const transactionSuccessFromBaxi =
-            //         requeryResultFromBaxi.source === "BAXI"
-            //             ? requeryResultFromBaxi.responseCode === 200
-            //             : false;
-            //
-            //     const transactionEventService = new AirtimeTransactionEventService(
-            //         transaction,
-            //         transaction.superagent,
-            //         transaction.partner.email,
-            //         data.phone.phoneNumber,
-            //     );
-            //     const transactionSuccess =
-            //         transactionSuccessFromBuypower ||
-            //         transactionSuccessFromIrecharge ||
-            //         transactionSuccessFromBaxi;
-            //
-            //     if (!transactionSuccess) {
-            //         await transactionEventService.addAirtimeTransactionRequery();
-            //         await AirtimeHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
-            //             {
-            //                 eventService: transactionEventService,
-            //                 eventData: {
-            //                     phone: data.phone,
-            //                     transactionId: data.transactionId,
-            //                     error: {
-            //                         code: requeryResultFromBuypower.responseCode,
-            //                         cause: TransactionErrorCause.TRANSACTION_FAILED,
-            //                     },
-            //                 },
-            //                 retryCount: 1,
-            //                 superAgent: transaction.superagent,
-            //                 transactionTimedOutFromBuypower: false,
-            //             },
-            //         );
-            //     }
-            //
-            //     logger.info("Airtime received from vendor", logMeta);
-            //     return await TransactionService.updateSingleTransaction(
-            //         data.transactionId,
-            //         {
-            //             status: Status.COMPLETE,
-            //         },
-            //     );
-        } catch (error) {
-            if (error instanceof CustomError) {
-                error.meta = error.meta ?? {
-                    transactionId: data.transactionId,
-                };
-            }
-
-            throw error;
-        }
-    }
-
     private static async requeryTransaction(
         data: PublisherEventAndParameters[TOPICS.GET_AIRTIME_FROM_VENDOR_REQUERY],
     ) {
@@ -947,15 +803,14 @@ class AirtimeHandler extends Registry {
             logger.warn("Requerying transaction from vendor", logMeta);
             retry.count = data.retryCount;
             console.log({
-                data: data.vendorRetryRecord,
+                data: data,
                 retyrCount: data.retryCount,
             });
 
             // Check if token has been found
-            const transaction =
-                await TransactionService.viewSingleTransaction(
-                    data.transactionId,
-                );
+            const transaction = await TransactionService.viewSingleTransaction(
+                data.transactionId,
+            );
             if (!transaction) {
                 logger.error("Transaction not found", logMeta);
                 return;
@@ -991,19 +846,17 @@ class AirtimeHandler extends Registry {
             }
 
             const user = await transaction.$get("user");
-            const meter = await transaction.$get("meter");
             const partner = await transaction.$get("partner");
-            if (!user || !meter || !partner) {
+            if (!user || !partner) {
                 throw new CustomError(
                     "Transaction  required relations not found",
                 );
             }
 
             // Check if disco is up
-            const vendor =
-                await VendorModelService.viewSingleVendorByName(
-                    data.superAgent,
-                );
+            const vendor = await VendorModelService.viewSingleVendorByName(
+                data.superAgent,
+            );
             if (!vendor) throw new CustomError("Vendor not found");
             const product =
                 await ProductService.viewSingleProductByMasterProductCode(
@@ -1024,27 +877,33 @@ class AirtimeHandler extends Registry {
                 data.superAgent,
                 transaction.partner.email,
                 data.phone.phoneNumber,
-            )
-            await transactionEventService.addGetAirtimeFromVendorRequeryInitiatedEvent(data.retryCount)
+            );
+            await transactionEventService.addGetAirtimeFromVendorRequeryInitiatedEvent(
+                data.retryCount,
+            );
 
-            const requeryResult = await AirtimeHandlerUtil.requeryTransactionFromVendor(transaction).catch(e => e ?? {})
-            const validationResponse = await ResponseValidationUtil.validateTransactionCondition({
-                requestType: "REQUERY",
-                vendor: vendor.name,
-                httpCode:
-                    requeryResult instanceof AxiosError
-                        ? requeryResult.status
-                        : requeryResult.httpStatusCode,
-                responseObject:
-                    requeryResult instanceof AxiosError
-                        ? requeryResult.response?.data
-                        : requeryResult,
-                vendType: "PREPAID",
-                transactionType: transaction.transactionType,
-                disco: discoCode,
-                transactionId: transaction.id,
-                isError: requeryResult instanceof AxiosError
-            })
+            const requeryResult =
+                await AirtimeHandlerUtil.requeryTransactionFromVendor(
+                    transaction,
+                ).catch((e) => e ?? {});
+            const validationResponse =
+                await ResponseValidationUtil.validateTransactionCondition({
+                    requestType: "REQUERY",
+                    vendor: vendor.name,
+                    httpCode:
+                        requeryResult instanceof AxiosError
+                            ? requeryResult.status
+                            : requeryResult.httpStatusCode,
+                    responseObject:
+                        requeryResult instanceof AxiosError
+                            ? requeryResult.response?.data
+                            : requeryResult,
+                    vendType: "PREPAID",
+                    transactionType: transaction.transactionType,
+                    disco: discoCode,
+                    transactionId: transaction.id,
+                    isError: requeryResult instanceof AxiosError,
+                });
 
             const eventMessage = {
                 phone: data.phone,
@@ -1052,10 +911,11 @@ class AirtimeHandler extends Registry {
                 transactionId: transaction.id,
                 error: {
                     code: 202,
-                    cause: TransactionErrorCause.UNEXPECTED_ERROR
-                }
-            }
+                    cause: TransactionErrorCause.UNEXPECTED_ERROR,
+                },
+            };
 
+            console.log({ validationResponse });
             switch (validationResponse.action) {
                 case -1:
                     logger.error(
@@ -1078,9 +938,12 @@ class AirtimeHandler extends Registry {
                             vendorRetryRecord: data.vendorRetryRecord,
                         },
                     );
-                    break
+                    break;
                 case 0:
-                    logger.error("Transaction condition failed - Retry", logMeta);
+                    logger.error(
+                        "Transaction condition failed - Retry",
+                        logMeta,
+                    );
                     await AirtimeHandlerUtil.triggerEventToRetryTransactionWithNewVendor(
                         {
                             eventData: eventMessage,
@@ -1100,13 +963,15 @@ class AirtimeHandler extends Registry {
                         transaction.id,
                         { status: Status.COMPLETE },
                     );
-                    await transactionEventService.addAirtimeReceivedFromVendorRequeryEvent()
-                    await VendorPublisher.publishEventForAirtimeReceivedFromVendor({
-                        transactionId: transaction.id,
-                        phone: data.phone,
-                        partner: partner,
-                        user: user,
-                    });
+                    await transactionEventService.addAirtimeReceivedFromVendorRequeryEvent();
+                    await VendorPublisher.publishEventForAirtimeReceivedFromVendor(
+                        {
+                            transactionId: transaction.id,
+                            phone: data.phone,
+                            partner: partner,
+                            user: user,
+                        },
+                    );
 
                     break;
                 default:
@@ -1132,8 +997,6 @@ class AirtimeHandler extends Registry {
                     );
                     break;
             }
-
-
         } catch (error) {
             if (error instanceof CustomError) {
                 error.meta = error.meta ?? {
@@ -1148,91 +1011,89 @@ class AirtimeHandler extends Registry {
     private static async scheduleRequeryTransaction(
         data: PublisherEventAndParameters[TOPICS.SCHEDULE_REQUERY_FOR_AIRTIME_TRANSACTION],
     ) {
-        // Check the timeStamp, and the delayInSeconds
+        const { timeStamp, delayInSeconds } = data;
 
-        return newrelic.startBackgroundTransaction(
-            "ConsumerFunction:ScheduleRequeryTransaction",
-            async function () {
-                const { timeStamp, delayInSeconds } = data;
+        const currentTimeInSeconds = Math.floor(Date.now() / 1000);
+        const timeStampInSeconds = Math.floor(
+            new Date(timeStamp).getTime() / 1000,
+        );
+        const timeInSecondsSinceInit =
+            currentTimeInSeconds - timeStampInSeconds;
+        const timeDifference = delayInSeconds - timeInSecondsSinceInit;
 
-                const currentTimeInSeconds = Math.floor(Date.now() / 1000);
-                const timeStampInSeconds = Math.floor(
-                    new Date(timeStamp).getTime() / 1000,
+        console.log({
+            timeDifference,
+            timeStamp,
+            currentTime: new Date(),
+            delayInSeconds,
+            timeInSecondsSinceInit,
+        });
+
+        if (timeDifference < 0) {
+            const existingTransaction =
+                await TransactionService.viewSingleTransaction(
+                    data.scheduledMessagePayload.transactionId,
                 );
-                const timeInSecondsSinceInit =
-                    currentTimeInSeconds - timeStampInSeconds;
-                const timeDifference = delayInSeconds - timeInSecondsSinceInit;
+            if (!existingTransaction) {
+                throw new CustomError("Transaction not found");
+            }
 
-                console.log({
-                    timeDifference,
-                    timeStamp,
-                    currentTime: new Date(),
-                    delayInSeconds,
-                    timeInSecondsSinceInit,
-                });
-
-                if (timeDifference <= 0) {
-                    const existingTransaction =
-                        await TransactionService.viewSingleTransaction(
-                            data.scheduledMessagePayload.transactionId,
-                        );
-                    if (!existingTransaction) {
-                        throw new CustomError("Transaction not found");
-                    }
-
-                    // Check if transaction has been requeried successfuly before
-                    const tokenReceivedFromRequery =
-                        await EventService.viewSingleEventByTransactionIdAndType(
-                            data.scheduledMessagePayload.transactionId,
-                            TOPICS.TOKEN_RECIEVED_FROM_REQUERY,
-                        );
-                    if (tokenReceivedFromRequery) {
-                        logger.warn(
-                            "Transaction has been requeried successfully before",
-                            {
-                                meta: {
-                                    transactionId:
-                                        data.scheduledMessagePayload
-                                            .transactionId,
-                                    currentMessagePayload: data,
-                                },
-                            },
-                        );
-                        return;
-                    }
-
-                    const transactionEventService = new AirtimeTransactionEventService(
-                        existingTransaction,
-                        existingTransaction.superagent,
-                        data.scheduledMessagePayload.phone.phoneNumber,
-                        data.scheduledMessagePayload.superAgent,
-                    );
-                    await transactionEventService.addGetAirtimeTokenRequestedFromVendorRequeryEvent(
-                        {
-                            cause: TransactionErrorCause.RESCHEDULED_BEFORE_WAIT_TIME,
-                            code: 202,
+            // Check if transaction has been requeried successfuly before
+            const tokenReceivedFromRequery =
+                await EventService.viewSingleEventByTransactionIdAndType(
+                    data.scheduledMessagePayload.transactionId,
+                    TOPICS.AIRTIME_RECEIVED_FROM_VENDOR_REQUERY,
+                );
+            if (tokenReceivedFromRequery) {
+                logger.warn(
+                    "Transaction has been requeried successfully before",
+                    {
+                        meta: {
+                            transactionId:
+                                data.scheduledMessagePayload
+                                    .transactionId,
+                            currentMessagePayload: data,
                         },
-                        data.scheduledMessagePayload.retryCount + 1,
-                    );
-                    return await VendorPublisher.publishEventForGetAirtimeRequestedFromVendorRequery(
-                        data.scheduledMessagePayload,
-                    );
-                }
+                    },
+                );
+                return;
+            }
 
-                // Change error cause to RESCHEDULED_BEFORE_WAIT_TIME
-                data.scheduledMessagePayload.error.cause =
-                    TransactionErrorCause.RESCHEDULED_BEFORE_WAIT_TIME;
+            const transactionEventService =
+                new AirtimeTransactionEventService(
+                    existingTransaction,
+                    existingTransaction.superagent,
+                    data.scheduledMessagePayload.phone.phoneNumber,
+                    data.scheduledMessagePayload.superAgent,
+                );
+            await transactionEventService.addGetAirtimeTokenRequestedFromVendorRequeryEvent(
+                {
+                    cause: TransactionErrorCause.RESCHEDULED_BEFORE_WAIT_TIME,
+                    code: 202,
+                },
+                data.scheduledMessagePayload.retryCount + 1,
+            );
+           
+            return await VendorPublisher.publishEventForGetAirtimeRequestedFromVendorRequery(
+                data.scheduledMessagePayload,
+            );
+        }
 
-                // logger.info("Rescheduling requery for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
-                // Else, schedule a new event to requery transaction from vendor
-                return await VendorPublisher.publishEventToScheduleAirtimeRequery({
-                    scheduledMessagePayload: data.scheduledMessagePayload,
-                    timeStamp: data.timeStamp,
-                    delayInSeconds: data.delayInSeconds,
-                    log: 0,
-                });
+        // Change error cause to RESCHEDULED_BEFORE_WAIT_TIME
+        data.scheduledMessagePayload.error.cause =
+            TransactionErrorCause.RESCHEDULED_BEFORE_WAIT_TIME;
+
+        // logger.info("Rescheduling requery for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
+        // Else, schedule a new event to requery transaction from vendor
+        return await VendorPublisher.publishEventToScheduleAirtimeRequery(
+            {
+                scheduledMessagePayload: data.scheduledMessagePayload,
+                timeStamp: data.timeStamp,
+                delayInSeconds: data.delayInSeconds,
+                log: 0,
             },
         );
+
     }
 
     private static async scheduleRetryTransaction(
@@ -1240,93 +1101,94 @@ class AirtimeHandler extends Registry {
     ) {
         // Check the timeStamp, and the delayInSeconds
 
-        return newrelic.startBackgroundTransaction(
-            "ConsumerFunction:ScheduleRetryForTransaction",
-            async function () {
-                const { timeStamp, delayInSeconds } = data;
 
-                const currentTimeInSeconds = Math.floor(Date.now() / 1000);
-                const timeStampInSeconds = Math.floor(
-                    new Date(timeStamp).getTime() / 1000,
+        const { timeStamp, delayInSeconds } = data;
+
+        const currentTimeInSeconds = Math.floor(Date.now() / 1000);
+        const timeStampInSeconds = Math.floor(
+            new Date(timeStamp).getTime() / 1000,
+        );
+        const timeInSecondsSinceInit =
+            currentTimeInSeconds - timeStampInSeconds;
+        const timeDifference = delayInSeconds - timeInSecondsSinceInit;
+
+        console.log({
+            timeDifference,
+            timeStamp,
+            currentTime: new Date(),
+            delayInSeconds,
+            timeInSecondsSinceInit,
+        });
+
+        // Check if current time is greater than the timeStamp + delayInSeconds
+        if (timeDifference <= 0) {
+            const existingTransaction =
+                await TransactionService.viewSingleTransaction(
+                    data.scheduledMessagePayload.transactionId,
                 );
-                const timeInSecondsSinceInit =
-                    currentTimeInSeconds - timeStampInSeconds;
-                const timeDifference = delayInSeconds - timeInSecondsSinceInit;
+            if (!existingTransaction) {
+                throw new CustomError("Transaction not found");
+            }
 
-                console.log({
-                    timeDifference,
-                    timeStamp,
-                    currentTime: new Date(),
-                    delayInSeconds,
-                    timeInSecondsSinceInit,
-                });
+            const transactionEventService =
+                new AirtimeTransactionEventService(
+                    existingTransaction,
+                    existingTransaction.superagent,
+                    data.scheduledMessagePayload.partner.email,
+                    data.scheduledMessagePayload.phone.phoneNumber,
+                );
 
-                // Check if current time is greater than the timeStamp + delayInSeconds
-                if (timeDifference <= 0) {
-                    const existingTransaction =
-                        await TransactionService.viewSingleTransaction(
-                            data.scheduledMessagePayload.transactionId,
-                        );
-                    if (!existingTransaction) {
-                        throw new CustomError("Transaction not found");
-                    }
-
-                    const transactionEventService = new AirtimeTransactionEventService(
-                        existingTransaction,
-                        existingTransaction.superagent,
-                        data.scheduledMessagePayload.partner.email,
-                        data.scheduledMessagePayload.phone.phoneNumber,
-                    );
-
-                    await TransactionService.updateSingleTransaction(
-                        data.scheduledMessagePayload.transactionId,
-                        {
-                            superagent: data.scheduledMessagePayload.newVendor,
-                            retryRecord:
-                                data.scheduledMessagePayload.retryRecord,
-                            vendorReferenceId:
-                                data.scheduledMessagePayload
-                                    .newTransactionReference,
-                            reference:
-                                data.scheduledMessagePayload
-                                    .newTransactionReference,
-                            irechargeAccessToken:
-                                data.scheduledMessagePayload
-                                    .irechargeAccessToken,
-                            previousVendors:
-                                data.scheduledMessagePayload.previousVendors,
-                        },
-                    );
-
-                    await VendorPublisher.publishEventForAirtimePurchaseRetryFromVendorWithNewVendor(
+            await TransactionService.updateSingleTransaction(
+                data.scheduledMessagePayload.transactionId,
+                {
+                    superagent: data.scheduledMessagePayload.newVendor,
+                    retryRecord:
+                        data.scheduledMessagePayload.retryRecord,
+                    vendorReferenceId:
                         data.scheduledMessagePayload
-                    );
-                    await transactionEventService.addAirtimePurchaseInitiatedEvent({ amount: existingTransaction.amount });
-                    return await VendorPublisher.publshEventForAirtimePurchaseInitiate(
-                        data.scheduledMessagePayload,
-                    );
-                }
+                            .newTransactionReference,
+                    reference:
+                        data.scheduledMessagePayload
+                            .newTransactionReference,
+                    irechargeAccessToken:
+                        data.scheduledMessagePayload
+                            .irechargeAccessToken,
+                    previousVendors:
+                        data.scheduledMessagePayload.previousVendors,
+                },
+            );
 
-                // logger.info("Rescheduling retry for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
-                // Else, schedule a new event to requery transaction from vendor
-                return await VendorPublisher.publishEventToScheduleAirtimeRetry({
-                    scheduledMessagePayload: data.scheduledMessagePayload,
-                    timeStamp: data.timeStamp,
-                    delayInSeconds: data.delayInSeconds,
-                    log: 0,
-                });
+            await VendorPublisher.publishEventForAirtimePurchaseRetryFromVendorWithNewVendor(
+                data.scheduledMessagePayload,
+            );
+            return await VendorPublisher.publshEventForAirtimePurchaseInitiate(
+                data.scheduledMessagePayload,
+            );
+        }
+
+        // logger.info("Rescheduling retry for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
+        // Else, schedule a new event to requery transaction from vendor
+        return await VendorPublisher.publishEventToScheduleAirtimeRetry(
+            {
+                scheduledMessagePayload: data.scheduledMessagePayload,
+                timeStamp: data.timeStamp,
+                delayInSeconds: data.delayInSeconds,
+                log: 0,
             },
         );
+
     }
 
     static registry = {
         [TOPICS.AIRTIME_PURCHASE_INITIATED_BY_CUSTOMER]:
             this.handleAirtimeRequest,
-        [TOPICS.AIRTIME_RECEIVED_FROM_VENDOR]: this.handleAirtimeRecievd,
-        [TOPICS.SCHEDULE_REQUERY_FOR_AIRTIME_TRANSACTION]: this.scheduleRequeryTransaction,
-        [TOPICS.SCHEDULE_RETRY_FOR_AIRTIME_TRANSACTION]: this.scheduleRetryTransaction,
+        [TOPICS.SCHEDULE_REQUERY_FOR_AIRTIME_TRANSACTION]:
+            this.scheduleRequeryTransaction,
+        [TOPICS.SCHEDULE_RETRY_FOR_AIRTIME_TRANSACTION]:
+            this.scheduleRetryTransaction,
         [TOPICS.GET_AIRTIME_FROM_VENDOR_REQUERY]: this.requeryTransaction,
-        [TOPICS.AIRTIME_PURCHASE_RETRY_FROM_NEW_VENDOR]: this.handleAirtimeRequest,
+        [TOPICS.AIRTIME_PURCHASE_RETRY_FROM_NEW_VENDOR]:
+            this.handleAirtimeRequest,
     };
 }
 

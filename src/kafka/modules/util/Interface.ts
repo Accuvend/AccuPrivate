@@ -270,6 +270,9 @@ export interface PublisherEventAndParameters
             phoneNumber: string;
             amount: number;
         };
+        vendorRetryRecord: {
+            retryCount: number;
+        };
         user: User;
         partner: Partner;
         transactionId: string;

@@ -59,6 +59,7 @@ import {
 import { TokenUtil } from "../../../utils/Auth/Token";
 import VendorModelService from "../../../services/Vendor.service";
 import { AxiosError } from "axios";
+import { PartnerProfile } from "../../../models/Entity/Profiles";
 
 enum MessageType {
     INFORMATION = "INFORMATION",
@@ -102,8 +103,7 @@ interface RequestTokenValidatorResponse {
 }
 
 // Validate request parameters for each controller
-export  class VendorControllerValdator {
-
+export class VendorControllerValdator {
     static async validateRequest({
         bankRefId,
         transactionId,
@@ -149,7 +149,10 @@ export  class VendorControllerValdator {
 
         //  Get Meter
         const meter: Meter | null = await transactionRecord.$get("meter");
-        if (!meter && transactionRecord.transactionType=== TransactionType.ELECTRICITY) {
+        if (
+            !meter &&
+            transactionRecord.transactionType === TransactionType.ELECTRICITY
+        ) {
             throw new InternalServerError(
                 `Transaction ${transactionRecord.id} does not have a meter`,
             );
@@ -1184,7 +1187,11 @@ export default class VendorController {
         });
     }
 
-    static async cusRe(req: Request, res: Response, next: NextFunction) {
+    static async cusRe(
+        req: AuthenticatedRequest,
+        res: Response,
+        next: NextFunction,
+    ) {
         const { transactionId } = req.body;
 
         // TODO: Change from viewbyid to vendor refer id
@@ -1193,6 +1200,13 @@ export default class VendorController {
         if (!transaction) {
             throw new NotFoundError("Transaction not found");
         }
+
+        if (transaction.transactionType != TransactionType.ELECTRICITY) {
+            throw new BadRequestError(
+                "Transaction is not an electricity transaction",
+            );
+        }
+
         const logMeta = { transactionId: transaction.id };
         const user = await transaction.$get("user");
         const meter = await transaction.$get("meter");
@@ -1204,64 +1218,23 @@ export default class VendorController {
         }
 
         logger.info("Requery initiated from customer", logMeta);
-        // Check if disco is up
-        const vendor = await VendorModelService.viewSingleVendorByName(
-            transaction.superagent,
-        );
-        if (!vendor) throw new InternalServerError("Vendor not found");
-
-        const product =
-            await ProductService.viewSingleProductByMasterProductCode(
-                transaction.disco,
-            );
-        if (!product) throw new InternalServerError("Product not found");
-
-        const vendorProduct =
-            await VendorProductService.viewSingleVendorProductByVendorIdAndProductId(
-                vendor.id,
-                product.id,
-            );
-        if (!vendorProduct)
-            throw new InternalServerError("Vendor product not found");
-
-        logger.info("Intiating transaction requery", logMeta);
-        const discoCode = vendorProduct.schemaData.code;
-        const requeryResult =
-            await TokenHandlerUtil.requeryTransactionFromVendor(
-                transaction,
-            ).catch((e) => e ?? {});
-
-        logger.info("Requeried transaction successfully", logMeta);
-        console.log({ requeryResult: requeryResult });
-        const response =
-            await ResponseValidationUtil.validateTransactionCondition({
-                requestType: "REQUERY",
-                vendor: vendor.name,
-                transactionType: transaction.transactionType,
-                httpCode:
-                    requeryResult instanceof AxiosError
-                        ? requeryResult.status
-                        : requeryResult.httpStatusCode,
-                responseObject:
-                    requeryResult instanceof AxiosError
-                        ? requeryResult.response?.data
-                        : requeryResult,
-                vendType: meter.vendType,
-                disco: discoCode,
-                transactionId: transaction.id,
-                isError: requeryResult instanceof AxiosError,
-            });
-
-        logger.info("Response validation completed", {
-            ...logMeta,
-            validationResponse: response,
-        });
-        if (response.action != 1) {
-            throw new BadRequestError("Transaction requery unsuccessfull");
+        const powerUnit = await transaction.$get("powerUnit");
+        if (!powerUnit) {
+            throw new InternalServerError("Power unit not found");
         }
 
         const tokenInResponse =
-            response.vendType === "PREPAID" ? response.token : undefined;
+            meter.vendType === "PREPAID" ? powerUnit.token : undefined;
+        if (!tokenInResponse && meter.vendType === "PREPAID") {
+            res.status(400).send({
+                message: "Transaction is still in progress",
+                data: {
+                    transaction,
+                },
+            });
+            return;
+        }
+
         await VendorPublisher.publishEventForTokenReceivedFromRequery({
             transactionId: transaction!.id,
             user: {
@@ -1280,7 +1253,7 @@ export default class VendorController {
                 vendType: meter.vendType,
                 token: tokenInResponse ?? "",
             },
-            tokenUnits: response.tokenUnits,
+            tokenUnits: powerUnit.tokenUnits,
         });
 
         res.status(200).send({
@@ -1299,6 +1272,7 @@ export default class VendorController {
                     vendType: meter.vendType,
                     name: meter.userId,
                 },
+                token: tokenInResponse,
             },
         });
     }

@@ -554,6 +554,7 @@ export class VendorPublisher extends ProducerFactory {
                 timeStamp: data.timeStamp,
                 retryCount: data.retryCount,
                 superAgent: data.superAgent,
+                vendorRetryRecord: data.vendorRetryRecord,
                 waitTime: data.waitTime,
             },
         });

@@ -1,20 +1,16 @@
 // Import required modules, types, and models
-import Transaction from "../models/Transaction.model";
+import Transaction, { Status } from "../models/Transaction.model";
 import {
-    ITransaction,
     ICreateTransaction,
     IUpdateTransaction,
 } from "../models/Transaction.model";
 import EventService from "./Event.service";
-import { v4 as uuidv4 } from "uuid";
-import Event, { Status } from "../models/Event.model";
-import logger from "../utils/Logger";
+import Event from "../models/Event.model";
 import PowerUnit from "../models/PowerUnit.model";
 import Partner from "../models/Entity/Profiles/PartnerProfile.model";
 import User from "../models/User.model";
 import Meter from "../models/Meter.model";
 import { Op, literal } from "sequelize";
-import { generateRandomString } from "../utils/Helper";
 import { Sequelize } from "sequelize-typescript";
 import Bundle from "../models/Bundle.model";
 
@@ -23,10 +19,21 @@ export default class TransactionService {
     // Create an instance of EventService for handling events
     private static eventService: EventService = new EventService();
 
+    static async flaggTransaction(transactionId: string) {
+        const transaction = await Transaction.findByPk(transactionId);
+        if (!transaction) {
+            throw new Error("Transaction not found");
+        }
+
+        transaction.status = Status.FLAGGED;
+        await transaction.save();
+        return transaction;
+    }
+
     static async addTransactionWithoutValidatingUserRelationship(
         transaction: Omit<ICreateTransaction, "userId">,
     ): Promise<Transaction> {
-        console.log({ transaction })
+        console.log({ transaction });
         const transactionData = Transaction.build({
             ...transaction,
             // reference: generateRandomString(10),
@@ -75,42 +82,42 @@ export default class TransactionService {
         // Retrieve all transactions from the database
         // Sort from latest
 
-        //Removed Because of Performance issues 
-        // Getting the list of columns 
+        //Removed Because of Performance issues
+        // Getting the list of columns
         // const ListofColumns = await Transaction.describe()
-        //convert the list of columns to array 
+        //convert the list of columns to array
         // const attributesMap: Array<string> = Object.keys(ListofColumns)
         const transactions: Transaction[] = (
             await Transaction.findAll({
                 ...query,
                 include: [PowerUnit, Event, Partner, User, Meter, Bundle],
-                //add the transform disco to biller so it can be used in the frontend and for the partner 
+                //add the transform disco to biller so it can be used in the frontend and for the partner
                 attributes: [
-                    ['disco', 'biller'],
-                    'id',
-                    'amount',
-                    'status',
-                    'paymentType',
-                    'transactionTimestamp',
-                    'disco',
-                    'bankRefId',
-                    'bankComment',
-                    'superagent',
-                    'reference',
-                    'productType',
-                    'productCodeId',
-                    'irechargeAccessToken',
-                    'vendorReferenceId',
-                    'networkProvider',
-                    'previousVendors',
-                    'userId',
-                    'transactionType',
-                    'partnerId',
-                    'powerUnitId',
-                    'meterId',
-                    'createdAt',
-                    'updatedAt',
-                    'channel'
+                    ["disco", "biller"],
+                    "id",
+                    "amount",
+                    "status",
+                    "paymentType",
+                    "transactionTimestamp",
+                    "disco",
+                    "bankRefId",
+                    "bankComment",
+                    "superagent",
+                    "reference",
+                    "productType",
+                    "productCodeId",
+                    "irechargeAccessToken",
+                    "vendorReferenceId",
+                    "networkProvider",
+                    "previousVendors",
+                    "userId",
+                    "transactionType",
+                    "partnerId",
+                    "powerUnitId",
+                    "meterId",
+                    "createdAt",
+                    "updatedAt",
+                    "channel",
                     //...attributesMap
                 ],
                 order: [["transactionTimestamp", "DESC"]],
@@ -178,44 +185,44 @@ export default class TransactionService {
     ): Promise<Transaction | null> {
         // Retrieve a single transaction by its UUID
 
-        //Removed Because of Performance issues 
-        // Getting the list of columns 
+        //Removed Because of Performance issues
+        // Getting the list of columns
         // const ListofColumns = await Transaction.describe()
-        //convert the list of columns to array 
+        //convert the list of columns to array
         // const attributesMap: Array<string> = Object.keys(ListofColumns)
 
         const transaction: Transaction | null = await Transaction.findByPk(
             uuid,
             {
-                //add the transform disco to biller so it can be used in the frontend and for the partner 
+                //add the transform disco to biller so it can be used in the frontend and for the partner
                 attributes: [
-                    ['disco', 'biller'],
-                    'id',
-                    'amount',
-                    'status',
-                    'paymentType',
-                    'transactionTimestamp',
-                    'disco',
-                    'bankRefId',
-                    'bankComment',
-                    'superagent',
-                    'reference',
-                    'productType',
-                    'productCodeId',
-                    'irechargeAccessToken',
-                    'vendorReferenceId',
-                    'networkProvider',
-                    'previousVendors',
-                    'userId',
-                    'transactionType',
-                    'partnerId',
-                    'powerUnitId',
-                    'meterId',
-                    'createdAt',
-                    'updatedAt',
-                    'bundleId',
-                    'retryRecord',
-                    'reference',
+                    ["disco", "biller"],
+                    "id",
+                    "amount",
+                    "status",
+                    "paymentType",
+                    "transactionTimestamp",
+                    "disco",
+                    "bankRefId",
+                    "bankComment",
+                    "superagent",
+                    "reference",
+                    "productType",
+                    "productCodeId",
+                    "irechargeAccessToken",
+                    "vendorReferenceId",
+                    "networkProvider",
+                    "previousVendors",
+                    "userId",
+                    "transactionType",
+                    "partnerId",
+                    "powerUnitId",
+                    "meterId",
+                    "createdAt",
+                    "updatedAt",
+                    "bundleId",
+                    "retryRecord",
+                    "reference",
                     //...attributesMap
                 ],
                 include: [PowerUnit, Event, Partner, User, Meter, Bundle],

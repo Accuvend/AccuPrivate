@@ -698,12 +698,27 @@ class ResponseValidationUtil {
             // Requery transaction if no token was found and vendType is PREPAID
             if (!dbQueryParams['TK'] && vendType === 'PREPAID') {
                 // Check if disco is down
-                const discoUp = await VendorService.buyPowerCheckDiscoUp(disco)
-                if (!discoUp) {
-                    logger.error(`ERROR_CODE_VALIDATION: Disco ${disco} is down`, {
-                        meta: { transactionId: transactionId, disco: disco, }
-                    })
-                }
+             const discoUp = await VendorService.buyPowerCheckDiscoUp(disco);
+                discoUp
+                    ? logger.info(
+                          `DISCO_UP_STATUS:  Disco ${disco} status is ${discoUp}`,
+                          {
+                              meta: {
+                                  transactionId: transactionId,
+                                  disco: disco,
+                              },
+                          },
+                      )
+                    : logger.error(
+                          `DISCO_UP_STATUS:  Disco ${disco} status is ${discoUp}`,
+                          {
+                              meta: {
+                                  transactionId: transactionId,
+                                  disco: disco,
+                              },
+                          },
+                      );
+
             }
 
             // If no masterResponseCode was set requery transaction

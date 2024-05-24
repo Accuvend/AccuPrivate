@@ -78,7 +78,6 @@ export default class MessageProcessorFactory {
             }
 
             await this.flaggMessage(messageData, error as Error);
-            console.log(error);
         }
     }
 

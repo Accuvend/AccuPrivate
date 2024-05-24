@@ -900,7 +900,7 @@ export default class VendorService {
         try {
             // Make a GET request to check Disco updates
             const response = await this.buyPowerAxios().get(
-                `${BUYPOWER_URL}/discos/status`,
+                `/discos/status`,
             );
             const data = response.data;
             if (data[disco.toUpperCase()] === true) return true;

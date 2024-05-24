@@ -479,22 +479,27 @@ export default class VendorService {
                     data: response.data,
                 });
 
-                logger.info("Vend response from baxi", {
-                    meta: {
-                        ...mainMeta,
-                        responseData: response.data,
-                        transactionId: body.transactionId,
-                    },
-                });
-                return { ...response.data, source: "BAXI" as const, httpStatusCode: response.status };
-            } catch (error: any) {
-                console.log({
-                    message: error.message,
-                    response: error.response?.data?.errors,
-                });
-                throw error
-            }
-        })
+                    logger.info("Vend response from baxi", {
+                        meta: {
+                            ...mainMeta,
+                            responseData: response.data,
+                            transactionId: body.transactionId,
+                        },
+                    });
+                    return {
+                        ...response.data,
+                        source: "BAXI" as const,
+                        httpStatusCode: response.status,
+                    };
+                } catch (error: any) {
+                    console.log({
+                        message: error.message,
+                        response: error.response?.data?.errors,
+                    });
+                    throw error;
+                }
+            },
+        );
     }
 
     static async baxiRequeryTransaction<
@@ -547,6 +552,8 @@ export default class VendorService {
                         // message: responseData.message,
                         // data: responseData.data,
                     };
+                } catch (error) {
+                    throw error;
                 }
 
                 return {
@@ -676,7 +683,7 @@ export default class VendorService {
         } catch (error) {
             console.error(error);
             logger.error(error);
-            throw new Error();
+            throw error;
         }
     }
 
@@ -774,8 +781,8 @@ export default class VendorService {
                 throw error;
             }
 
-            // TODO: Use event emitter to requery transaction after 10s
-        })
+                    throw error;
+                }
 
     }
 
@@ -811,10 +818,14 @@ export default class VendorService {
 
                 if (successResponse.result.status === true) {
                     return {
-                        ...successResponse,
-                        result: successResponse.result,
-                        source: "BUYPOWERNG", httpStatusCode: response.status
-                    } as SuccessResponseForBuyPowerRequery;
+                        ...response.data,
+                        source: "BUYPOWERNG",
+                        httpStatusCode: response.status,
+                    } as
+                        | InprogressResponseForBuyPowerRequery
+                        | FailedResponseForBuyPowerRequery;
+                } catch (error) {
+                    throw error;
                 }
 
                 return { ...response.data, source: "BUYPOWERNG", httpStatusCode: response.status } as
@@ -895,8 +906,9 @@ export default class VendorService {
             if (data[disco.toUpperCase()] === true) return true;
             else return false;
         } catch (error) {
-            logger.info(error);
-            throw new Error();
+            console.log(error)
+            logger.error(error);
+            throw error;
         }
     }
 
@@ -933,7 +945,7 @@ export default class VendorService {
             return providers;
         } catch (error) {
             logger.error(error);
-            throw new Error();
+            throw error;
         }
     }
 
@@ -963,7 +975,7 @@ export default class VendorService {
         } catch (error) {
             console.error(error);
             logger.error(error);
-            throw new Error();
+            throw error;
         }
     }
 
@@ -1179,9 +1191,9 @@ export default class VendorService {
                 meta: {
                     transactionId: data.transactionId,
                     error,
-                }
-            })
-            throw error
+                },
+            });
+            throw error;
         }
     }
 }

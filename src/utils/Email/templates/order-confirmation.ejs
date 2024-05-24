@@ -84,6 +84,9 @@ const formattedDate = transactionDate.toLocaleDateString('en-UK', {
 
 
 function formatToken(token) {
+    if(token === null || token === undefined){return ''}
+    if(typeof token !== 'string') return ''
+
   token = token.toString().replace(/-/g,'');
   let formattedToken = '';
   for (let i = 0; i < token.length; i += 4) {

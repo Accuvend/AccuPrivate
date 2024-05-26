@@ -1,12 +1,12 @@
-name: ci-cd
+name: ci-cd - production
 
 on:
   push:
     branches: 
-      - sandbox
+      - production
   pull_request: 
     branches: 
-      - sandbox
+      - production
   workflow_dispatch:
 
 jobs:
@@ -26,8 +26,9 @@ jobs:
   generate-env-file:
     name: generate-env-file
     # needs: [push-build]
+    environment: PRODUCTION
     runs-on: ubuntu-latest
-    if : github.ref == 'refs/heads/sandbox'
+    if : github.ref == 'refs/heads/production'
     steps:
     - name: chechkout
       uses: actions/checkout@v2
@@ -110,11 +111,23 @@ jobs:
         AFRICASTALKING_API_KEY=${{ secrets.AFRICASTALKING_API_KEY}}
         AFRICASTALKING_SENDER=${{ secrets.AFRICASTALKING_SENDER}}
         AFRICASTALKING_USERNAME=${{ secrets.AFRICASTALKING_USERNAME}}
+        CYBER_PAY_USERNAME=${{secrets.CYBER_PAY_USERNAME}}
+        CYBER_PAY_PASSWORD=${{secrets.CYBER_PAY_PASSWORD}}
+        CYBER_PAY_API_KEY=${{secrets.CYBER_PAY_API_KEY}}
+        CYBER_PAY_BASE_URL=${{secrets.CYBER_PAY_BASE_URL}}
+        CYBER_PAY_SENDER_ID=${{secrets.CYBER_PAY_SENDER_ID}}
         ZOHO_BASE_URL=${{ secrets.ZOHO_BASE_URL}}
 
         
 
         echo "ZOHO_BASE_URL=$ZOHO_BASE_URL" >> .env
+
+
+        echo "CYBER_PAY_USERNAME=$CYBER_PAY_USERNAME" >> .env
+        echo "CYBER_PAY_PASSWORD=$CYBER_PAY_PASSWORD" >> .env
+        echo "CYBER_PAY_API_KEY=$CYBER_PAY_API_KEY" >> .env
+        echo "CYBER_PAY_BASE_URL=$CYBER_PAY_BASE_URL" >> .env
+        echo "CYBER_PAY_SENDER_ID=$CYBER_PAY_SENDER_ID" >> .env
         
 
         echo "AFRICASTALKING_API_KEY=$AFRICASTALKING_API_KEY" >> .env
@@ -193,7 +206,8 @@ jobs:
         cat .env
     - name: push to state to s3
       run: |
-        aws s3 cp ./.env s3://accuvend-bucket-configuration/ 
+        cp .env prod.env
+        aws s3 cp ./prod.env s3://accuvend-bucket-configuration/ 
     - name: Save env file
       uses: actions/cache@v2
       with:
@@ -204,7 +218,7 @@ jobs:
   scan-backend: 
     name: scan-backend
     runs-on: ubuntu-latest
-    if : github.ref == 'refs/heads/sandbox'
+    if : github.ref == 'refs/heads/production'
     # needs: [test-backend]
     needs: [generate-env-file]
     steps: 
@@ -228,7 +242,7 @@ jobs:
   build-backend:
     name: build-backend
     needs: [scan-backend]
-    if : github.ref == 'refs/heads/sandbox'
+    if : github.ref == 'refs/heads/production'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -280,7 +294,7 @@ jobs:
   push-build:
     name: push-build
     needs: [build-backend]
-    if : github.ref == 'refs/heads/sandbox'
+    if : github.ref == 'refs/heads/production'
     runs-on: ubuntu-latest
     steps:
       - name: chechkout
@@ -311,13 +325,14 @@ jobs:
           fi
           unzip dist.zip 
           ls -R dist
-          aws s3 cp ./dist.zip s3://staging-bucket-deployment/ 
+          cp ./dist.zip proddist.zip
+          aws s3 cp ./proddist.zip s3://staging-bucket-deployment/ 
 
   # Depolys the backend to sandbox
   deploy-build:
     name: deploy-build
     needs: [push-build]
-    if : github.ref == 'refs/heads/sandbox'
+    if : github.ref == 'refs/heads/production'
     runs-on: ubuntu-latest
     steps:
       - name: chechkout
@@ -336,7 +351,7 @@ jobs:
       - name: get ip address for staging ec2
         id: get_ip_address_ec2
         run: |
-          EC2_HOST_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Sand Box Core Instance" --query "Reservations[].Instances[].[PublicIpAddress]" --output text)
+          EC2_HOST_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Sand Box (Prod) Core Instance" --query "Reservations[].Instances[].[PublicIpAddress]" --output text)
           echo "EC2_HOST_IP=$EC2_HOST_IP" >> $GITHUB_OUTPUT
       - name: SSH to EC2 Instance
         env: 
@@ -349,14 +364,15 @@ jobs:
           ssh -o StrictHostKeyChecking=no -i 'private_key.pem' ubuntu@${EC2_HOST_IP} '
             cd /home/ubuntu/
             pm2 stop server #stop the server 
+            pm2 delete server #removing server completely to avoid pm2 caching 
             # GET THE LATEST_SUCCESSFUL_RUN_ID 
-            if aws s3 cp s3://accuvend-bucket-configuration/staging_last_run.txt ./staging_last_run.txt | grep "does not exist" 
+            if aws s3 cp s3://accuvend-bucket-configuration/prod_last_run.txt ./prod_last_run.txt | grep "does not exist" 
             then
                 echo 'FILE DOES NOT EXIST'
                 LAST_SUCCESSFUL_RUN_NUMBER=0               
             else
                 echo 'FILE EXIST'
-                LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./staging_last_run.txt | cut -d "=" -f2)            
+                LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./prod_last_run.txt | cut -d "=" -f2)            
             fi
             #rename the old folder 
             echo "$LAST_SUCCESSFUL_RUN_NUMBER"
@@ -367,22 +383,27 @@ jobs:
                 echo "Folder does not exist."
             fi
             # download build latest
-            aws s3 cp s3://staging-bucket-deployment/dist.zip dist.zip
+            aws s3 cp s3://staging-bucket-deployment/proddist.zip dist.zip
             #unzip latest build
             unzip dist.zip
             # cd 
             cd dist
 
             # Get ENV file
-            aws s3 cp s3://accuvend-bucket-configuration/.env ./.env
+            aws s3 cp s3://accuvend-bucket-configuration/prod.env ./.env
             
             #GET DATABASE CREDENTINALS
             DB_USERNAME=$(grep DB_USER_NAME ./.env | cut -d "=" -f2) &&\
             DB_PASSWORD=$(grep DB_PASSWORD ./.env | cut -d "=" -f2) &&\
             DB_NAME=$(grep DB_DB_NAME ./.env | cut -d "=" -f2) &&\
-            DB_HOST=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Sand Box DB Instance" --query "Reservations[].Instances[].[PublicIpAddress]" --output text)
-          
+            DB_HOST=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Sand Box (Prod) DB Instance 1" --query "Reservations[].Instances[].[PrivateIpAddress]" --output text)
+            LOG_DB_HOST=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Sand Box (Prod) DB Instance 2" --query "Reservations[].Instances[].[PrivateIpAddress]" --output text)
+
+            echo $DB_HOST
+            echo $LOG_DB_HOST
+            
             echo "DB_URL=postgres://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:5432/$DB_NAME" >> .env
+            echo "LOG_DB_URL=postgres://$DB_USERNAME:$DB_PASSWORD@$LOG_DB_HOST:5432/$DB_NAME" >> .env
             
             #install depencendies in dist folder
             npm install
@@ -393,7 +414,7 @@ jobs:
   # Smoke Test to check if server is up and running 
   smoke-test:
     name: smoke-test
-    if : github.ref == 'refs/heads/sandbox'
+    if : github.ref == 'refs/heads/production'
     runs-on: ubuntu-latest
     needs: [deploy-build]
     outputs:
@@ -408,7 +429,7 @@ jobs:
     - name: check if server is up and running 
       id: check_server_status
       run : |
-        EC2_HOST_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Sand Box Core Instance" --query "Reservations[].Instances[].[PublicIpAddress]" --output text)
+        EC2_HOST_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Sand Box (Prod) Core Instance" --query "Reservations[].Instances[].[PublicIpAddress]" --output text)
         sleep 10 # wait 10 seconds to make sure the server is up and running before somke test 
         if curl "http://${EC2_HOST_IP}/healthcheck" | grep "Server is working"
         then
@@ -425,7 +446,7 @@ jobs:
   roll-back:
     name: roll-back
     needs: smoke-test
-    if : github.ref == 'refs/heads/sandbox'
+    if : github.ref == 'refs/heads/production'
     runs-on: ubuntu-latest
     steps: 
       - name: Configure AWS Credentials
@@ -439,7 +460,7 @@ jobs:
           PRIVATE_KEY: ${{ secrets.SAND_BOX_SSH_KEY }}
           GITHUB_RUN_NUMBER: ${{ secrets.GITHUB_RUN_NUMBER }}
         run: |
-          EC2_HOST_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Sand Box Core Instance" --query "Reservations[].Instances[].[PublicIpAddress]" --output text)
+          EC2_HOST_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Sand Box (Prod) Core Instance" --query "Reservations[].Instances[].[PublicIpAddress]" --output text)
           echo "${{needs.smoke-test.outputs.smoke_test_result}}"
           if [[ "${{needs.smoke-test.outputs.smoke_test_result}}" == "1" ]];
           then 
@@ -450,14 +471,15 @@ jobs:
             ssh -o StrictHostKeyChecking=no -i 'private_key.pem' ubuntu@${EC2_HOST_IP} '
               cd /home/ubuntu/
               pm2 stop server #stop the server 
+              pm2 delete server #deleting server so we can start again
               # GET THE LATEST_SUCCESSFUL_RUN_ID 
-              if aws s3 cp s3://accuvend-bucket-configuration/staging_last_run.txt ./staging_last_run.txt | grep "does not exist" 
+              if aws s3 cp s3://accuvend-bucket-configuration/prod_last_run.txt ./prod_last_run.txt | grep "does not exist" 
               then
                   echo 'FILE DOES NOT EXIST'
                   LAST_SUCCESSFUL_RUN_NUMBER=0               
               else
                   echo 'FILE EXIST'
-                  LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./staging_last_run.txt | cut -d "=" -f2)            
+                  LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./prod_last_run.txt | cut -d "=" -f2)            
               fi
               #rename the old folder 
               echo "$LAST_SUCCESSFUL_RUN_NUMBER"
@@ -478,7 +500,7 @@ jobs:
   # Fail stage initiate on successful roll back 
   fail-stage-on-rollback: 
     name:  fail-stage-on-rollback
-    if : github.ref == 'refs/heads/sandbox'
+    if : github.ref == 'refs/heads/production'
     needs: [roll-back, smoke-test ]
     runs-on: ubuntu-latest
     steps: 
@@ -497,8 +519,8 @@ jobs:
   # Clean up of old artificats on successful deployment 
   clean-up:
     name: clean-up
-    needs: [roll-back, smoke-test ]
-    if : github.ref == 'refs/heads/sandbox'
+    needs: [roll-back, smoke-test]
+    if : github.ref == 'refs/heads/production'
     runs-on: ubuntu-latest
     steps: 
       - name: Configure AWS Credentials
@@ -536,7 +558,7 @@ jobs:
           PRIVATE_KEY: ${{ secrets.SAND_BOX_SSH_KEY }}
           GITHUB_RUN_NUMBER: ${{ secrets.GITHUB_RUN_NUMBER }}
         run: |
-          EC2_HOST_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Sand Box Core Instance" --query "Reservations[].Instances[].[PublicIpAddress]" --output text)
+          EC2_HOST_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Sand Box (Prod) Core Instance" --query "Reservations[].Instances[].[PublicIpAddress]" --output text)
           echo "${{needs.smoke-test.outputs.smoke_test_result}}"
           if [[ "${{needs.smoke-test.outputs.smoke_test_result}}" == "1" ]];
           then 
@@ -546,13 +568,13 @@ jobs:
               cd /home/ubuntu/
               pm2 stop server #stop the server 
               # GET THE LATEST_SUCCESSFUL_RUN_ID 
-              if aws s3 cp s3://accuvend-bucket-configuration/staging_last_run.txt ./staging_last_run.txt | grep "does not exist" 
+              if aws s3 cp s3://accuvend-bucket-configuration/prod_last_run.txt ./prod_last_run.txt | grep "does not exist" 
               then
                   echo 'FILE DOES NOT EXIST'
                   LAST_SUCCESSFUL_RUN_NUMBER=0               
               else
                   echo 'FILE EXIST'
-                  LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./staging_last_run.txt | cut -d "=" -f2)            
+                  LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./prod_last_run.txt | cut -d "=" -f2)            
               fi
               #delete the old folder 
               echo "$LAST_SUCCESSFUL_RUN_NUMBER"
@@ -574,8 +596,8 @@ jobs:
   # Add RUN_id has last successful run
   save-latest-successful_run:
     name: save-latest-successful-run
-    # if : github.ref == 'refs/heads/sandbox' && needs.smoke-test.outputs.smoke_test_result == '1'
-    if : github.ref == 'refs/heads/sandbox'
+    # if : github.ref == 'refs/heads/production' && needs.smoke-test.outputs.smoke_test_result == '1'
+    if : github.ref == 'refs/heads/production'
     needs: [fail-stage-on-rollback , clean-up]
     # needs: [roll-back, smoke-test]
     runs-on: ubuntu-latest
@@ -591,13 +613,13 @@ jobs:
           PRIVATE_KEY: ${{ secrets.SAND_BOX_SSH_KEY }}
           GITHUB_RUN_NUMBER: ${{ secrets.GITHUB_RUN_NUMBER }}
         run: |
-          echo "LAST_SUCCESSFUL_RUN_ID=$GITHUB_RUN_NUMBER" > staging_last_run.txt
-          aws s3 cp ./staging_last_run.txt s3://accuvend-bucket-configuration/staging_last_run.txt
+          echo "LAST_SUCCESSFUL_RUN_ID=$GITHUB_RUN_NUMBER" > prod_last_run.txt
+          aws s3 cp ./prod_last_run.txt s3://accuvend-bucket-configuration/prod_last_run.txt
         
   # create-update-environment:
   #   name: create-environment
   #   needs: [push-build]
-  #   if : github.ref == 'refs/heads/sandbox'
+  #   if : github.ref == 'refs/heads/production'
   #   runs-on: ubuntu-latest
   #   steps:
   #   - name: Checkout

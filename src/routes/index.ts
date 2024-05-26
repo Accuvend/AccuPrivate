@@ -23,6 +23,7 @@ import discoStatusRoute from "./DiscoStatus.routes";
 import bundleRoute from "./Bundle.routes";
 import responsePathRoute from "./ResponsePath.routes";
 import errorCodeRoute from "./ErrorCode.routes";
+import complaintV2Route from "./compalintV2.routes"
 
 const router = Router();
 
@@ -51,5 +52,6 @@ router
     .use('/mock', MockEndpointRoute)
     .use('/response_path', responsePathRoute)
     .use('/error_code', errorCodeRoute)
+    .use('/complaint/v2',complaintV2Route)
 
 export default router;

@@ -1,0 +1,2 @@
+docker run --name accuvend-postgres-2  -p 5432:5432  -e POSTGRES_PASSWORD=accuvend -e POSTGRES_USER=accuvend -e POSTGRES_DB=accuvend -e MONITORING_TOKEN=8f114f19-cb58-4e63-a47b-890784027e85 -e ST_MONITOR_POSTGRESQL_DB_USER="spmuser" -e ST_MONITOR_POSTGRESQL_DB_PASSWORD="spm-password" -e ST_MONITOR_POSTGRESQL_DB_NAME="postgres" -e ST_MONITOR_POSTGRESQL_DB_ADDITIONAL_PARAMS='autoReconnect=true'  -d postgres:13
+# --net=host

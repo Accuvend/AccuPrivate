@@ -215,3 +215,6 @@ ansible/.DS_Store
 src/.DS_Store
 src/controllers/.DS_Store
 terraform/.DS_Store
+sematext-agent-docker
+zoho1_help.txt
+zohoIntegrationTest.ts

@@ -1238,7 +1238,7 @@ export default class VendorController {
             await ResponseValidationUtil.validateTransactionCondition({
                 requestType: "REQUERY",
                 vendor: vendor.name,
-                transactionType: transaction.transactionType,
+                // transactionType: transaction.transactionType,
                 httpCode:
                     requeryResult instanceof AxiosError
                         ? requeryResult.status

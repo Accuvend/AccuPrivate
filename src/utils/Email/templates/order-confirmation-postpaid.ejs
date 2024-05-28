@@ -169,54 +169,14 @@ const formattedDate = transactionDate.toLocaleDateString('en-UK', {
 
 
 
-            <% if(transaction.status==='COMPLETED' ){ %>
                 <div style="padding-top: 5px;  font-size: small;">
                     <div>
                         <span style="float: left; padding-left: 5%;">Status</span>
                     </div>
                     <div>
-                        <span style="float:right;   border: 1px  solid #ebebeb; color: #3ebd64;  background:#ccffe5; margin-right: 15px; padding-left: 5px; padding-right: 5px; "><%= transaction.status %></span>
+                        <span style="float:right;   border: 1px  solid #ebebeb; color: #3ebd64;  background:#ccffe5; margin-right: 15px; padding-left: 5px; padding-right: 5px; ">COMPLETE</span>
                     </div>
                 </div>
-                <hr style="margin-top:25px; width:90%; border:1px solid #ebebeb ">
-                
-                <%} else if (transaction.status==='PENDING' ){ %>
-                    <div style="padding-top: 5px;  font-size: small;">
-                        <div>
-                            <span style="float: left; padding-left: 5%;">Status</span>
-                        </div>
-                        <div>
-                            <span style="float:right;   border: 1px  solid #ebebeb;   background:#f0f1f1;  margin-right: 15px; padding-left: 5px; padding-right: 5px; "><%= transaction.status %></span>
-                        </div>
-                    </div>
-                    <hr style="margin-top:25px; width:90%; border:1px solid #ebebeb ">
-                    <% }else if (transaction.status==='INPROGRESS' ){ %>
-                        <div style="padding-top: 5px;  font-size: small;">
-                            <div>
-                                <span style="float: left; padding-left: 5%;">Status</span>
-                            </div>
-                            <div>
-                                <span style="float:right;  border: 1px  solid #ebebeb; color: #a09936; background:#ffff97;  margin-right: 15px; padding-left: 5px; padding-right: 5px; "><%= transaction.status %></span>
-                            </div>
-                        </div>
-                        <hr style="margin-top:25px; width:90%; border:1px solid #ebebeb ">
-                        <% }else if (transaction.status==='FAILED' ){ %>
-                            <div style="padding-top: 5px;  font-size: small;">
-                                <div>
-                                    <span style="float: left; padding-left: 5%;">Status</span>
-                                </div>
-                                <div>
-                                    <span style="float:right;  border: 1px  solid #ebebeb; color: #8e3d1a; background:#f6ad89;  margin-right: 15px; padding-left: 5px; padding-right: 5px; "><%= transaction.status %></span>
-                                </div>
-                            </div>
-                            <hr style="margin-top:25px; width:90%; border:1px solid #ebebeb ">
-                            <% } else{ %>
-                        <div></div>
-                        <% } %>
-
-
-
-
 
             <% if(transaction.disco==='ABA' ){ %>
                 <div style="padding-top: 5px;  font-size: small;">

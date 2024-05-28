@@ -556,7 +556,7 @@ type IAction = -1 | 0 | 1
 type IVendType = 'PREPAID' | 'POSTPAID'
 type TxnValidationResponse = ({ action: 1, tokenUnits: string } & ({ token: string, vendType: 'PREPAID' } | { vendType: 'POSTPAID' }) | { action: -1 | 0, vendType: IVendType })
 
-class ResponseValidationUtil {
+export class ResponseValidationUtil {
 
     static async validateTransactionCondition({
         requestType, vendor, responseObject,

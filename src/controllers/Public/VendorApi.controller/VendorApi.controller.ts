@@ -1,4 +1,3 @@
-
 import { NextFunction, Request, Response } from "express";
 import TransactionService from "../../../services/Transaction.service";
 import Transaction, {
@@ -103,8 +102,7 @@ interface RequestTokenValidatorResponse {
 }
 
 // Validate request parameters for each controller
-export  class VendorControllerValdator {
-
+export class VendorControllerValdator {
     static async validateRequest({
         bankRefId,
         transactionId,
@@ -150,7 +148,10 @@ export  class VendorControllerValdator {
 
         //  Get Meter
         const meter: Meter | null = await transactionRecord.$get("meter");
-        if (!meter && transactionRecord.transactionType=== TransactionType.ELECTRICITY) {
+        if (
+            !meter &&
+            transactionRecord.transactionType === TransactionType.ELECTRICITY
+        ) {
             throw new InternalServerError(
                 `Transaction ${transactionRecord.id} does not have a meter`,
             );
@@ -1325,9 +1326,105 @@ export default class VendorController {
             throw new BadRequestError("Transaction condition not met");
         }
 
-        const logMeta = { meta: { transactionId } };
+        const _product = await ProductService.viewSingleProduct(
+            transaction.productCodeId,
+        );
+        if (!_product) throw new InternalServerError("Product not found");
 
-        logger.info("Transaction condition met - Successful", logMeta);
+        const meter = await transaction.$get("meter");
+        if (!meter) {
+            throw new InternalServerError("Meter not found");
+        }
+
+        const user = await transaction.$get("user");
+        if (!user) {
+            throw new InternalServerError("User not found");
+        }
+
+        const partner = await transaction.$get("partner");
+        if (!partner) {
+            throw new InternalServerError("Partner not found");
+        }
+
+        const transactionEventService = new TransactionEventService(
+            transaction,
+            meter,
+            transaction.superagent,
+            partner.email,
+        );
+        logger.info("Initiated manual requery", {
+            meta: {
+                transactionId,
+                admin: req.user.user,
+            },
+        });
+
+        await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor({
+            eventService: transactionEventService,
+            eventData: {
+                meter: {
+                    meterNumber: meter.meterNumber,
+                    vendType: meter.vendType,
+                    disco: transaction.disco,
+                    id: meter.id,
+                },
+                transactionId: transaction.id,
+                error: {
+                    code: 200,
+                    cause: TransactionErrorCause.MANUAL_REQUERY_TRIGGERED,
+                },
+            },
+            retryCount: 1,
+            superAgent: transaction.superagent,
+            manual: true,
+            tokenInResponse: null,
+            vendorRetryRecord: {
+                retryCount: 1,
+            },
+            transactionTimedOutFromBuypower: false,
+        });
+
+        res.status(200).json({
+            status: "success",
+            message: "Manual requery initiated successfully",
+            data: {
+                transaction: {
+                    transactionId: transaction.id,
+                    status: transaction.status,
+                },
+                meter: {
+                    disco: meter.disco,
+                    number: meter.meterNumber,
+                    address: meter.address,
+                    phone: meter.userId,
+                    vendType: meter.vendType,
+                    name: meter.userId,
+                },
+            },
+        });
+    }
+
+    static async initManualRetryTransaction(
+        req: AuthenticatedRequest,
+        res: Response,
+        next: NextFunction,
+    ) {
+        const { transactionId } = req.body;
+
+        if (!transactionId) {
+            throw new BadRequestError("Transaction ID is required");
+        }
+
+        const transaction =
+            await TransactionService.viewSingleTransaction(transactionId);
+        if (!transaction) {
+            throw new NotFoundError("Transaction not found");
+        }
+
+        if (transaction.status != Status.INPROGRESS) {
+            throw new BadRequestError("Transaction condition not met");
+        }
+
         const _product = await ProductService.viewSingleProduct(
             transaction.productCodeId,
         );
@@ -1355,43 +1452,22 @@ export default class VendorController {
             partner.email,
         );
 
-        await transactionEventService.addGetTransactionTokenRequestedFromVendorRetryEvent(
-            {
-                cause: TransactionErrorCause.MANUAL_REQUERY_TRIGGERED,
-                code: 200,
-            },
-            1,
-        );
-        logger.info("Initiated manual requery", {
+        logger.info("Initiated manual retry", {
             meta: {
                 transactionId,
                 admin: req.user.user,
             },
         });
-        await VendorPublisher.publishEventForGetTransactionTokenRequestedFromVendorRetry(
-            {
-                transactionId: transaction.id,
-                meter: {
-                    id: meter.id,
-                    meterNumber: meter.meterNumber,
-                    disco: transaction!.disco,
-                    vendType: meter.vendType,
-                },
-                error: {
-                    cause: TransactionErrorCause.MANUAL_REQUERY_TRIGGERED,
-                    code: 500,
-                },
-                retryCount: 1,
-                superAgent: transaction.superagent,
-                timeStamp: new Date(),
-                vendorRetryRecord: {
-                    ...transaction.retryRecord,
-                    retryCount: 1,
-                },
-                waitTime: 0,
-            },
-        );
 
+        await TokenHandlerUtil.triggerEventToRetryTransactionWithNewVendor({
+            transactionEventService,
+            transaction,
+            meter,
+            manual: true,
+            vendorRetryRecord: {
+                retryCount: 1,
+            },
+        });
         res.status(200).json({
             status: "success",
             message: "Manual requery initiated successfully",
@@ -1412,4 +1488,3 @@ export default class VendorController {
         });
     }
 }
-

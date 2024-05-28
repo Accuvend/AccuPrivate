@@ -479,26 +479,26 @@ export default class VendorService {
                     data: response.data,
                 });
 
-                    logger.info("Vend response from baxi", {
-                        meta: {
-                            ...mainMeta,
-                            responseData: response.data,
-                            transactionId: body.transactionId,
-                        },
-                    });
-                    return {
-                        ...response.data,
-                        source: "BAXI" as const,
-                        httpStatusCode: response.status,
-                    };
-                } catch (error: any) {
-                    console.log({
-                        message: error.message,
-                        response: error.response?.data?.errors,
-                    });
-                    throw error;
-                }
-            },
+                logger.info("Vend response from baxi", {
+                    meta: {
+                        ...mainMeta,
+                        responseData: response.data,
+                        transactionId: body.transactionId,
+                    },
+                });
+                return {
+                    ...response.data,
+                    source: "BAXI" as const,
+                    httpStatusCode: response.status,
+                };
+            } catch (error: any) {
+                console.log({
+                    message: error.message,
+                    response: error.response?.data?.errors,
+                });
+                throw error;
+            }
+        },
         );
     }
 
@@ -552,8 +552,6 @@ export default class VendorService {
                         // message: responseData.message,
                         // data: responseData.data,
                     };
-                } catch (error) {
-                    throw error;
                 }
 
                 return {
@@ -780,10 +778,7 @@ export default class VendorService {
 
                 throw error;
             }
-
-                    throw error;
-                }
-
+        })
     }
 
     static async buyPowerRequeryTransaction({
@@ -824,8 +819,6 @@ export default class VendorService {
                     } as
                         | InprogressResponseForBuyPowerRequery
                         | FailedResponseForBuyPowerRequery;
-                } catch (error) {
-                    throw error;
                 }
 
                 return { ...response.data, source: "BUYPOWERNG", httpStatusCode: response.status } as

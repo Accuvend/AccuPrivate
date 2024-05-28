@@ -698,52 +698,27 @@ class ResponseValidationUtil {
             // Requery transaction if no token was found and vendType is PREPAID
             if (!dbQueryParams['TK'] && vendType === 'PREPAID') {
                 // Check if disco is down
-             const discoUp = await VendorService.buyPowerCheckDiscoUp(disco);
+                const discoUp = await VendorService.buyPowerCheckDiscoUp(disco);
                 discoUp
                     ? logger.info(
-                          `DISCO_UP_STATUS:  Disco ${disco} status is ${discoUp}`,
-                          {
-                              meta: {
-                                  transactionId: transactionId,
-                                  disco: disco,
-                              },
-                          },
-                      )
+                        `DISCO_UP_STATUS:  Disco ${disco} status is ${discoUp}`,
+                        {
+                            meta: {
+                                transactionId: transactionId,
+                                disco: disco,
+                            },
+                        },
+                    )
                     : logger.error(
-                          `DISCO_UP_STATUS:  Disco ${disco} status is ${discoUp}`,
-                          {
-                              meta: {
-                                  transactionId: transactionId,
-                                  disco: disco,
-                              },
-                          },
-                      );
-
-                // Requery transaction if no token was found and vendType is PREPAID
-                if (!dbQueryParams["TK"] && vendType === "PREPAID") {
-                    // Check if disco is down
-                    const discoUp =
-                        await VendorService.buyPowerCheckDiscoUp(disco);
-                    discoUp
-                        ? logger.info(
-                            `DISCO_UP_STATUS:  Disco ${disco} status is ${discoUp}`,
-                            {
-                                meta: {
-                                    transactionId: transactionId,
-                                    disco: disco,
-                                },
+                        `DISCO_UP_STATUS:  Disco ${disco} status is ${discoUp}`,
+                        {
+                            meta: {
+                                transactionId: transactionId,
+                                disco: disco,
                             },
-                        )
-                        : logger.error(
-                            `DISCO_UP_STATUS:  Disco ${disco} status is ${discoUp}`,
-                            {
-                                meta: {
-                                    transactionId: transactionId,
-                                    disco: disco,
-                                },
-                            },
-                        );
-                }
+                        },
+                    );
+            }
 
             // If no masterResponseCode was set requery transaction
             return { action: (errorCode.accuvendMasterResponseCode as -1 | 0 | 1) ?? -1, token: dbQueryParams['TK'] as string, tokenUnits: dbQueryParams['UNITS'], vendType: vendType } as TxnValidationResponse

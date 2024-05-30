@@ -146,7 +146,7 @@ export interface ICreateEntity extends IEntity {
 }
 
 // Interface for updating an existing Entity
-export interface IUpdateEntity {
+export interface IUpdateEntity extends Partial<ICreateEntity> {
     notificationSettings?: {
         login: boolean;
         logout: boolean;

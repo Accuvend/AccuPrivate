@@ -14,5 +14,6 @@ router
     .get('/all', AuthenticatedController(PartnerController.getAllPartners))
     .post('/invite', AuthenticatedController(PartnerController.invitePartner))
     .post('/invite/resend', AuthenticatedController(PartnerController.reSendPartnerPassword))
+    .patch('/update/:id',AuthenticatedController(PartnerController.updatePartner))
 
 export default router 

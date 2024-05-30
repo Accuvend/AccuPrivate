@@ -118,6 +118,7 @@ export default class TransactionService {
                     "createdAt",
                     "updatedAt",
                     "channel",
+                    "retryRecord"
                     //...attributesMap
                 ],
                 order: [["transactionTimestamp", "DESC"]],
@@ -185,6 +186,7 @@ export default class TransactionService {
                 "createdAt",
                 "updatedAt",
                 "channel",
+                "retryRecord"
             ],
             order: [["transactionTimestamp", "DESC"]], // Sorting transactions by transaction timestamp in descending order
         });

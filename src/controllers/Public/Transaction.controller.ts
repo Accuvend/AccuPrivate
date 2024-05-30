@@ -6,7 +6,6 @@ import {
     InternalServerError,
     NotFoundError,
 } from "../../utils/Errors";
-import ResponseTrimmer from "../../utils/ResponseTrimmer";
 import VendorService from "../../services/VendorApi.service";
 import { AuthenticatedRequest } from "../../utils/Interface";
 import PartnerService from "../../services/Entity/Profiles/PartnerProfile.service";
@@ -45,7 +44,7 @@ export default class TransactionController {
 
         const transaction: Transaction | null = bankRefId
             ? await TransactionService.viewSingleTransactionByBankRefID(
-                  bankRefId
+                  bankRefId,
               )
             : await TransactionService.viewSingleTransaction(transactionId);
         if (!transaction) {
@@ -97,10 +96,10 @@ export default class TransactionController {
             [RoleEnum.SuperAdmin].includes(req.user.user.entity.role);
         if (!requestWasMadeByAnAdmin) {
             const requestMadeByEnduser = [RoleEnum.EndUser].includes(
-                req.user.user.entity.role
+                req.user.user.entity.role,
             );
             const requestWasMadeByTeamMember = [RoleEnum.TeamMember].includes(
-                req.user.user.entity.role
+                req.user.user.entity.role,
             );
 
             if (requestMadeByEnduser) {
@@ -109,7 +108,7 @@ export default class TransactionController {
                 //To show Partner Data to Teammember
                 const _teamMember =
                     await TeamMemberProfileService.viewSingleTeamMember(
-                        req.user.user.entity.teamMemberProfileId || ""
+                        req.user.user.entity.teamMemberProfileId || "",
                     );
                 query.where.partnerId = _teamMember?.partnerId;
             } else {
@@ -127,7 +126,7 @@ export default class TransactionController {
 
         const totalAmount = transactions.reduce(
             (acc, curr) => acc + parseInt(curr.amount),
-            0
+            0,
         );
 
         const paginationData = {
@@ -166,7 +165,7 @@ export default class TransactionController {
      */
     static async getTransactionsFiltered(
         req: AuthenticatedRequest,
-        res: Response
+        res: Response,
     ) {
         // Extracting request query parameters
         const {
@@ -236,10 +235,10 @@ export default class TransactionController {
             [RoleEnum.SuperAdmin].includes(req.user.user.entity.role);
         if (!requestWasMadeByAnAdmin) {
             const requestMadeByEnduser = [RoleEnum.EndUser].includes(
-                req.user.user.entity.role
+                req.user.user.entity.role,
             );
             const requestWasMadeByTeamMember = [RoleEnum.TeamMember].includes(
-                req.user.user.entity.role
+                req.user.user.entity.role,
             );
 
             if (requestMadeByEnduser) {
@@ -248,7 +247,7 @@ export default class TransactionController {
                 // To show Partner Data to Teammember
                 const _teamMember =
                     await TeamMemberProfileService.viewSingleTeamMember(
-                        req.user.user.entity.teamMemberProfileId || ""
+                        req.user.user.entity.teamMemberProfileId || "",
                     );
                 query.where.partnerId = _teamMember?.partnerId;
             } else {
@@ -259,7 +258,7 @@ export default class TransactionController {
         // Retrieving transactions based on the constructed query
         const transactions: Transaction[] =
             await TransactionService.viewTransactionsWithCustomQueryAndInclude(
-                query
+                query,
             );
         if (!transactions) {
             throw new NotFoundError("Transactions not found");
@@ -268,7 +267,7 @@ export default class TransactionController {
         // Calculating total amount of transactions
         const totalAmount = transactions.reduce(
             (acc, curr) => acc + parseInt(curr.amount),
-            0
+            0,
         );
 
         // Constructing pagination data
@@ -316,7 +315,7 @@ export default class TransactionController {
     static async getTransactionsLatest(
         req: AuthenticatedRequest,
         res: Response,
-        next: NextFunction
+        next: NextFunction,
     ) {
         // Extracts parameters from the request
         const { phoneNumber } = req.params as any as { phoneNumber: string };
@@ -445,7 +444,7 @@ export default class TransactionController {
 
         // Checks if the request was made by a customer
         const requestWasMadeByCustomer = [RoleEnum.EndUser].includes(
-            req.user.user.entity.role
+            req.user.user.entity.role,
         );
         if (requestWasMadeByCustomer) {
             // Restricts data access to the current user's transactions if they are a customer
@@ -454,12 +453,12 @@ export default class TransactionController {
         if (!requestWasMadeByAnAdmin && !requestWasMadeByCustomer) {
             // If the request was made by a team member, restricts data access to their partner's transactions
             const requestWasMadeByTeamMember = [RoleEnum.TeamMember].includes(
-                req.user.user.entity.role
+                req.user.user.entity.role,
             );
             if (requestWasMadeByTeamMember) {
                 const _teamMember =
                     await TeamMemberProfileService.viewSingleTeamMember(
-                        req.user.user.entity.teamMemberProfileId || ""
+                        req.user.user.entity.teamMemberProfileId || "",
                     );
                 query.where.partnerId = _teamMember?.partnerId;
             } else {
@@ -471,11 +470,11 @@ export default class TransactionController {
         // Retrieves the total transaction amount and count based on the constructed query
         const totalTransactionAmount: any =
             await TransactionService.viewTransactionsAmountWithCustomQuery(
-                query
+                query,
             );
         const totalTransactionCount: number =
             await TransactionService.viewTransactionsCountWithCustomQuery(
-                query
+                query,
             );
 
         // Constructs the response object
@@ -609,7 +608,7 @@ export default class TransactionController {
      */
     static async getYesterdaysTransactions(
         req: AuthenticatedRequest,
-        res: Response
+        res: Response,
     ) {
         // Extracts the transaction status from the request query parameters
         const { status } = req.query as any as {
@@ -631,14 +630,14 @@ export default class TransactionController {
         const transactions = status
             ? await TransactionService.viewTransactionsForYesterdayByStatus(
                   partner.id,
-                  status.toUpperCase() as typeof status
+                  status.toUpperCase() as typeof status,
               )
             : await TransactionService.viewTransactionForYesterday(partner.id);
 
         // Calculates the total amount of yesterday's transactions
         const totalAmount = transactions.reduce(
             (acc, curr) => acc + parseInt(curr.amount),
-            0
+            0,
         );
 
         // Sends a JSON response containing the retrieved transactions and total amount

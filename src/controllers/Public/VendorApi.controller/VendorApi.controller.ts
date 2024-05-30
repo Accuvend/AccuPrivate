@@ -1322,96 +1322,106 @@ export default class VendorController {
         if (!transactionId) {
             throw new BadRequestError("Transaction ID is required");
         }
-
         const transaction =
             await TransactionService.viewSingleTransaction(transactionId);
         if (!transaction) {
             throw new NotFoundError("Transaction not found");
         }
-
-        if (transaction.status != Status.INPROGRESS) {
-            throw new BadRequestError("Transaction condition not met");
-        }
-
-        const _product = await ProductService.viewSingleProduct(
-            transaction.productCodeId,
-        );
-        if (!_product) throw new InternalServerError("Product not found");
-
         const meter = await transaction.$get("meter");
         if (!meter) {
             throw new InternalServerError("Meter not found");
         }
 
-        const user = await transaction.$get("user");
-        if (!user) {
-            throw new InternalServerError("User not found");
-        }
-
-        const partner = await transaction.$get("partner");
-        if (!partner) {
-            throw new InternalServerError("Partner not found");
-        }
-        const retryRecord = transaction.retryRecord;
-        const lastRetryRecord = retryRecord[retryRecord.length - 1];
-        const lastSuperAgentUsed = lastRetryRecord.vendor;
-
-        const transactionEventService = new TransactionEventService(
-            transaction,
-            meter,
-            lastSuperAgentUsed,
-            partner.email,
+                const vendor = await VendorModelService.viewSingleVendorByName(
+            transaction.superagent,
         );
+        if (!vendor) throw new InternalServerError("Vendor not found");
+
+        const product =
+            await ProductService.viewSingleProductByMasterProductCode(
+                transaction.disco,
+            );
+        if (!product) throw new InternalServerError("Product not found");
+
+        const vendorProduct =
+            await VendorProductService.viewSingleVendorProductByVendorIdAndProductId(
+                vendor.id,
+                product.id,
+            );
+        if (!vendorProduct)
+            throw new InternalServerError("Vendor product not found");
+
+        const logMeta = { transactionId: transaction.id };
         logger.info("Initiated manual requery", {
             meta: {
                 transactionId,
                 admin: req.user.user,
             },
         });
+        const requeryResult =
+            await TokenHandlerUtil.requeryTransactionFromVendor(
+                transaction,
+            ).catch((e) => e ?? {});
 
-        await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor({
-            eventService: transactionEventService,
-            eventData: {
-                meter: {
-                    meterNumber: meter.meterNumber,
-                    vendType: meter.vendType,
-                    disco: transaction.disco,
-                    id: meter.id,
-                },
+        logger.info("Requeried transaction successfully", logMeta);
+        console.log({ requeryResult: requeryResult });
+        const discoCode = vendorProduct.schemaData.code;
+        const response =
+            await ResponseValidationUtil.validateTransactionCondition({
+                requestType: "REQUERY",
+                vendor: vendor.name,
+                // transactionType: transaction.transactionType,
+                httpCode:
+                    requeryResult instanceof AxiosError
+                        ? requeryResult.status
+                        : requeryResult.httpStatusCode,
+                responseObject:
+                    requeryResult instanceof AxiosError
+                        ? requeryResult.response?.data
+                        : requeryResult,
+                vendType: meter.vendType,
+                disco: discoCode,
                 transactionId: transaction.id,
-                error: {
-                    code: 200,
-                    cause: TransactionErrorCause.MANUAL_REQUERY_TRIGGERED,
-                },
-            },
-            retryCount: 1,
-            superAgent: lastSuperAgentUsed,
-            manual: true,
-            tokenInResponse: null,
-            vendorRetryRecord: {
-                retryCount: 1,
-            },
-            transactionTimedOutFromBuypower: false,
-        });
+                isError: requeryResult instanceof AxiosError,
+            });
 
-        res.status(200).json({
-            status: "success",
-            message: "Manual requery initiated successfully",
-            data: {
-                transaction: {
-                    transactionId: transaction.id,
-                    status: transaction.status,
-                },
-                meter: {
-                    disco: meter.disco,
-                    number: meter.meterNumber,
-                    address: meter.address,
-                    phone: meter.userId,
-                    vendType: meter.vendType,
-                    name: meter.userId,
-                },
+        const responseMessage = {
+            processing: {
+                status: "success",
+                message: "Transaction is being processed",
+                state: {} as Record<string, any>,
             },
-        });
+            successful: {
+                status: "success",
+                message: "Transaction requery successful",
+                data: {
+                    transaction: {
+                        transactionId: transaction.id,
+                        status: transaction.status,
+                    },
+                    meter: {
+                        disco: meter.disco,
+                        number: meter.meterNumber,
+                        address: meter.address,
+                        phone: meter.userId,
+                        vendType: meter.vendType,
+                        name: meter.userId,
+                    },
+                } as Record<string, any>,
+            },
+        };
+
+        if (response.action === 1) {
+            if (response.vendType === "PREPAID") {
+                responseMessage.successful.data.token = response.token;
+                responseMessage.successful.data.tokenUnits =
+                    response.tokenUnits;
+            }
+
+            res.status(200).send(responseMessage.successful);
+        } else {
+            res.status(200).send(responseMessage.processing);
+        }
     }
 
     static async initManualRetryTransaction(
@@ -1462,13 +1472,68 @@ export default class VendorController {
             partner.email,
         );
 
-        logger.info("Initiated manual retry", {
-            meta: {
-                transactionId,
-                admin: req.user.user,
-            },
+        const logMeta = { transactionId, admin: req.user.user };
+        logger.info("Initiated manual retry", logMeta);
+
+        const retryRecord = transaction.retryRecord;
+        const lastRetryRecord = retryRecord[retryRecord.length - 1];
+        const lastSuperAgentUsed = lastRetryRecord.vendor;
+        const vendor =
+            await VendorModelService.viewSingleVendorByName(lastSuperAgentUsed);
+        if (!vendor) throw new InternalServerError("Vendor not found");
+
+        const product =
+            await ProductService.viewSingleProductByMasterProductCode(
+                transaction.disco,
+            );
+        if (!product) throw new InternalServerError("Product not found");
+
+        const vendorProduct =
+            await VendorProductService.viewSingleVendorProductByVendorIdAndProductId(
+                vendor.id,
+                product.id,
+            );
+        if (!vendorProduct)
+            throw new InternalServerError("Vendor product not found");
+
+        logger.info("Intiating transaction requery", logMeta);
+        const discoCode = vendorProduct.schemaData.code;
+        const requeryResult =
+            await TokenHandlerUtil.requeryTransactionFromVendor(
+                transaction,
+            ).catch((e) => e ?? {});
+
+        logger.info("Requeried transaction successfully", logMeta);
+        console.log({ requeryResult: requeryResult });
+        const response =
+            await ResponseValidationUtil.validateTransactionCondition({
+                requestType: "REQUERY",
+                vendor: vendor.name,
+                // transactionType: transaction.transactionType,
+                httpCode:
+                    requeryResult instanceof AxiosError
+                        ? requeryResult.status
+                        : requeryResult.httpStatusCode,
+                responseObject:
+                    requeryResult instanceof AxiosError
+                        ? requeryResult.response?.data
+                        : requeryResult,
+                vendType: meter.vendType,
+                disco: discoCode,
+                transactionId: transaction.id,
+                isError: requeryResult instanceof AxiosError,
+            });
+
+        logger.info("Response validation completed", {
+            ...logMeta,
+            validationResponse: response,
         });
 
+        switch (response.action) {
+            case 0:
+            case 1:
+            case -1:
+        }
         await TokenHandlerUtil.triggerEventToRetryTransactionWithNewVendor({
             transactionEventService,
             transaction,

@@ -435,6 +435,11 @@ export class TokenHandlerUtil {
             partner.email,
         );
 
+        await TransactionService.updateSingleTransaction(transaction.id, {
+            retryRecord,
+            reference: newTransactionReference,
+        });
+
         if (manual) {
             await transactionEventService.addGetTransactionTokenRequestedFromVendorRetryEvent(
                 {
@@ -476,10 +481,6 @@ export class TokenHandlerUtil {
 
         logger.info("Scheduled retry event", meta);
 
-        await TransactionService.updateSingleTransaction(transaction.id, {
-            retryRecord,
-            reference: newTransactionReference,
-        });
         await VendorPublisher.publishEventToScheduleRetry({
             scheduledMessagePayload: {
                 meter: meter,

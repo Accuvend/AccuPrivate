@@ -1352,11 +1352,14 @@ export default class VendorController {
         if (!partner) {
             throw new InternalServerError("Partner not found");
         }
+        const retryRecord = transaction.retryRecord;
+        const lastRetryRecord = retryRecord[retryRecord.length - 1];
+        const lastSuperAgentUsed = lastRetryRecord.vendor;
 
         const transactionEventService = new TransactionEventService(
             transaction,
             meter,
-            transaction.superagent,
+            lastSuperAgentUsed,
             partner.email,
         );
         logger.info("Initiated manual requery", {
@@ -1382,7 +1385,7 @@ export default class VendorController {
                 },
             },
             retryCount: 1,
-            superAgent: transaction.superagent,
+            superAgent: lastSuperAgentUsed,
             manual: true,
             tokenInResponse: null,
             vendorRetryRecord: {

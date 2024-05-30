@@ -1,5 +1,5 @@
 import { Transaction, UUIDV4 } from "sequelize";
-import PartnerProfile, { IPartnerProfile } from "../../../models/Entity/Profiles/PartnerProfile.model";
+import PartnerProfile, { IPartnerProfile, IUpdatePartnerProfile } from "../../../models/Entity/Profiles/PartnerProfile.model";
 import Cypher, { generateRandomString } from "../../../utils/Cypher";
 import { randomUUID } from "crypto";
 import ApiKeyService from "../../ApiKey.service ";
@@ -25,6 +25,18 @@ export default class PartnerProfileService {
         const result = transaction ? await newPartner.save({ transaction }) : await newPartner.save()
 
         return result
+    }
+
+    static async updatePartner(partner: PartnerProfile, dataToUpdate: IUpdatePartnerProfile , transaction ?: Transaction): Promise<PartnerProfile> {
+        if(transaction)  await partner.update(dataToUpdate, {transaction})
+        else await partner.update(dataToUpdate)
+
+        const updatedPartner = await PartnerProfile.findOne({ where: { id: partner.id } })
+        if (!updatedPartner) {
+            throw new Error('Partner not found')
+        }
+
+        return updatedPartner
     }
 
     static async viewPartners(): Promise<PartnerProfile[] | void> {

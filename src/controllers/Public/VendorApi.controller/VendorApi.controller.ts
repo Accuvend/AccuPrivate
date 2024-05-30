@@ -758,9 +758,16 @@ export default class VendorController {
                 };
                 res.status(200).json(responseData);
 
-                Logger.apiRequest.info("Meter validated successfully", {
-                    meta: { transactionId: transaction.id, ...responseData },
-                });
+                Logger.apiRequest.info(
+                    "Meter validation response sent to partner",
+                    {
+                        meta: {
+                            transactionId: transaction.id,
+                            responseData,
+                            partnerId: partnerId,
+                        },
+                    },
+                );
                 await transactionEventService.addMeterValidationSentEvent(
                     meter.id,
                 );

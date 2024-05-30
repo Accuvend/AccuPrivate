@@ -251,7 +251,7 @@ export class TokenHandlerUtil {
                     superAgent: transaction.superagent,
                     timeStamp: new Date(),
                     vendorRetryRecord: {
-                        ...transaction.retryRecord,
+                        // ...transaction.retryRecord,
                         retryCount: 1,
                     },
                     waitTime: 0,
@@ -466,7 +466,7 @@ export class TokenHandlerUtil {
                     address: user.address,
                     phoneNumber: user.phoneNumber,
                 },
-                superAgent: transaction.superagent,
+                superAgent: transaction.retryRecord[0].vendor,
                 vendorRetryRecord: {
                     retryCount: 1,
                 },
@@ -1010,8 +1010,10 @@ export class ResponseValidationUtil {
                 // Requery transaction if no token was found and vendType is PREPAID
                 if (!dbQueryParams["TK"] && vendType === "PREPAID") {
                     // Check if disco is down
-                    const discoUp =
-                        await VendorService.buyPowerCheckDiscoUp(disco);
+                    const discoUp = await VendorService.buyPowerCheckDiscoUp(
+                        disco,
+                        transactionId,
+                    );
                     discoUp
                         ? logger.info(
                               `DISCO_UP_STATUS:  Disco ${disco} status is ${discoUp}`,
@@ -1380,10 +1382,7 @@ class TokenHandler extends Registry {
                                     superAgent: data.superAgent,
                                     tokenInResponse: null,
                                     transactionTimedOutFromBuypower: false,
-                                    vendorRetryRecord:
-                                        transaction.retryRecord[
-                                            transaction.retryRecord.length - 1
-                                        ],
+                                    vendorRetryRecord: data.vendorRetryRecord,
                                 },
                             );
                     }
@@ -1710,10 +1709,7 @@ class TokenHandler extends Registry {
                                     superAgent: data.superAgent,
                                     tokenInResponse: null,
                                     transactionTimedOutFromBuypower: false,
-                                    vendorRetryRecord:
-                                        transaction.retryRecord[
-                                            transaction.retryRecord.length - 1
-                                        ],
+                                    vendorRetryRecord: data.vendorRetryRecord,
                                 },
                             );
                     }

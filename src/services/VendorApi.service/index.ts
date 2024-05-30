@@ -970,7 +970,7 @@ export default class VendorService {
 
             logger.info(
                 `DISCO_STATUS: ${disco.toUpperCase()} => ${data[disco.toUpperCase()]}`,
-                { transactionId, responseData: response.dat },
+                { transactionId, responseData: response.data },
             );
             if (data[disco.toUpperCase()] === true) return true;
             else return false;

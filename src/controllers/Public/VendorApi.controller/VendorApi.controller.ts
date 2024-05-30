@@ -1186,7 +1186,7 @@ export default class VendorController {
         });
     }
 
-    static async cusRe(req: Request, res: Response, next: NextFunction) {
+    static async resendToken(req: Request, res: Response, next: NextFunction) {
         const { transactionId } = req.body;
 
         // TODO: Change from viewbyid to vendor refer id

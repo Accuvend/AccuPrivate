@@ -961,7 +961,7 @@ export default class VendorService {
     // Static method for checking Disco updates with BuyPower
     static async buyPowerCheckDiscoUp(
         disco: string,
-        transactionId: string,
+        transactionId?: string,
     ): Promise<boolean> {
         try {
             // Make a GET request to check Disco updates

@@ -122,7 +122,11 @@ export default class BuypowerDataApi extends BuyPowerApi {
                     responseData: response.data,
                 },
             });
-            return response.data;
+            return {
+                ...response.data,
+                source: "BUYPOWERNG" as const,
+                httpStatusCode: response.status,
+            };
         } catch (error: any) {
             if (error instanceof AxiosError) {
                 const requery =
@@ -144,4 +148,3 @@ export default class BuypowerDataApi extends BuyPowerApi {
         }
     }
 }
-

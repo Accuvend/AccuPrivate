@@ -5,27 +5,37 @@ import ProducerFactory from "../kafka/modules/util/Producer";
 import Event, { ICreateEvent, Status } from "../models/Event.model";
 import Transaction from "../models/Transaction.model";
 import EventService from "./Event.service";
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4 } from "uuid";
 
 interface IMeterValidationReceivedEventParams {
-    user: { name: string, email: string, address: string, phoneNumber: string };
+    user: { name: string; email: string; address: string; phoneNumber: string };
 }
 
 interface ICRMUserInitiatedEventParams {
-    user: { id: string, name: string, email: string, address: string, phoneNumber: string };
+    user: {
+        id: string;
+        name: string;
+        email: string;
+        address: string;
+        phoneNumber: string;
+    };
 }
 
 interface EventMeterInfo {
-    meterNumber: string,
-    disco: string,
-    vendType: 'PREPAID' | 'POSTPAID'
+    meterNumber: string;
+    disco: string;
+    vendType: "PREPAID" | "POSTPAID";
 }
 
 const EventAndPublishers = {
-    [TOPICS.POWER_PURCHASE_INITIATED_BY_CUSTOMER]: VendorPublisher.publishEventForInitiatedPowerPurchase,
-    [TOPICS.TOKEN_RECIEVED_FROM_VENDOR]: VendorPublisher.publishEventForTokenReceivedFromVendor,
-    [TOPICS.METER_VALIDATION_REQUEST_SENT_TO_VENDOR]: VendorPublisher.publishEventForMeterValidationRequested,
-    [TOPICS.METER_VALIDATION_RECIEVED_FROM_VENDOR]: VendorPublisher.publishEventForMeterValidationReceived,
+    [TOPICS.POWER_PURCHASE_INITIATED_BY_CUSTOMER]:
+        VendorPublisher.publishEventForInitiatedPowerPurchase,
+    [TOPICS.TOKEN_RECIEVED_FROM_VENDOR]:
+        VendorPublisher.publishEventForTokenReceivedFromVendor,
+    [TOPICS.METER_VALIDATION_REQUEST_SENT_TO_VENDOR]:
+        VendorPublisher.publishEventForMeterValidationRequested,
+    [TOPICS.METER_VALIDATION_RECIEVED_FROM_VENDOR]:
+        VendorPublisher.publishEventForMeterValidationReceived,
 } as Record<TOPICS, (...args: any[]) => Promise<void>>;
 
 class EventPublisher {
@@ -33,17 +43,15 @@ class EventPublisher {
     private publisher: (...args: any[]) => Promise<void>;
     private args: any[];
 
-    constructor({ event, params }: {
-        event: Event, params: any[]
-    }) {
+    constructor({ event, params }: { event: Event; params: any[] }) {
         this.event = event;
-        event.eventType
+        event.eventType;
         this.publisher = EventAndPublishers[event.eventType];
         this.args = params;
     }
 
     public async publish() {
-        await this.publisher(...this.args)
+        await this.publisher(...this.args);
     }
 
     public async getEvent() {
@@ -53,22 +61,33 @@ class EventPublisher {
 
 export class AirtimeTransactionEventService {
     private transaction: Transaction;
-    private superAgent: Transaction['superagent']
-    private partner: Transaction['partner']['email']
-    private phoneNumber: string
+    private superAgent: Transaction["superagent"];
+    private partner: Transaction["partner"]["email"];
+    private phoneNumber: string;
 
-    constructor(transaction: Transaction, superAgent: Transaction['superagent'], partner: string, phoneNumber: string) {
+    constructor(
+        transaction: Transaction,
+        superAgent: Transaction["superagent"],
+        partner: string,
+        phoneNumber: string,
+    ) {
         this.transaction = transaction;
         this.superAgent = superAgent;
-        this.partner = partner
-        this.phoneNumber = phoneNumber
+        this.partner = partner;
+        this.phoneNumber = phoneNumber;
     }
 
-    public async addScheduleRequeryEvent({ timeStamp, waitTime }: { timeStamp: string, waitTime: number }): Promise<Event> {
+    public async addScheduleRequeryEvent({
+        timeStamp,
+        waitTime,
+    }: {
+        timeStamp: string;
+        waitTime: number;
+    }): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.SCHEDULE_REQUERY_FOR_AIRTIME_TRANSACTION,
-            eventText: TOPICS.SCHEDULE_REQUERY_FOR_TRANSACTION_INITIATED,
+            eventText: TOPICS.SCHEDULE_REQUERY_FOR_AIRTIME_TRANSACTION,
             payload: JSON.stringify({
                 timeStamp,
                 waitTime,
@@ -76,16 +95,24 @@ export class AirtimeTransactionEventService {
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
 
-    public async addScheduleRetryEvent({ timeStamp, waitTime, retryRecord }: { timeStamp: string, waitTime: number, retryRecord: Transaction['retryRecord'][number] }): Promise<Event> {
+    public async addScheduleRetryEvent({
+        timeStamp,
+        waitTime,
+        retryRecord,
+    }: {
+        timeStamp: string;
+        waitTime: number;
+        retryRecord: Transaction["retryRecord"][number];
+    }): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.SCHEDULE_RETRY_FOR_AIRTIME_TRANSACTION,
@@ -96,13 +123,13 @@ export class AirtimeTransactionEventService {
                 phone: this.phoneNumber,
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
-                retryRecord: retryRecord
+                retryRecord: retryRecord,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -116,13 +143,13 @@ export class AirtimeTransactionEventService {
                 phoneNumber: this.phoneNumber,
                 disco: this.transaction.disco,
                 superagent: this.superAgent,
-                partnerEmail: this.partner
+                partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -136,18 +163,18 @@ export class AirtimeTransactionEventService {
                 phoneNumber: this.phoneNumber,
                 disco: this.transaction.disco,
                 superagent: this.superAgent,
-                partnerEmail: this.partner
+                partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
         return await EventService.addEvent(event);
     }
 
     public async addCRMUserInitiatedEvent(info: {
-        user: { id: string, name?: string, email: string, phoneNumber: string }
+        user: { id: string; name?: string; email: string; phoneNumber: string };
     }): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
@@ -163,15 +190,17 @@ export class AirtimeTransactionEventService {
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
         return await EventService.addEvent(event);
     }
 
-    public async addCRMUserConfirmedEvent(info: ICRMUserInitiatedEventParams): Promise<Event> {
+    public async addCRMUserConfirmedEvent(
+        info: ICRMUserInitiatedEventParams,
+    ): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.CREATE_USER_CONFIRMED,
@@ -187,15 +216,19 @@ export class AirtimeTransactionEventService {
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
         return await EventService.addEvent(event);
     }
 
-    public async addAirtimePurchaseInitiatedEvent({ amount }: { amount: string }): Promise<Event> {
+    public async addAirtimePurchaseInitiatedEvent({
+        amount,
+    }: {
+        amount: string;
+    }): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.AIRTIME_PURCHASE_INITIATED_BY_CUSTOMER,
@@ -205,13 +238,13 @@ export class AirtimeTransactionEventService {
                 disco: this.transaction.disco,
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
-                amount: amount
+                amount: amount,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
         return await EventService.addEvent(event);
     }
 
@@ -226,11 +259,11 @@ export class AirtimeTransactionEventService {
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
         return await EventService.addEvent(event);
     }
 
@@ -245,11 +278,11 @@ export class AirtimeTransactionEventService {
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
         return await EventService.addEvent(event);
     }
 
@@ -264,15 +297,18 @@ export class AirtimeTransactionEventService {
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
         return await EventService.addEvent(event);
     }
 
-    public async addGetAirtimeFromVendorRetryEvent(error: { cause: TransactionErrorCause, code: number, }, retryCount: number): Promise<Event> {
+    public async addGetAirtimeFromVendorRetryEvent(
+        error: { cause: TransactionErrorCause; code: number },
+        retryCount: number,
+    ): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_REQUERY,
@@ -284,18 +320,20 @@ export class AirtimeTransactionEventService {
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
                 error,
-                retryCount
+                retryCount,
             }),
             source: this.transaction.superagent.toUpperCase(),
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
 
-    public async addGetAirtimeFromVendorRequeryInitiatedEvent(retryCount: number): Promise<Event> {
+    public async addGetAirtimeFromVendorRequeryInitiatedEvent(
+        retryCount: number,
+    ): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.AIRTIME_TRANSACTION_REQUERY_INITIATED,
@@ -307,18 +345,21 @@ export class AirtimeTransactionEventService {
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
                 networProvider: this.transaction.networkProvider,
-                retryCount
+                retryCount,
             }),
             source: this.transaction.superagent.toUpperCase(),
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
 
-    public async addGetAirtimeTokenRequestedFromVendorRequeryEvent(error: { cause: TransactionErrorCause, code: number, }, retryCount: number): Promise<Event> {
+    public async addGetAirtimeTokenRequestedFromVendorRequeryEvent(
+        error: { cause: TransactionErrorCause; code: number },
+        retryCount: number,
+    ): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.GET_AIRTIME_FROM_VENDOR_REQUERY,
@@ -333,19 +374,23 @@ export class AirtimeTransactionEventService {
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
                 error,
-                retryCount
+                retryCount,
             }),
             source: this.transaction.superagent.toUpperCase(),
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
 
-    public async addAirtimePurchaseWithNewVendorEvent({ currentVendor, newVendor }: {
-        currentVendor: Transaction['superagent'], newVendor: Transaction['superagent']
+    public async addAirtimePurchaseWithNewVendorEvent({
+        currentVendor,
+        newVendor,
+    }: {
+        currentVendor: Transaction["superagent"];
+        newVendor: Transaction["superagent"];
     }): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
@@ -364,7 +409,7 @@ export class AirtimeTransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -385,7 +430,7 @@ export class AirtimeTransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -406,7 +451,7 @@ export class AirtimeTransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -427,7 +472,7 @@ export class AirtimeTransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -451,7 +496,7 @@ export class AirtimeTransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -475,7 +520,7 @@ export class AirtimeTransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -499,7 +544,7 @@ export class AirtimeTransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -523,7 +568,7 @@ export class AirtimeTransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
         return await EventService.addEvent(event);
     }
 
@@ -546,24 +591,56 @@ export class AirtimeTransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
         return await EventService.addEvent(event);
     }
-
 }
 export class DataTransactionEventService {
     private transaction: Transaction;
-    private superAgent: Transaction['superagent']
-    private partner: Transaction['partner']['email']
-    private phoneNumber: string
+    private superAgent: Transaction["superagent"];
+    private partner: Transaction["partner"]["email"];
+    private phoneNumber: string;
 
-    constructor(transaction: Transaction, superAgent: Transaction['superagent'], partner: string, phoneNumber: string) {
+    constructor(
+        transaction: Transaction,
+        superAgent: Transaction["superagent"],
+        partner: string,
+        phoneNumber: string,
+    ) {
         this.transaction = transaction;
         this.superAgent = superAgent;
-        this.partner = partner
-        this.phoneNumber = phoneNumber
+        this.partner = partner;
+        this.phoneNumber = phoneNumber;
     }
 
+    public async addGetDataTokenRequestedFromVendorRequeryEvent(
+        error: { cause: TransactionErrorCause; code: number },
+        retryCount: number,
+    ): Promise<Event> {
+        const event: ICreateEvent = {
+            transactionId: this.transaction.id,
+            eventType: TOPICS.GET_DATA_FROM_VENDOR_REQUERY,
+            eventText: TOPICS.GET_DATA_FROM_VENDOR_REQUERY,
+            payload: JSON.stringify({
+                transactionId: this.transaction.id,
+                superAgent: this.transaction.superagent,
+                amount: this.transaction.amount,
+                disco: this.transaction.disco,
+                phone: this.phoneNumber,
+                timestamp: new Date(),
+                superagent: this.superAgent,
+                partnerEmail: this.partner,
+                error,
+                retryCount,
+            }),
+            source: this.transaction.superagent.toUpperCase(),
+            eventTimestamp: new Date(),
+            id: uuidv4(),
+            status: Status.COMPLETE,
+        };
+
+        return await EventService.addEvent(event);
+    }
     public async addPhoneNumberValidationRequestedEvent(): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
@@ -573,13 +650,13 @@ export class DataTransactionEventService {
                 phoneNumber: this.phoneNumber,
                 disco: this.transaction.disco,
                 superagent: this.superAgent,
-                partnerEmail: this.partner
+                partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -593,18 +670,18 @@ export class DataTransactionEventService {
                 phoneNumber: this.phoneNumber,
                 disco: this.transaction.disco,
                 superagent: this.superAgent,
-                partnerEmail: this.partner
+                partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
         return await EventService.addEvent(event);
     }
 
     public async addCRMUserInitiatedEvent(info: {
-        user: { id: string, name?: string, email: string, phoneNumber: string }
+        user: { id: string; name?: string; email: string; phoneNumber: string };
     }): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
@@ -620,15 +697,17 @@ export class DataTransactionEventService {
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
         return await EventService.addEvent(event);
     }
 
-    public async addCRMUserConfirmedEvent(info: ICRMUserInitiatedEventParams): Promise<Event> {
+    public async addCRMUserConfirmedEvent(
+        info: ICRMUserInitiatedEventParams,
+    ): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.CREATE_USER_CONFIRMED,
@@ -644,15 +723,19 @@ export class DataTransactionEventService {
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
         return await EventService.addEvent(event);
     }
 
-    public async addDataPurchaseInitiatedEvent({ amount }: { amount: string }): Promise<Event> {
+    public async addDataPurchaseInitiatedEvent({
+        amount,
+    }: {
+        amount: string;
+    }): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.DATA_PURCHASE_INITIATED_BY_CUSTOMER,
@@ -662,13 +745,13 @@ export class DataTransactionEventService {
                 disco: this.transaction.disco,
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
-                amount: amount
+                amount: amount,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
         return await EventService.addEvent(event);
     }
 
@@ -683,11 +766,11 @@ export class DataTransactionEventService {
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
         return await EventService.addEvent(event);
     }
 
@@ -702,11 +785,11 @@ export class DataTransactionEventService {
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
         return await EventService.addEvent(event);
     }
 
@@ -721,15 +804,71 @@ export class DataTransactionEventService {
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
         return await EventService.addEvent(event);
     }
 
-    public async addGetDataFromVendorRetryEvent(error: { cause: TransactionErrorCause, code: number, }, retryCount: number): Promise<Event> {
+    public async addScheduleRequeryEvent({
+        timeStamp,
+        waitTime,
+    }: {
+        timeStamp: string;
+        waitTime: number;
+    }): Promise<Event> {
+        const event: ICreateEvent = {
+            transactionId: this.transaction.id,
+            eventType: TOPICS.SCHEDULE_REQUERY_FOR_DATA_TRANSACTION,
+            eventText: TOPICS.SCHEDULE_REQUERY_FOR_DATA_TRANSACTION,
+            payload: JSON.stringify({
+                timeStamp,
+                waitTime,
+                phone: this.phoneNumber,
+                superagent: this.superAgent,
+                partnerEmail: this.partner,
+            }),
+            source: "API",
+            eventTimestamp: new Date(),
+            id: uuidv4(),
+            status: Status.PENDING,
+        };
+
+        return await EventService.addEvent(event);
+    }
+
+    public async addScheduleRetryEvent({
+        timeStamp,
+        waitTime,
+    }: {
+        timeStamp: string;
+        waitTime: number;
+    }): Promise<Event> {
+        const event: ICreateEvent = {
+            transactionId: this.transaction.id,
+            eventType: TOPICS.SCHEDULE_RETRY_FOR_DATA_TRANSACTION,
+            eventText: TOPICS.SCHEDULE_RETRY_FOR_DATA_TRANSACTION,
+            payload: JSON.stringify({
+                timeStamp,
+                waitTime,
+                phone: this.phoneNumber,
+                superagent: this.superAgent,
+                partnerEmail: this.partner,
+            }),
+            source: "API",
+            eventTimestamp: new Date(),
+            id: uuidv4(),
+            status: Status.PENDING,
+        };
+
+        return await EventService.addEvent(event);
+    }
+    public async addGetDataFromVendorRetryEvent(
+        error: { cause: TransactionErrorCause; code: number },
+        retryCount: number,
+    ): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_REQUERY,
@@ -741,19 +880,23 @@ export class DataTransactionEventService {
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
                 error,
-                retryCount
+                retryCount,
             }),
             source: this.transaction.superagent.toUpperCase(),
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
 
-    public async addDataPurchaseWithNewVendorEvent({ currentVendor, newVendor }: {
-        currentVendor: Transaction['superagent'], newVendor: Transaction['superagent']
+    public async addDataPurchaseWithNewVendorEvent({
+        currentVendor,
+        newVendor,
+    }: {
+        currentVendor: Transaction["superagent"];
+        newVendor: Transaction["superagent"];
     }): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
@@ -772,7 +915,7 @@ export class DataTransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -793,7 +936,7 @@ export class DataTransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -814,7 +957,7 @@ export class DataTransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -838,7 +981,7 @@ export class DataTransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -862,7 +1005,7 @@ export class DataTransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -886,7 +1029,7 @@ export class DataTransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -910,7 +1053,7 @@ export class DataTransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
         return await EventService.addEvent(event);
     }
 
@@ -933,34 +1076,46 @@ export class DataTransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
         return await EventService.addEvent(event);
     }
-
 }
 
 export default class TransactionEventService {
     private transaction: Transaction;
     private meterInfo: EventMeterInfo;
-    private superAgent: Transaction['superagent']
-    private partner: Transaction['partner']['email']
+    private superAgent: Transaction["superagent"];
+    private partner: Transaction["partner"]["email"];
 
-    constructor(transaction: Transaction, meterInfo: EventMeterInfo, superAgent: Transaction['superagent'], partner: string) {
+    constructor(
+        transaction: Transaction,
+        meterInfo: EventMeterInfo,
+        superAgent: Transaction["superagent"],
+        partner: string,
+    ) {
         this.transaction = transaction;
         this.meterInfo = meterInfo;
         this.superAgent = superAgent;
-        this.partner = partner
+        this.partner = partner;
     }
 
     public getMeterInfo(): EventMeterInfo {
-        return this.meterInfo
+        return this.meterInfo;
     }
 
     public getTransactionInfo(): Transaction {
-        return this.transaction
+        return this.transaction;
     }
 
-    public async addScheduleRetryEvent({ timeStamp, waitTime, retryRecord }: { timeStamp: string, waitTime: number, retryRecord: Transaction['retryRecord'][number] }): Promise<Event> {
+    public async addScheduleRetryEvent({
+        timeStamp,
+        waitTime,
+        retryRecord,
+    }: {
+        timeStamp: string;
+        waitTime: number;
+        retryRecord: Transaction["retryRecord"][number];
+    }): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.SCHEDULE_RETRY_FOR_TRANSACTION,
@@ -973,13 +1128,13 @@ export default class TransactionEventService {
                 vendType: this.meterInfo.vendType,
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
-                retryRecord: retryRecord
+                retryRecord: retryRecord,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -996,16 +1151,22 @@ export default class TransactionEventService {
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
 
-    public async addScheduleRequeryEvent({ timeStamp, waitTime }: { timeStamp: string, waitTime: number }): Promise<Event> {
+    public async addScheduleRequeryEvent({
+        timeStamp,
+        waitTime,
+    }: {
+        timeStamp: string;
+        waitTime: number;
+    }): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.SCHEDULE_REQUERY_FOR_TRANSACTION,
@@ -1019,18 +1180,23 @@ export default class TransactionEventService {
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.PENDING,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
 
-    public async addMeterValidationFailedEvent(superAgent: string, meterInfo: {
-        meterNumber: string, disco: string, vendType: string
-    }) {
+    public async addMeterValidationFailedEvent(
+        superAgent: string,
+        meterInfo: {
+            meterNumber: string;
+            disco: string;
+            vendType: string;
+        },
+    ) {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.METER_VALIDATION_FAILED,
@@ -1039,13 +1205,13 @@ export default class TransactionEventService {
                 meterInfo: meterInfo,
                 disco: this.transaction.disco,
                 superagent: this.superAgent,
-                partnerEmail: this.partner
+                partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -1060,18 +1226,20 @@ export default class TransactionEventService {
                 disco: this.meterInfo.disco,
                 vendType: this.meterInfo.vendType,
                 superagent: this.superAgent,
-                partnerEmail: this.partner
+                partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
 
-    public async addMeterValidationReceivedEvent(userInfo: IMeterValidationReceivedEventParams): Promise<Event> {
+    public async addMeterValidationReceivedEvent(
+        userInfo: IMeterValidationReceivedEventParams,
+    ): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.METER_VALIDATION_RECIEVED_FROM_VENDOR,
@@ -1087,13 +1255,13 @@ export default class TransactionEventService {
                 disco: this.meterInfo.disco,
                 vendType: this.meterInfo.vendType,
                 superagent: this.superAgent,
-                partnerEmail: this.partner
+                partnerEmail: this.partner,
             }),
             source: this.transaction.superagent.toUpperCase(),
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -1109,17 +1277,19 @@ export default class TransactionEventService {
                 disco: this.meterInfo.disco,
                 vendType: this.meterInfo.vendType,
                 superagent: this.superAgent,
-                partnerEmail: this.partner
+                partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
         return await EventService.addEvent(event);
     }
 
-    public async addCRMUserInitiatedEvent(info: ICRMUserInitiatedEventParams): Promise<Event> {
+    public async addCRMUserInitiatedEvent(
+        info: ICRMUserInitiatedEventParams,
+    ): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.CREATE_USER_INITIATED,
@@ -1136,15 +1306,17 @@ export default class TransactionEventService {
                 partnerEmail: this.partner,
                 disco: this.meterInfo.disco,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
         return await EventService.addEvent(event);
     }
 
-    public async addCRMUserConfirmedEvent(info: ICRMUserInitiatedEventParams): Promise<Event> {
+    public async addCRMUserConfirmedEvent(
+        info: ICRMUserInitiatedEventParams,
+    ): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.CREATE_USER_CONFIRMED,
@@ -1161,11 +1333,11 @@ export default class TransactionEventService {
                 partnerEmail: this.partner,
                 disco: this.meterInfo.disco,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
         return await EventService.addEvent(event);
     }
 
@@ -1177,20 +1349,23 @@ export default class TransactionEventService {
             payload: JSON.stringify({
                 disco: this.meterInfo.disco,
                 superagent: this.superAgent,
-                patner: this.partner
+                patner: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
         return await EventService.addEvent(event);
     }
 
-    public async addPowerPurchaseInitiatedEvent(bankRefId: string, amount: string): Promise<Event> {
-        const user = await this.transaction.$get('user');
+    public async addPowerPurchaseInitiatedEvent(
+        bankRefId: string,
+        amount: string,
+    ): Promise<Event> {
+        const user = await this.transaction.$get("user");
         if (!user) {
-            throw new Error('Transaction does not have a user');
+            throw new Error("Transaction does not have a user");
         }
 
         const event: ICreateEvent = {
@@ -1208,23 +1383,29 @@ export default class TransactionEventService {
                 phoneNumber: user.phoneNumber,
                 vendType: this.meterInfo.vendType,
                 superagent: this.superAgent,
-                partnerEmail: this.partner
+                partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
 
-    public async addPowerPurchaseRetryWithNewVendor({ bankRefId, currentVendor, newVendor }: {
-        bankRefId: string, currentVendor: Transaction['superagent'], newVendor: Transaction['superagent']
+    public async addPowerPurchaseRetryWithNewVendor({
+        bankRefId,
+        currentVendor,
+        newVendor,
+    }: {
+        bankRefId: string;
+        currentVendor: Transaction["superagent"];
+        newVendor: Transaction["superagent"];
     }): Promise<Event> {
-        const user = await this.transaction.$get('user');
+        const user = await this.transaction.$get("user");
         if (!user) {
-            throw new Error('Transaction does not have a user');
+            throw new Error("Transaction does not have a user");
         }
 
         const event: ICreateEvent = {
@@ -1242,13 +1423,13 @@ export default class TransactionEventService {
                 meterNumber: this.meterInfo.meterNumber,
                 phoneNumber: user.phoneNumber,
                 vendType: this.meterInfo.vendType,
-                partnerEmail: this.partner
+                partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -1267,13 +1448,13 @@ export default class TransactionEventService {
                 meterNumber: this.meterInfo.meterNumber,
                 vendType: this.meterInfo.vendType,
                 superagent: this.superAgent,
-                partnerEmail: this.partner
+                partnerEmail: this.partner,
             }),
-            source: 'API',
+            source: "API",
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -1292,18 +1473,21 @@ export default class TransactionEventService {
                 meterNumber: this.meterInfo.meterNumber,
                 vendType: this.meterInfo.vendType,
                 superagent: this.superAgent,
-                partnerEmail: this.partner
+                partnerEmail: this.partner,
             }),
             source: this.transaction.superagent.toUpperCase(),
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
 
-    public async addGetTransactionTokenRequestedFromVendorEvent(error: { code: number, cause: string }): Promise<Event> {
+    public async addGetTransactionTokenRequestedFromVendorEvent(error: {
+        code: number;
+        cause: string;
+    }): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.GET_TRANSACTION_TOKEN_REQUESTED_FROM_VENDOR,
@@ -1319,18 +1503,21 @@ export default class TransactionEventService {
                 vendType: this.meterInfo.vendType,
                 timestamp: new Date(),
                 superagent: this.superAgent,
-                partnerEmail: this.partner
+                partnerEmail: this.partner,
             }),
             source: this.transaction.superagent.toUpperCase(),
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
 
-    public async addGetTransactionTokenRequestedFromVendorRetryEvent(error: { cause: TransactionErrorCause, code: number, }, retryCount: number): Promise<Event> {
+    public async addGetTransactionTokenRequestedFromVendorRetryEvent(
+        error: { cause: TransactionErrorCause; code: number },
+        retryCount: number,
+    ): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_REQUERY,
@@ -1347,13 +1534,13 @@ export default class TransactionEventService {
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
                 error,
-                retryCount
+                retryCount,
             }),
             source: this.transaction.superagent.toUpperCase(),
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -1373,13 +1560,13 @@ export default class TransactionEventService {
                 vendType: this.meterInfo.vendType,
                 timestamp: new Date(),
                 superagent: this.superAgent,
-                partnerEmail: this.partner
+                partnerEmail: this.partner,
             }),
             source: this.transaction.superagent.toUpperCase(),
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -1397,13 +1584,13 @@ export default class TransactionEventService {
                 meterNumber: this.meterInfo.meterNumber,
                 vendType: this.meterInfo.vendType,
                 superagent: this.superAgent,
-                partnerEmail: this.partner
+                partnerEmail: this.partner,
             }),
             source: this.transaction.superagent.toUpperCase(),
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -1423,13 +1610,13 @@ export default class TransactionEventService {
                 meterNumber: this.meterInfo.meterNumber,
                 vendType: this.meterInfo.vendType,
                 superagent: this.superAgent,
-                partnerEmail: this.partner
+                partnerEmail: this.partner,
             }),
             source: this.transaction.superagent.toUpperCase(),
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
@@ -1448,21 +1635,21 @@ export default class TransactionEventService {
                 meterNumber: this.meterInfo.meterNumber,
                 vendType: this.meterInfo.vendType,
                 superagent: this.superAgent,
-                partnerEmail: this.partner
+                partnerEmail: this.partner,
             }),
             source: this.transaction.superagent.toUpperCase(),
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
 
     public async addTokenSentToUserEmailEvent(): Promise<Event> {
-        const user = await this.transaction.$get('user');
+        const user = await this.transaction.$get("user");
         if (!user) {
-            throw new Error('Transaction does not have a user');
+            throw new Error("Transaction does not have a user");
         }
 
         const event: ICreateEvent = {
@@ -1479,15 +1666,15 @@ export default class TransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
 
     public async addSmsTokenSentToUserEvent(): Promise<Event> {
-        const user = await this.transaction.$get('user');
+        const user = await this.transaction.$get("user");
         if (!user) {
-            throw new Error('Transaction does not have a user');
+            throw new Error("Transaction does not have a user");
         }
 
         const event: ICreateEvent = {
@@ -1499,21 +1686,21 @@ export default class TransactionEventService {
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
                 disco: this.meterInfo.disco,
-                phone: user.phoneNumber
+                phone: user.phoneNumber,
             }),
             source: this.transaction.superagent.toUpperCase(),
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
 
     public async addTokenSentToPartnerEvent(): Promise<Event> {
-        const partner = await this.transaction.$get('partner');
+        const partner = await this.transaction.$get("partner");
         if (!partner) {
-            throw new Error('Transaction does not have a partner');
+            throw new Error("Transaction does not have a partner");
         }
 
         const event: ICreateEvent = {
@@ -1533,15 +1720,15 @@ export default class TransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
 
     public async addTokenSentToPartnerRetryEvent(): Promise<Event> {
-        const partner = await this.transaction.$get('partner');
+        const partner = await this.transaction.$get("partner");
         if (!partner) {
-            throw new Error('Transaction does not have a partner');
+            throw new Error("Transaction does not have a partner");
         }
 
         const event: ICreateEvent = {
@@ -1561,15 +1748,15 @@ export default class TransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
 
     public async addTokenRequestFailedNotificationToPartnerEvent(): Promise<Event> {
-        const partner = await this.transaction.$get('partner');
+        const partner = await this.transaction.$get("partner");
         if (!partner) {
-            throw new Error('Transaction does not have a partner');
+            throw new Error("Transaction does not have a partner");
         }
 
         const event: ICreateEvent = {
@@ -1589,15 +1776,15 @@ export default class TransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
 
     public async addWebHookNotificationSentEvent(): Promise<Event> {
-        const partner = await this.transaction.$get('partner')
+        const partner = await this.transaction.$get("partner");
         if (!partner) {
-            throw new Error('Transaction does not have a partner')
+            throw new Error("Transaction does not have a partner");
         }
 
         const event: ICreateEvent = {
@@ -1617,15 +1804,15 @@ export default class TransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
 
     public async addWebHookNotificationConfirmedEvent(): Promise<Event> {
-        const partner = await this.transaction.$get('partner')
+        const partner = await this.transaction.$get("partner");
         if (!partner) {
-            throw new Error('Transaction does not have a partner')
+            throw new Error("Transaction does not have a partner");
         }
 
         const event: ICreateEvent = {
@@ -1645,15 +1832,23 @@ export default class TransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
 
-    public async addWebHookNotificationRetryEvent({ url, retryCount, timeStamp }: { url: string, retryCount: number, timeStamp: Date }): Promise<Event> {
-        const partner = await this.transaction.$get('partner')
+    public async addWebHookNotificationRetryEvent({
+        url,
+        retryCount,
+        timeStamp,
+    }: {
+        url: string;
+        retryCount: number;
+        timeStamp: Date;
+    }): Promise<Event> {
+        const partner = await this.transaction.$get("partner");
         if (!partner) {
-            throw new Error('Transaction does not have a partner')
+            throw new Error("Transaction does not have a partner");
         }
 
         const event: ICreateEvent = {
@@ -1676,14 +1871,14 @@ export default class TransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
     public async addPartnerTransactionCompleteEvent(): Promise<Event> {
-        const partner = await this.transaction.$get('partner');
+        const partner = await this.transaction.$get("partner");
         if (!partner) {
-            throw new Error('Transaction does not have a partner');
+            throw new Error("Transaction does not have a partner");
         }
 
         const event: ICreateEvent = {
@@ -1703,10 +1898,8 @@ export default class TransactionEventService {
             eventTimestamp: new Date(),
             id: uuidv4(),
             status: Status.COMPLETE,
-        }
+        };
 
         return await EventService.addEvent(event);
     }
-
-
 }

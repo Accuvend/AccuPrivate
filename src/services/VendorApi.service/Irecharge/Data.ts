@@ -76,7 +76,12 @@ export class IRechargeDataApi extends IRechargeBaseConfig {
                 },
             });
             console.log({ params, response: response.data });
-            return response.data;
+
+            return {
+                ...response.data,
+                source: "IRECHARGE" as const,
+                httpStatusCode: response.status,
+            };
         } catch (error: any) {
             if (error.response) {
                 logger.error("Vend response from IRECHARGE", {

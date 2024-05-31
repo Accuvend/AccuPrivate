@@ -33,6 +33,34 @@ export class VendorPublisher extends ProducerFactory {
         });
     }
 
+    static async publishEventToScheduleDataRequery(
+        data: PublisherEventAndParameters[TOPICS.SCHEDULE_REQUERY_FOR_DATA_TRANSACTION],
+    ) {
+        return ProducerFactory.sendMessage({
+            topic: TOPICS.SCHEDULE_REQUERY_FOR_DATA_TRANSACTION,
+            message: {
+                log: data.log,
+                scheduledMessagePayload: data.scheduledMessagePayload,
+                timeStamp: data.timeStamp,
+                delayInSeconds: data.delayInSeconds,
+            },
+        });
+    }
+
+    static async publishEventToScheduleDataRetry(
+        data: PublisherEventAndParameters[TOPICS.SCHEDULE_RETRY_FOR_DATA_TRANSACTION],
+    ) {
+        return ProducerFactory.sendMessage({
+            topic: TOPICS.SCHEDULE_RETRY_FOR_DATA_TRANSACTION,
+            message: {
+                log: data.log,
+                scheduledMessagePayload: data.scheduledMessagePayload,
+                timeStamp: data.timeStamp,
+                delayInSeconds: data.delayInSeconds,
+            },
+        });
+    }
+
     static async publishEventToScheduleRequery(
         data: PublisherEventAndParameters[TOPICS.SCHEDULE_REQUERY_FOR_TRANSACTION],
     ) {
@@ -341,6 +369,26 @@ export class VendorPublisher extends ProducerFactory {
                 superAgent: data.superAgent,
                 waitTime: data.waitTime,
                 vendorRetryRecord: data.vendorRetryRecord,
+            },
+        });
+    }
+
+    static async publishEventForGetDataRequestedFromVendorRequery(
+        data: PublisherEventAndParameters[TOPICS.GET_DATA_FROM_VENDOR_REQUERY],
+    ) {
+        return ProducerFactory.sendMessage({
+            topic: TOPICS.GET_DATA_FROM_VENDOR_REQUERY,
+            message: {
+                log: data.log,
+                error: data.error,
+                transactionId: data.transactionId,
+                timeStamp: data.timeStamp,
+                retryCount: data.retryCount,
+                bundle: data.bundle,
+                superAgent: data.superAgent,
+                waitTime: data.waitTime,
+                vendorRetryRecord: data.vendorRetryRecord,
+                phone: data.phone,
             },
         });
     }

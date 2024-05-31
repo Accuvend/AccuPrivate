@@ -49,8 +49,14 @@ import VendorModelService from "../../../services/Vendor.service";
 import BundleService from "../../../services/Bundle.service";
 import { token } from "morgan";
 import WaitTimeService from "../../../services/Waittime.service";
-import { ResponseValidationUtil, TokenHandlerUtil } from "./Token";
+import {
+    ResponseValidationUtil,
+    TokenHandlerUtil,
+    getCurrentWaitTimeForRequeryEvent,
+} from "./Token";
 import { parse } from "path";
+import { timeStamp } from "console";
+import { IBundle } from "../../../models/Bundle.model";
 
 interface EventMessage {
     phone: {
@@ -71,6 +77,7 @@ interface TriggerRequeryTransactionTokenProps {
     transactionTimedOutFromBuypower: boolean;
     superAgent: Transaction["superagent"];
     retryCount: number;
+    bundle: IBundle;
     vendorRetryRecord: VendorRetryRecord;
 }
 
@@ -105,36 +112,6 @@ const TransactionErrorCodeAndCause = {
     202: TransactionErrorCause.TRANSACTION_TIMEDOUT,
 };
 
-export async function getCurrentWaitTimeForRequeryEvent(retryCount: number) {
-    // Use geometric progression  calculate wait time, where R = 2
-    const defaultValues = [
-        10, 20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 10240, 20480, 40960,
-        81920, 163840, 327680, 655360, 1310720, 2621440, 5242880,
-    ];
-    const timesToRetry = (await WaitTimeService.getWaitTime()) ?? defaultValues;
-
-    if (retryCount > timesToRetry.length) {
-        return timesToRetry[timesToRetry.length - 1];
-    }
-
-    return timesToRetry[retryCount];
-}
-
-export async function getCurrentWaitTimeForSwitchEvent(retryCount: number) {
-    // Use geometric progression  calculate wait time, where R = 2
-    const defaultValues = [
-        10, 20, 40, 80, 160, 320, 640, 1280, 2560, 5120, 10240, 20480, 40960,
-        81920, 163840, 327680, 655360, 1310720, 2621440, 5242880,
-    ];
-    const timesToRetry = (await WaitTimeService.getWaitTime()) ?? defaultValues;
-
-    if (retryCount >= timesToRetry.length) {
-        return timesToRetry[timesToRetry.length - 1];
-    }
-
-    return timesToRetry[retryCount - 1];
-}
-
 export class DataHandlerUtil {
     static async triggerEventToRequeryTransactionTokenFromVendor({
         eventService,
@@ -143,6 +120,7 @@ export class DataHandlerUtil {
         retryCount,
         superAgent,
         vendorRetryRecord,
+        bundle,
     }: TriggerRequeryTransactionTokenProps) {
         // Check if the transaction has hit the requery limit
         // If yes, flag transaction
@@ -193,45 +171,28 @@ export class DataHandlerUtil {
         const eventMetaData = {
             transactionId: eventData.transactionId,
             phone: eventData.phone,
+            bundle: bundle,
             error: eventData.error,
             timeStamp: new Date(),
             retryCount,
             superAgent,
             vendorRetryRecord,
-            waitTime: await getCurrentWaitTimeForRequeryEvent(retryCount),
+            waitTime: await getCurrentWaitTimeForRequeryEvent(
+                retryCount,
+                superAgent,
+            ),
         };
 
-        // Start timer to requery transaction at intervals
-        async function countDownTimer(time: number): Promise<void> {
-            return new Promise<void>((resolve) => {
-                for (let i = time; i > 0; i--) {
-                    setTimeout(
-                        () => {
-                            logger.warn(
-                                `Reinitating transaction with vendor in ${i} seconds`,
-                                {
-                                    meta: {
-                                        transactionId:
-                                            eventMetaData.transactionId,
-                                    },
-                                },
-                            );
-                            if (i === 1) {
-                                resolve(); // Resolve the Promise when countdown is complete
-                            }
-                        },
-                        (time - i) * 1000,
-                    );
-                }
-            });
-        }
-        await countDownTimer(eventMetaData.waitTime);
+        await eventService.addScheduleRequeryEvent({
+            timeStamp: new Date().toString(),
+            waitTime: eventMetaData.waitTime,
+        });
 
-        // Publish event in increasing intervals of seconds i.e 1, 2, 4, 8, 16, 32, 64, 128, 256, 512
-        // TODO: Use an external service to schedule this task
-        await VendorPublisher.publishEventForGetDataFromVendorRetry(
-            eventMetaData,
-        );
+        await VendorPublisher.publishEventToScheduleDataRequery({
+            scheduledMessagePayload: eventMetaData,
+            timeStamp: new Date().toString(),
+            delayInSeconds: eventMetaData.waitTime,
+        });
     }
 
     static async triggerEventToRetryTransactionWithNewVendor({
@@ -666,44 +627,6 @@ export class DataHandlerUtil {
 }
 
 class TokenHandler extends Registry {
-    private static async retryDataPurchaseWithNewVendor(
-        data: PublisherEventAndParameters[TOPICS.RETRY_DATA_PURCHASE_FROM_NEW_VENDOR],
-    ) {
-        const transaction = await TransactionService.viewSingleTransaction(
-            data.transactionId,
-        );
-        if (!transaction) {
-            throw new CustomError(
-                `Error fetching transaction with id ${data.transactionId}`,
-            );
-        }
-        if (!transaction.bankRefId) {
-            throw new CustomError("BankRefId not found");
-        }
-
-        await TransactionService.updateSingleTransaction(transaction.id, {
-            superagent: data.newVendor,
-        });
-        const transactionEventService = new DataTransactionEventService(
-            transaction,
-            data.newVendor,
-            data.partner.email,
-            data.phone.phoneNumber,
-        );
-        await transactionEventService.addDataPurchaseInitiatedEvent({
-            amount: transaction.amount,
-        });
-        await VendorPublisher.publshEventForDataPurchaseInitiate({
-            phone: data.phone,
-            user: data.user,
-            partner: data.partner,
-            transactionId: transaction.id,
-            superAgent: data.newVendor,
-            vendorRetryRecord:
-                transaction.retryRecord[transaction.retryRecord.length - 1],
-        });
-    }
-
     private static async handleDataRequest(
         data: PublisherEventAndParameters[TOPICS.DATA_PURCHASE_INITIATED_BY_CUSTOMER],
     ) {
@@ -848,6 +771,7 @@ class TokenHandler extends Registry {
                 error: error,
             };
 
+            console.log({ tokenInfo });
             const validationResponse =
                 await ResponseValidationUtil.validateTransactionCondition({
                     requestType: "VENDREQUEST",
@@ -869,7 +793,7 @@ class TokenHandler extends Registry {
 
             switch (validationResponse.action) {
                 case -1:
-                    logger.error(
+                    logger.info(
                         "Transaction condition pending - Requery",
                         logMeta,
                     );
@@ -905,7 +829,7 @@ class TokenHandler extends Registry {
                     );
                     break;
                 case 1:
-                    logger.error(
+                    logger.info(
                         "Transaction condition passed - Complete",
                         logMeta,
                     );
@@ -957,70 +881,6 @@ class TokenHandler extends Registry {
 
             throw error;
         }
-    }
-
-    private static async handleDataRecievd(
-        data: PublisherEventAndParameters[TOPICS.DATA_RECEIVED_FROM_VENDOR],
-    ) {
-        const transaction = await TransactionService.viewSingleTransaction(
-            data.transactionId,
-        );
-        if (!transaction) {
-            throw new CustomError(
-                `Error fetching transaction with id ${data.transactionId}`,
-            );
-        }
-
-        // Check if transaction is already complete
-        if (transaction.status === Status.COMPLETE) {
-            throw new CustomError(
-                `Transaction with id ${data.transactionId} is already complete`,
-            );
-        }
-
-        // // Requery transaction from provider and update transaction status
-        // const requeryResult = await TokenHandlerUtil.requeryTransactionFromVendor(transaction);
-        // const requeryResultFromBuypower = requeryResult as Awaited<ReturnType<typeof VendorService.buyPowerRequeryTransaction>>
-        // const requeryResultFromIrecharge = requeryResult as Awaited<ReturnType<typeof VendorService.irechargeRequeryTransaction>>
-        // const requeryResultFromBaxi = requeryResult as Awaited<ReturnType<typeof VendorService.baxiRequeryTransaction>>
-
-        // const transactionSuccessFromBuypower = requeryResultFromBuypower.source === 'BUYPOWERNG' ? requeryResultFromBuypower.responseCode === 200 : false
-        // const transactionSuccessFromIrecharge = requeryResultFromIrecharge.source === 'IRECHARGE' ? requeryResultFromIrecharge.status === '00' && requeryResultFromIrecharge.vend_status === 'successful' && requeryResultFromIrecharge.vend_status === 'successful' : false
-        // const transactionSuccessFromBaxi = requeryResultFromBaxi.source === 'BAXI' ? requeryResultFromBaxi.responseCode === 200 : false
-
-        // const transactionEventService = new DataTransactionEventService(
-        //     transaction,
-        //     transaction.superagent,
-        //     transaction.partner.email,
-        //     data.phone.phoneNumber,
-        // );
-        // const transactionSuccess = transactionSuccessFromBuypower || transactionSuccessFromIrecharge || transactionSuccessFromBaxi
-
-        // if (!transactionSuccess) {
-        //     await transactionEventService.addDataTransactionRequery()
-        //     await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor({
-        //         eventService: transactionEventService,
-        //         eventData: {
-        //             phone: data.phone,
-        //             transactionId: data.transactionId,
-        //             error: {
-        //                 code: requeryResultFromBuypower.responseCode,
-        //                 cause: TransactionErrorCause.TRANSACTION_FAILED
-        //             }
-        //         },
-        //         retryCount: 1,
-        //         superAgent: transaction.superagent,
-        //         transactionTimedOutFromBuypower: false,
-        //         vendorRetryRecord: transaction.retryRecord[transaction.retryRecord.length - 1]
-        //     })
-        // }
-
-        return await TransactionService.updateSingleTransaction(
-            data.transactionId,
-            {
-                status: Status.COMPLETE,
-            },
-        );
     }
 
     private static async requeryTransaction(
@@ -1208,12 +1068,175 @@ class TokenHandler extends Registry {
         });
     }
 
+    private static async scheduleRequeryTransaction(
+        data: PublisherEventAndParameters[TOPICS.SCHEDULE_REQUERY_FOR_DATA_TRANSACTION],
+    ) {
+        const { timeStamp, delayInSeconds } = data;
+
+        const currentTimeInSeconds = Math.floor(Date.now() / 1000);
+        const timeStampInSeconds = Math.floor(
+            new Date(timeStamp).getTime() / 1000,
+        );
+        const timeInSecondsSinceInit =
+            currentTimeInSeconds - timeStampInSeconds;
+        const timeDifference = delayInSeconds - timeInSecondsSinceInit;
+
+        console.log({
+            timeDifference,
+            timeStamp,
+            currentTime: new Date(),
+            delayInSeconds,
+            timeInSecondsSinceInit,
+        });
+
+        if (timeDifference < 0) {
+            const existingTransaction =
+                await TransactionService.viewSingleTransaction(
+                    data.scheduledMessagePayload.transactionId,
+                );
+            if (!existingTransaction) {
+                throw new CustomError("Transaction not found");
+            }
+
+            // Check if transaction has been requeried successfuly before
+            const tokenReceivedFromRequery =
+                await EventService.viewSingleEventByTransactionIdAndType(
+                    data.scheduledMessagePayload.transactionId,
+                    TOPICS.AIRTIME_RECEIVED_FROM_VENDOR_REQUERY,
+                );
+            if (tokenReceivedFromRequery) {
+                logger.warn(
+                    "Transaction has been requeried successfully before",
+                    {
+                        meta: {
+                            transactionId:
+                                data.scheduledMessagePayload.transactionId,
+                            currentMessagePayload: data,
+                        },
+                    },
+                );
+                return;
+            }
+
+            const transactionEventService = new DataTransactionEventService(
+                existingTransaction,
+                existingTransaction.superagent,
+                data.scheduledMessagePayload.phone.phoneNumber,
+                data.scheduledMessagePayload.superAgent,
+            );
+            await transactionEventService.addGetDataTokenRequestedFromVendorRequeryEvent(
+                {
+                    cause: TransactionErrorCause.RESCHEDULED_BEFORE_WAIT_TIME,
+                    code: 202,
+                },
+                data.scheduledMessagePayload.retryCount + 1,
+            );
+
+            return await VendorPublisher.publishEventForGetDataRequestedFromVendorRequery(
+                data.scheduledMessagePayload,
+            );
+        }
+
+        // Change error cause to RESCHEDULED_BEFORE_WAIT_TIME
+        data.scheduledMessagePayload.error.cause =
+            TransactionErrorCause.RESCHEDULED_BEFORE_WAIT_TIME;
+
+        // logger.info("Rescheduling requery for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
+        // Else, schedule a new event to requery transaction from vendor
+        return await VendorPublisher.publishEventToScheduleDataRequery({
+            scheduledMessagePayload: data.scheduledMessagePayload,
+            timeStamp: data.timeStamp,
+            delayInSeconds: data.delayInSeconds,
+            log: 0,
+        });
+    }
+
+    private static async scheduleRetryTransaction(
+        data: PublisherEventAndParameters[TOPICS.SCHEDULE_RETRY_FOR_DATA_TRANSACTION],
+    ) {
+        // Check the timeStamp, and the delayInSeconds
+
+        const { timeStamp, delayInSeconds } = data;
+
+        const currentTimeInSeconds = Math.floor(Date.now() / 1000);
+        const timeStampInSeconds = Math.floor(
+            new Date(timeStamp).getTime() / 1000,
+        );
+        const timeInSecondsSinceInit =
+            currentTimeInSeconds - timeStampInSeconds;
+        const timeDifference = delayInSeconds - timeInSecondsSinceInit;
+
+        console.log({
+            timeDifference,
+            timeStamp,
+            currentTime: new Date(),
+            delayInSeconds,
+            timeInSecondsSinceInit,
+        });
+
+        // Check if current time is greater than the timeStamp + delayInSeconds
+        if (timeDifference <= 0) {
+            const existingTransaction =
+                await TransactionService.viewSingleTransaction(
+                    data.scheduledMessagePayload.transactionId,
+                );
+            if (!existingTransaction) {
+                throw new CustomError("Transaction not found");
+            }
+
+            const transactionEventService = new DataTransactionEventService(
+                existingTransaction,
+                existingTransaction.superagent,
+                data.scheduledMessagePayload.partner.email,
+                data.scheduledMessagePayload.phone.phoneNumber,
+            );
+            await transactionEventService.addGetDataFromVendorRetryEvent(
+                {
+                    cause: TransactionErrorCause.RESCHEDULED_BEFORE_WAIT_TIME,
+                    code: 202,
+                },
+                data.scheduledMessagePayload.retryCount + 1,
+            );
+
+            await TransactionService.updateSingleTransaction(
+                data.scheduledMessagePayload.transactionId,
+                {
+                    superagent: data.scheduledMessagePayload.newVendor,
+                    retryRecord: data.scheduledMessagePayload.retryRecord,
+                    vendorReferenceId:
+                        data.scheduledMessagePayload.newTransactionReference,
+                    reference:
+                        data.scheduledMessagePayload.newTransactionReference,
+                    irechargeAccessToken:
+                        data.scheduledMessagePayload.irechargeAccessToken,
+                    previousVendors:
+                        data.scheduledMessagePayload.previousVendors,
+                },
+            );
+
+            return await VendorPublisher.publishEventForDataPurchaseRetryFromVendorWithNewVendor(
+                data.scheduledMessagePayload,
+            );
+        }
+
+        // logger.info("Rescheduling retry for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
+        // Else, schedule a new event to requery transaction from vendor
+        return await VendorPublisher.publishEventToScheduleDataRetry({
+            scheduledMessagePayload: data.scheduledMessagePayload,
+            timeStamp: data.timeStamp,
+            delayInSeconds: data.delayInSeconds,
+            log: 0,
+        });
+    }
+
     static registry = {
         [TOPICS.DATA_PURCHASE_INITIATED_BY_CUSTOMER]: this.handleDataRequest,
-        [TOPICS.DATA_RECEIVED_FROM_VENDOR]: this.handleDataRecievd,
-        [TOPICS.GET_DATA_FROM_VENDOR_RETRY]: this.requeryTransaction,
-        [TOPICS.DATA_PURCHASE_RETRY_FROM_NEW_VENDOR]:
-            this.retryDataPurchaseWithNewVendor,
+        [TOPICS.DATA_PURCHASE_RETRY_FROM_NEW_VENDOR]: this.handleDataRequest,
+        [TOPICS.GET_DATA_FROM_VENDOR_REQUERY]: this.requeryTransaction,
+        [TOPICS.SCHEDULE_REQUERY_FOR_DATA_TRANSACTION]:
+            this.scheduleRequeryTransaction,
+        [TOPICS.SCHEDULE_RETRY_FOR_DATA_TRANSACTION]:
+            this.scheduleRetryTransaction,
     };
 }
 

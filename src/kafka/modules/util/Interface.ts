@@ -73,6 +73,27 @@ export interface PublisherEventAndParameters
             previousVendors: Transaction["superagent"][];
         };
     };
+    [TOPICS.SCHEDULE_REQUERY_FOR_DATA_TRANSACTION]: {
+        log?: 1 | 0;
+        timeStamp: string;
+        delayInSeconds: number;
+        scheduledMessagePayload: PublisherEventAndParameters[TOPICS.GET_DATA_FROM_VENDOR_REQUERY];
+    };
+    [TOPICS.SCHEDULE_RETRY_FOR_DATA_TRANSACTION]: {
+        log?: 1 | 0;
+        timeStamp: string;
+        delayInSeconds: number;
+        scheduledMessagePayload: PublisherEventAndParameters[TOPICS.DATA_PURCHASE_INITIATED_BY_CUSTOMER] & {
+            retryRecord: Transaction["retryRecord"];
+            retryCount: number;
+            bundle: IBundle;
+            vendorRetryRecord: VendorRetryRecord;
+            newVendor: Transaction["superagent"];
+            newTransactionReference: string;
+            irechargeAccessToken: string;
+            previousVendors: Transaction["superagent"][];
+        };
+    };
     [TOPICS.SCHEDULE_REQUERY_FOR_TRANSACTION]: {
         log?: 1 | 0;
         timeStamp: string;
@@ -342,6 +363,8 @@ export interface PublisherEventAndParameters
             phoneNumber: string;
             amount: number;
         };
+        bundle: IBundle;
+        vendorRetryRecord: VendorRetryRecord;
         user: User;
         partner: Partner;
         transactionId: string;

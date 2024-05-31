@@ -137,9 +137,10 @@ export default class BuypowerDataApi extends BuyPowerApi {
                             ...logMeta,
                         },
                     });
-                    throw error;
                 }
             }
+
+            throw error;
         }
     }
 }

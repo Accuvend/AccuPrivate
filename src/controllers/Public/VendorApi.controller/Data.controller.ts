@@ -78,7 +78,7 @@ class DataValidator {
     }) {
         if (!transactionId || !bankRefId || !bankComment) {
             throw new BadRequestError(
-                "Transaction ID, bank reference ID, and bank comment are required"
+                "Transaction ID, bank reference ID, and bank comment are required",
             );
         }
 
@@ -94,7 +94,7 @@ export class DataVendController {
     static async validateDataRequest(
         req: Request,
         res: Response,
-        next: NextFunction
+        next: NextFunction,
     ) {
         console.log({ VENDOR_URL: VENDOR_URL });
         const { phoneNumber, email, bundleCode, channel } = req.body;
@@ -103,14 +103,17 @@ export class DataVendController {
 
         let disco = req.body.networkProvider;
         // TODO: I'm using this for now to allow the schema validation since product code hasn't been created for airtime
-        const dataBundle = await BundleService.viewSingleBundleByBundleCode(bundleCode)
+        const dataBundle =
+            await BundleService.viewSingleBundleByBundleCode(bundleCode);
         if (!dataBundle) {
             throw new NotFoundError("Bundle not found");
         }
 
         const existingProductCodeForDisco = await dataBundle.$get("product");
         if (!existingProductCodeForDisco) {
-            throw new InternalServerError("Product record not found for already validated request");
+            throw new InternalServerError(
+                "Product record not found for already validated request",
+            );
         }
 
         disco = existingProductCodeForDisco.masterProductCode;
@@ -120,7 +123,10 @@ export class DataVendController {
         }
 
         const amount = dataBundle.bundleAmount.toString();
-        const superAgent = await TokenHandlerUtil.getBestVendorForPurchase(dataBundle.id, dataBundle.bundleAmount);
+        const superAgent = await TokenHandlerUtil.getBestVendorForPurchase(
+            dataBundle.id,
+            dataBundle.bundleAmount,
+        );
 
         const reference = generateRandomString(10);
         const transaction: Transaction =
@@ -146,15 +152,15 @@ export class DataVendController {
                             ? generateRandonNumbers(12)
                             : reference,
                     retryRecord: [],
-                    channel
-                }
+                    channel,
+                },
             );
 
         const transactionEventService = new DataTransactionEventService(
             transaction,
             superAgent,
             partnerId,
-            phoneNumber
+            phoneNumber,
         );
         await transactionEventService.addPhoneNumberValidationRequestedEvent();
 
@@ -183,12 +189,15 @@ export class DataVendController {
                     email: email,
                     phoneNumber: phoneNumber,
                 },
-                sequelizeTransaction
+                sequelizeTransaction,
             );
 
             await transaction.update(
-                { userId: user.id },
-                { transaction: sequelizeTransaction }
+                {
+                    userId: user.id,
+                    networkProvider: existingProductCodeForDisco.productName,
+                },
+                { transaction: sequelizeTransaction },
             );
             await sequelizeTransaction.commit();
         } catch (error) {
@@ -222,14 +231,14 @@ export class DataVendController {
         const user = await transaction.$get("user");
         if (!user) {
             throw new InternalServerError(
-                "User record not found for already validated request"
+                "User record not found for already validated request",
             );
         }
 
         const partner = await transaction.$get("partner");
         if (!partner) {
             throw new InternalServerError(
-                "Partner record not found for already validated request"
+                "Partner record not found for already validated request",
             );
         }
 
@@ -241,36 +250,43 @@ export class DataVendController {
         // Check if reference has been used before
         const existingTransaction: Transaction | null =
             await TransactionService.viewSingleTransactionByBankRefID(
-                bankRefId
+                bankRefId,
             );
         if (existingTransaction) {
             throw new BadRequestError("Duplicate reference");
         }
 
-        if (transaction.status === Status.COMPLETE as any) {
+        if (transaction.status === (Status.COMPLETE as any)) {
             throw new BadRequestError("Transaction already completed");
+        }
+
+        const bundle = await transaction.$get("bundle");
+        if (!bundle) {
+            throw new InternalServerError(
+                "Bundle record not found for already validated request",
+            );
         }
 
         const transactionEventService = new DataTransactionEventService(
             transaction,
             transaction.superagent,
             transaction.partnerId,
-            user.phoneNumber
+            user.phoneNumber,
         );
         await transactionEventService.addDataPurchaseInitiatedEvent({
             amount: transaction.amount,
         });
 
         await TransactionService.updateSingleTransaction(transactionId, {
-            status: Status.PENDING,
+            status: Status.INPROGRESS,
             bankRefId: bankRefId,
             bankComment: bankComment,
         });
 
         console.log({
             transaction: transaction.dataValues,
-            existingTransaction: existingTransaction
-        })
+            existingTransaction: existingTransaction,
+        });
         if (!transaction.bundleId) {
             throw new BadRequestError("Bundle code is required");
         }
@@ -281,6 +297,7 @@ export class DataVendController {
                 phoneNumber: user.phoneNumber,
                 amount: parseFloat(transaction.amount),
             },
+            bundle: bundle,
             superAgent: transaction.superagent,
             partner: partner,
             user: user,
@@ -310,7 +327,7 @@ export class DataVendController {
     static async confirmPayment(
         req: Request,
         res: Response,
-        next: NextFunction
+        next: NextFunction,
     ) {
         const { transactionId, bankRefId, bankComment } = req.body;
 
@@ -323,14 +340,14 @@ export class DataVendController {
         const user = await transaction.$get("user");
         if (!user) {
             throw new InternalServerError(
-                "User record not found for already validated request"
+                "User record not found for already validated request",
             );
         }
 
         const partner = await transaction.$get("partner");
         if (!partner) {
             throw new InternalServerError(
-                "Partner record not found for already validated request"
+                "Partner record not found for already validated request",
             );
         }
 
@@ -338,7 +355,7 @@ export class DataVendController {
             transaction,
             transaction.superagent,
             transaction.partnerId,
-            user.phoneNumber
+            user.phoneNumber,
         );
         await transactionEventService.addDataPurchaseConfirmedEvent();
 
@@ -380,7 +397,7 @@ export class DataVendController {
     static async getDataBundles(
         req: Request,
         res: Response,
-        next: NextFunction
+        next: NextFunction,
     ): Promise<void> {
         const { networkProvider } = req.query as Record<string, string>;
 
@@ -388,7 +405,7 @@ export class DataVendController {
             // Retrieve data bundles based on the specified network provider
             const dataBundles =
                 await VendorProductService.getVendorProductsBasedOnProvider(
-                    networkProvider
+                    networkProvider,
                 );
             // Send a successful response with the retrieved data bundles
             res.status(200).json({

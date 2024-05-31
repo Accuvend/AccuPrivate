@@ -1,6 +1,7 @@
 import { ConsumerSubscribeTopics, EachMessagePayload } from "kafkajs";
 import { TOPICS } from "../../Constants";
 import Transaction from "../../../models/Transaction.model";
+import { IBundle } from "../../../models/Bundle.model";
 export type Topic = TOPICS;
 
 export interface CustomMessageFormat {
@@ -269,6 +270,7 @@ export interface PublisherEventAndParameters
             phoneNumber: string;
             amount: number;
         };
+        bundle: IBundle;
         user: User;
         partner: Partner;
         transactionId: string;
@@ -294,15 +296,6 @@ export interface PublisherEventAndParameters
         transactionId: string;
         superAgent: Transaction["superagent"];
         newVendor: Transaction["superagent"];
-    };
-    [TOPICS.DATA_PURCHASE_INITIATED_BY_CUSTOMER]: {
-        log?: 1 | 0;
-        phone: { phoneNumber: string; amount: number };
-        user: User;
-        partner: Partner;
-        transactionId: string;
-        superAgent: Transaction["superagent"];
-        vendorRetryRecord: VendorRetryRecord;
     };
     [TOPICS.DATA_RECEIVED_FROM_VENDOR]: {
         log?: 1 | 0;

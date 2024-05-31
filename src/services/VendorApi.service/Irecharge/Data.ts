@@ -42,13 +42,14 @@ export class IRechargeDataApi extends IRechargeBaseConfig {
             vtu_network:
                 network[serviceType.toLowerCase() as keyof typeof network],
             vtu_amount: parseFloat(amount.toString()),
-            vtu_data: parseInt(data.dataCode),
+            vtu_data: data.dataCode,
             vtu_number: phoneNumber,
             email: email,
             reference_id: reference,
             response_format: "json",
             hash,
         };
+        console.log({ params });
 
         const logMeta = {
             description: {

@@ -24,10 +24,11 @@ import { Database } from "../../../models";
 import ProductService from "../../../services/Product.service";
 import VendorProduct from "../../../models/VendorProduct.model";
 import VendorProductService from "../../../services/VendorProduct.service";
-import { TokenHandlerUtil } from "../../../kafka/modules/consumers/Data";
+import { DataHandlerUtil } from "../../../kafka/modules/consumers/Data";
 import {
     generateRandomString,
     generateRandonNumbers,
+    generateVendorReference,
 } from "../../../utils/Helper";
 import ResponseTrimmer from "../../../utils/ResponseTrimmer";
 import BundleService from "../../../services/Bundle.service";
@@ -123,16 +124,16 @@ export class DataVendController {
         }
 
         const amount = dataBundle.bundleAmount.toString();
-        const superAgent = await TokenHandlerUtil.getBestVendorForPurchase(
+        const superAgent = await DataHandlerUtil.getBestVendorForPurchase(
             dataBundle.id,
             dataBundle.bundleAmount,
         );
 
-        const reference = generateRandomString(10);
+        const transactionId = uuidv4();
         const transaction: Transaction =
             await TransactionService.addTransactionWithoutValidatingUserRelationship(
                 {
-                    id: uuidv4(),
+                    id: transactionId,
                     amount: amount,
                     status: Status.PENDING,
                     disco: disco,
@@ -145,12 +146,9 @@ export class DataVendController {
                     productCodeId: existingProductCodeForDisco.id,
                     previousVendors: [superAgent],
                     networkProvider: existingProductCodeForDisco.productName,
-                    reference,
+                    reference: transactionId,
                     productType: "DATA",
-                    vendorReferenceId:
-                        superAgent === "IRECHARGE"
-                            ? generateRandonNumbers(12)
-                            : reference,
+                    vendorReferenceId: await generateVendorReference(),
                     retryRecord: [],
                     channel,
                 },
@@ -165,6 +163,8 @@ export class DataVendController {
         await transactionEventService.addPhoneNumberValidationRequestedEvent();
 
         await DataValidator.validateDataRequest({ phoneNumber, amount });
+        const vendorProduct = await dataBundle.$get("vendorProducts");
+        vendorProduct.forEach((p) => console.log({ p: p.dataValues }));
         await transactionEventService.addPhoneNumberValidationRequestedEvent();
 
         const userInfo = {

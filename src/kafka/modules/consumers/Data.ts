@@ -424,7 +424,10 @@ export class DataHandlerUtil {
             serviceType: data.serviceProvider,
             amount: data.amount,
             email: data.email,
-            reference: transaction.reference,
+            reference:
+                transaction.superagent === "IRECHARGE"
+                    ? transaction.vendorReferenceId
+                    : transaction.reference,
             transactionId: data.transactionId,
         };
 
@@ -756,6 +759,7 @@ class TokenHandler extends Registry {
                 }),
             );
 
+            console.log({ vendorAndDiscos });
             const vendorProduct = vendorAndDiscos.find(
                 (data) => data.vendorName === transaction.superagent,
             );

@@ -1,7 +1,3 @@
-// Tsingore all erros in file
-
-/* eslint-disable */
-// @ts-nocheck
 import { AxiosError } from "axios";
 import { Status } from "../../../models/Transaction.model";
 import Meter from "../../../models/Meter.model";
@@ -53,6 +49,8 @@ import VendorModelService from "../../../services/Vendor.service";
 import BundleService from "../../../services/Bundle.service";
 import { token } from "morgan";
 import WaitTimeService from "../../../services/Waittime.service";
+import { ResponseValidationUtil, TokenHandlerUtil } from "./Token";
+import { parse } from "path";
 
 interface EventMessage {
     phone: {
@@ -137,7 +135,7 @@ export async function getCurrentWaitTimeForSwitchEvent(retryCount: number) {
     return timesToRetry[retryCount - 1];
 }
 
-export class TokenHandlerUtil {
+export class DataHandlerUtil {
     static async triggerEventToRequeryTransactionTokenFromVendor({
         eventService,
         eventData,
@@ -706,258 +704,255 @@ class TokenHandler extends Registry {
     private static async handleDataRequest(
         data: PublisherEventAndParameters[TOPICS.DATA_PURCHASE_INITIATED_BY_CUSTOMER],
     ) {
-        console.log({
-            log: "New Data request",
-            currentVendor: data.superAgent,
-        });
-        const logMeta = {
-            meta: { transactionId: data.transactionId, bundle: data.bundle.id },
-        };
-        logger.info("New Data request", logMeta);
-        const transaction = await TransactionService.viewSingleTransaction(
-            data.transactionId,
-        );
-        if (!transaction) {
-            logger.error(
-                `Error fetching transaction with id ${data.transactionId}`,
-                logMeta,
-            );
-            return;
-        }
-
-        const { user, partner } = transaction;
-
-        if (!transaction.bundleId) {
-            throw new CustomError("BundleId is required");
-        }
-
-        const dataBundle = await BundleService.viewSingleBundleById(
-            transaction.bundleId,
-        );
-        if (!dataBundle) throw new CustomError("Bundle not found");
-
-        const product = await dataBundle.$get("product");
-        if (!product) throw new CustomError("Product not found");
-
-        const vendorProducts = await dataBundle.$get("vendorProducts");
-        const vendorAndDiscos = await Promise.all(
-            vendorProducts.map(async (vendorProduct) => {
-                const vendor = await vendorProduct.$get("vendor");
-                if (!vendor) throw new CustomError("Vendor not found");
-                return {
-                    vendorName: vendor.name,
-                    discoCode: (
-                        vendorProduct.schemaData as VendorProductSchemaData.BUYPOWERNG
-                    ).code,
-                    dataCode: vendorProduct.schemaData.datacode,
-                };
-            }),
-        );
-
-        const vendorProductCode = vendorAndDiscos.find(
-            (vendorAndDisco) =>
-                vendorAndDisco.vendorName === transaction.superagent,
-        )?.dataCode;
-        if (!vendorProductCode)
-            throw new CustomError("Vendor product code not found");
-
-        // find MTN, GLO, AIRTEL, 9MOBILE In the product code using regex
-        const validMasterProductCode = product.masterProductCode.match(
-            /MTN|GLO|AIRTEL|9MOBILE/g,
-        );
-        if (!validMasterProductCode)
-            throw new CustomError("Product code not found");
-
-        const network = transaction.networkProvider;
-        if (!network) throw new CustomError("Network not found");
-
-        // Purchase token from vendor
-        logger.info("Processing vend request", logMeta);
-        const tokenInfo = await TokenHandlerUtil.processVendRequest({
-            transaction: transaction as TokenPurchaseData["transaction"],
-            phoneNumber: data.phone.phoneNumber,
-            email: user.email,
-            amount: parseFloat(transaction.amount),
-            dataCode: vendorProductCode as TokenPurchaseData["dataCode"],
-            serviceProvider: network as TokenPurchaseData["serviceProvider"],
-        }).catch((e) => e);
-
-        logger.info("Vend request processed", logMeta);
-        const vendResult = await TokenHandlerUtil.requeryTransactionFromVendor(
-            transaction,
-        ).catch((e) => e);
-        const vendResultFromBuypower =
-            vendResult as ElectricityRequeryResponse["BUYPOWERNG"];
-        const vendResultFromIrecharge =
-            vendResult as ElectricityRequeryResponse["IRECHARGE"];
-        const vendResultFromBaxi =
-            vendResult as ElectricityRequeryResponse["BAXI"];
-
-        const error = { code: 202, cause: TransactionErrorCause.UNKNOWN };
-        const transactionEventService = new DataTransactionEventService(
-            transaction,
-            data.superAgent,
-            partner.email,
-            data.phone.phoneNumber,
-        );
-        await transactionEventService.addVendDataRequestedFromVendorEvent();
-
-        let requeryFromNewVendor = false;
-        let requeryFromSameVendor = false;
-        let transactionFailed = !["00", "15", "43"].includes(tokenInfo.status);
-
-        const transactionTimedOutFromIrecharge =
-            vendResultFromIrecharge.source === "IRECHARGE"
-                ? ["15", "43"].includes(vendResultFromIrecharge.status)
-                : false;
-        let transactionTimedOutFromBuypower =
-            vendResultFromBuypower.source === "BUYPOWERNG"
-                ? vendResultFromBuypower.status === true &&
-                  vendResultFromBuypower.data.responseCode == 202
-                : false; // TODO: Add check for when transaction timeout from baxi
-        const transactionTimedOutFromBaxi =
-            vendResultFromBaxi.source === "BAXI"
-                ? vendResultFromBaxi.status === true &&
-                  vendResultFromBaxi.data.statusCode === "0"
-                : false;
-        const transactionTimedOut =
-            transactionTimedOutFromBuypower ||
-            transactionTimedOutFromIrecharge ||
-            transactionTimedOutFromBaxi;
-
-        requeryFromSameVendor = transactionTimedOut;
-        if (TEST_FAILED) {
-            const totalRetries =
-                retry.retryCountBeforeSwitchingVendor *
-                    transaction.previousVendors.length -
-                1 +
-                retry.count +
-                1;
-
-            // If we are in test mode, and the transaction is successful, after a number of retries, we should assume the transaction is successful
-            const shouldAssumeToBeSuccessful =
-                totalRetries >
-                    retry.limitToStopRetryingWhenTransactionIsSuccessful &&
-                TEST_FAILED;
-            requeryFromSameVendor = !shouldAssumeToBeSuccessful;
-        }
-
-        if (requeryFromNewVendor) {
-            return await TokenHandlerUtil.triggerEventToRetryTransactionWithNewVendor(
-                {
-                    phone: data.phone,
-                    transaction: transaction,
-                    transactionEventService,
-                    vendorRetryRecord: data.vendorRetryRecord,
+        try {
+            console.log({
+                log: "New Data request",
+                currentVendor: data.superAgent,
+            });
+            const logMeta = {
+                meta: {
+                    transactionId: data.transactionId,
+                    bundle: data.bundle.id,
                 },
+            };
+            logger.info("New Data request", logMeta);
+            const transaction = await TransactionService.viewSingleTransaction(
+                data.transactionId,
             );
-        }
+            if (!transaction) {
+                logger.error(
+                    `Error fetching transaction with id ${data.transactionId}`,
+                    logMeta,
+                );
+                return;
+            }
 
-        const eventMessage = {
-            phone: {
-                amount: parseFloat(transaction.amount),
+            const { user, partner } = transaction;
+
+            if (!transaction.bundleId) {
+                throw new CustomError("BundleId is required");
+            }
+
+            const dataBundle = await BundleService.viewSingleBundleById(
+                transaction.bundleId,
+            );
+            if (!dataBundle) throw new CustomError("Bundle not found");
+
+            const product = await dataBundle.$get("product");
+            if (!product) throw new CustomError("Product not found");
+
+            const vendorProducts = await dataBundle.$get("vendorProducts");
+            const vendorAndDiscos = await Promise.all(
+                vendorProducts.map(async (vendorProduct) => {
+                    const vendor = await vendorProduct.$get("vendor");
+                    if (!vendor) throw new CustomError("Vendor not found");
+                    return {
+                        vendorName: vendor.name,
+                        discoCode: (
+                            vendorProduct.schemaData as VendorProductSchemaData.BUYPOWERNG
+                        ).code,
+                        dataCode: vendorProduct.schemaData.datacode,
+                    };
+                }),
+            );
+
+            const vendorProduct = vendorAndDiscos.find(
+                (data) => data.vendorName === transaction.superagent,
+            );
+            const vendorProductCode = vendorProduct?.dataCode;
+            if (!vendorProductCode)
+                throw new CustomError("Vendor product code not found");
+
+            const disco = vendorProduct.discoCode;
+
+            // find MTN, GLO, AIRTEL, 9MOBILE In the product code using regex
+            const validMasterProductCode = product.masterProductCode.match(
+                /MTN|GLO|AIRTEL|9MOBILE/g,
+            );
+            if (!validMasterProductCode)
+                throw new CustomError("Product code not found");
+
+            const network = transaction.networkProvider;
+            if (!network) throw new CustomError("Network not found");
+
+            // Purchase token from vendor
+            logger.info("Processing vend request", logMeta);
+            const tokenInfo = await DataHandlerUtil.processVendRequest({
+                transaction: transaction as TokenPurchaseData["transaction"],
                 phoneNumber: data.phone.phoneNumber,
-            },
-            transactionId: transaction.id,
-            error: {
-                code: (tokenInfo instanceof AxiosError
-                    ? tokenInfo.response?.data?.responseCode
-                    : undefined) as number | 0,
-                cause: TransactionErrorCause.UNKNOWN,
-            },
-        };
+                transactionId: transaction.id,
+                email: user.email,
+                amount: parseFloat(transaction.amount.toString()),
+                dataCode: vendorProductCode as TokenPurchaseData["dataCode"],
+                serviceProvider:
+                    network as TokenPurchaseData["serviceProvider"],
+            }).catch((e) => e);
 
-        if (requeryFromSameVendor) {
-            return await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
-                {
-                    eventService: transactionEventService,
-                    eventData: eventMessage,
-                    transactionTimedOutFromBuypower,
-                    superAgent: transaction.superagent,
-                    retryCount: 1,
-                    vendorRetryRecord:
-                        transaction.retryRecord[
-                            transaction.retryRecord.length - 1
-                        ],
-                },
+            logger.info("Vend request processed", logMeta);
+            const transactionEventService = new DataTransactionEventService(
+                transaction,
+                data.superAgent,
+                partner.email,
+                data.phone.phoneNumber,
             );
-        }
 
-        const transactionSuccessfulForBuyPower =
-            tokenInfo.source === "BUYPOWERNG"
-                ? vendResultFromBuypower.responseCode === 200
-                : false;
-        const transactionSuccessfulForIrecharge =
-            tokenInfo.source === "IRECHARGE"
-                ? tokenInfo.status === "00"
-                : false;
-        const transactionSuccessfulForBaxi =
-            tokenInfo.source === "BAXI" ? tokenInfo.code === 200 : false;
-        const transactionSuccessFul =
-            transactionSuccessfulForBuyPower ||
-            transactionSuccessfulForIrecharge ||
-            transactionSuccessfulForBaxi;
+            // For irecharge airtime access token is gotten after vend, this token will be required to requery transaction later
+            if (
+                !(tokenInfo instanceof AxiosError) &&
+                tokenInfo.source === "IRECHARGE"
+            ) {
+                // Update the access token in the retry record
+                const vendorRetryRecord = transaction.retryRecord.slice().pop();
 
-        transactionFailed = TEST_FAILED
-            ? retry.count > retry.retryCountBeforeSwitchingVendor
-            : transactionFailed; // TOGGLE - Will simulate failed irecharge transaction
-        if (transactionFailed) requeryFromNewVendor = true;
-        else {
-            requeryFromSameVendor = true;
-            eventMessage.error.code = tokenInfo.status === "00" ? 200 : 202;
-            eventMessage.error.cause =
-                tokenInfo.status === "00"
-                    ? TransactionErrorCause.TRANSACTION_TIMEDOUT
-                    : TransactionErrorCause.TRANSACTION_FAILED;
-        }
+                let updatedRetryRecord = transaction.retryRecord;
 
-        if (!transactionSuccessFul) {
-            logger.error("Transaction unsuccessful", logMeta);
-            if (requeryFromNewVendor) {
-                return await TokenHandlerUtil.triggerEventToRetryTransactionWithNewVendor(
+                if (vendorRetryRecord) {
+                    vendorRetryRecord.accessToken = tokenInfo.ref;
+                    vendorRetryRecord.data = {
+                        ...vendorRetryRecord.data,
+                        accessToken: tokenInfo.ref,
+                    };
+
+                    updatedRetryRecord = transaction.retryRecord.map(
+                        (record) => {
+                            if (record.vendor === vendorRetryRecord.vendor) {
+                                return vendorRetryRecord;
+                            }
+
+                            return record;
+                        },
+                    );
+                } else {
+                    logger.warn("Vendor retry record not found", logMeta);
+                }
+
+                await TransactionService.updateSingleTransaction(
+                    transaction.id,
                     {
-                        phone: data.phone,
-                        transaction,
-                        transactionEventService,
-                        vendorRetryRecord: data.vendorRetryRecord,
+                        irechargeAccessToken: tokenInfo.ref,
+                        retryRecord: updatedRetryRecord,
                     },
                 );
             }
 
-            return await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
-                {
-                    eventService: transactionEventService,
-                    eventData: eventMessage,
-                    vendorRetryRecord:
-                        transaction.retryRecord[
-                            transaction.retryRecord.length - 1
-                        ],
-                    retryCount: 1,
-                    superAgent: data.superAgent,
-                    transactionTimedOutFromBuypower: true,
-                },
-            );
+            await transactionEventService.addVendDataRequestedFromVendorEvent();
+            const error = { code: 202, cause: TransactionErrorCause.UNKNOWN };
+            const eventMessage = {
+                phone: data.phone,
+                disco: disco,
+                transactionId: transaction.id,
+                error: error,
+            };
+
+            const validationResponse =
+                await ResponseValidationUtil.validateTransactionCondition({
+                    requestType: "VENDREQUEST",
+                    vendor: vendorProduct.vendorName,
+                    httpCode:
+                        tokenInfo instanceof AxiosError
+                            ? (tokenInfo.response?.status.toString() as string)
+                            : tokenInfo?.httpStatusCode.toString(),
+                    responseObject:
+                        tokenInfo instanceof AxiosError
+                            ? tokenInfo.response?.data
+                            : tokenInfo,
+                    vendType: "PREPAID", // This isn't required for airtime, it won't be used when validating requests
+                    // transactionType: transaction.transactionType,
+                    disco: disco,
+                    transactionId: transaction.id,
+                    isError: tokenInfo instanceof AxiosError,
+                });
+
+            switch (validationResponse.action) {
+                case -1:
+                    logger.error(
+                        "Transaction condition pending - Requery",
+                        logMeta,
+                    );
+                    await DataHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
+                        {
+                            eventData: {
+                                ...eventMessage,
+                                error: {
+                                    ...eventMessage.error,
+                                    cause: TransactionErrorCause.UNEXPECTED_ERROR,
+                                },
+                            },
+                            eventService: transactionEventService,
+                            retryCount: 1,
+                            superAgent: data.superAgent,
+                            transactionTimedOutFromBuypower: false,
+                            vendorRetryRecord: data.vendorRetryRecord,
+                        },
+                    );
+                    break;
+                case 0:
+                    logger.error(
+                        "Transaction condition failed - Retry",
+                        logMeta,
+                    );
+                    await DataHandlerUtil.triggerEventToRetryTransactionWithNewVendor(
+                        {
+                            transaction,
+                            transactionEventService,
+                            phone: data.phone,
+                            vendorRetryRecord: data.vendorRetryRecord,
+                        },
+                    );
+                    break;
+                case 1:
+                    logger.error(
+                        "Transaction condition passed - Complete",
+                        logMeta,
+                    );
+                    await transactionEventService.addDataReceivedFromVendorEvent();
+                    await DataHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
+                        {
+                            eventData: {
+                                ...eventMessage,
+                                error: {
+                                    ...eventMessage.error,
+                                    cause: TransactionErrorCause.UNEXPECTED_ERROR,
+                                },
+                            },
+                            eventService: transactionEventService,
+                            retryCount: 1,
+                            superAgent: data.superAgent,
+                            transactionTimedOutFromBuypower: false,
+                            vendorRetryRecord: data.vendorRetryRecord,
+                        },
+                    );
+                    break;
+                default:
+                    logger.error("Transaction condition were not met", logMeta);
+                    await DataHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
+                        {
+                            eventData: {
+                                ...eventMessage,
+                                error: {
+                                    ...eventMessage.error,
+                                    cause: TransactionErrorCause.UNEXPECTED_ERROR,
+                                },
+                            },
+                            eventService: transactionEventService,
+                            retryCount: 1,
+                            superAgent: data.superAgent,
+                            transactionTimedOutFromBuypower: false,
+                            vendorRetryRecord: { retryCount: 1 },
+                        },
+                    );
+                    break;
+            }
+            return;
+        } catch (error) {
+            if (error instanceof CustomError) {
+                error.meta = error.meta ?? {
+                    transactionId: data.transactionId,
+                };
+            }
+
+            throw error;
         }
-
-        await transaction.update({
-            irechargeAccessToken:
-                tokenInfo.source === "IRECHARGE" ? tokenInfo.ref : undefined,
-        });
-
-        await transactionEventService.addDataReceivedFromVendorEvent();
-        return await VendorPublisher.publishEventForDataReceivedFromVendor({
-            transactionId: transaction!.id,
-            user: {
-                name: user.name as string,
-                email: user.email,
-                address: user.address,
-                phoneNumber: user.phoneNumber,
-            },
-            partner: {
-                email: partner.email,
-            },
-            phone: data.phone,
-        });
     }
 
     private static async handleDataRecievd(

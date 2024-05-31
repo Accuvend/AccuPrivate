@@ -76,15 +76,22 @@ export class ComplaintController {
         next: NextFunction
     ) {
         // Extracting necessary data from request body
-        const { title, description , category , transactionId }: { title: string; description: string , category: string, transactionId : string} =
-            req.body;
+        const { 
+            //title,
+            description , 
+            category , 
+            transactionId 
+         }: { title?: string; description: string , category: string, transactionId : string} = req.body;
+        
+        // checking the route calling the Endpoint
+        let channel = ''
+        const _route = req.url
 
-        //     res.status(200).json({
-        //                 status: "success",
-        //                 message: "complaint created successfully",
-        //                 data: {title , description , category , transactionId}
-        //             });
-        // return ;
+        // selecting the channel based on the route path
+        if(_route === '/create/complaint') channel = 'PARTNER API'
+        else if (_route === '/create') channel = 'PARTNER PORTAL'
+        else channel = 'OTHERS'
+        
         // Extracting the entity ID from the authenticated user data
         const {
             entity: { id },
@@ -92,11 +99,12 @@ export class ComplaintController {
 
         const transaction: Transaction | null = await TransactionService.viewSingleTransaction(transactionId)
         try {
+            // removed title validation , Title is now based on the category selected
             // Validation of inputs
-            if (!title) {
-                next(new BadRequestError("title of Complaint is required"));
-                return;
-            }
+            // if (!title) {
+            //     next(new BadRequestError("title of Complaint is required"));
+            //     return;
+            // }
 
             if (!description) {
                 next(new BadRequestError("Description of complaint is required"));
@@ -121,7 +129,7 @@ export class ComplaintController {
 
             // Creating complaint schema based on request data
             const complaintSchema: ICreateComplaint = {
-                subject: title, // The subject of the complaint.
+                subject: category, // The subject of the complaint.
                 channel: "WEB", // The channel through which the complaint is received.
                 contactId: entity.zohoContactId, // The ID of the contact associated with the complaint.
                 description: description, // The description of the complaint.
@@ -135,7 +143,8 @@ export class ComplaintController {
                     cf_customer_email: transaction.user.email, // The email address of the customer associated with the complaint.
                     cf_customer_phone: transaction.user.phoneNumber, // The phone of the customer associated with the complaint.
                     cf_customer_name: transaction.user.name, // The name of the customer associated with the complaint.
-                    cf_product_code: transaction.disco // The Product Code Attached to the transaction
+                    cf_product_code: transaction.disco, // The Product Code Attached to the transaction
+                    cf_complain_channel: channel //The Channel which the complaint is coming from
                 }
             };
 

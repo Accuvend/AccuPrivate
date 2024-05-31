@@ -82,7 +82,7 @@ export interface ICreatePartnerProfile extends IPartnerProfile {
 }
 
 // Interface for updating an existing Partner
-export interface IUpdatePartnerProfile {
+export interface IUpdatePartnerProfile extends Partial<ICreatePartnerProfile> {
     // You can define specific properties here that are updatable for a Partner
     // This interface is intentionally left empty for flexibility
 }

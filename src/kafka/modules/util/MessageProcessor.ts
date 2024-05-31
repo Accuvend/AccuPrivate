@@ -1,132 +1,192 @@
 import { EachBatchPayload, EachMessagePayload, Message } from "kafkajs";
 import logger from "../../../utils/Logger";
-import { CustomMessageFormat, MessageHandler, PublisherEventAndParameters, Topic } from "./Interface";
+import {
+    CustomMessageFormat,
+    MessageHandler,
+    PublisherEventAndParameters,
+    Topic,
+} from "./Interface";
 import { CustomError } from "../../../utils/Errors";
+import TransactionService from "../../../services/Transaction.service";
 
 export default class MessageProcessorFactory {
-    private handlers: () => MessageHandler
-    private consumerName: string
+    private handlers: () => MessageHandler;
+    private consumerName: string;
 
     constructor(handlers: MessageHandler, consumerName: string) {
-        this.handlers = () => handlers ?? {} as MessageHandler
-        this.consumerName = consumerName
+        this.handlers = () => handlers ?? ({} as MessageHandler);
+        this.consumerName = consumerName;
+    }
+
+    private async flaggMessage(
+        messageData: CustomMessageFormat,
+        parentError: Error | CustomError,
+    ) {
+        try {
+            const transactionId = messageData.value.transactionId;
+            if (transactionId) {
+                await TransactionService.flaggTransaction(transactionId);
+            } else {
+                logger.error(
+                    "FLAG_MSG_ERROR:  No transactionId found in message data",
+                    {
+                        meta: {
+                            parentErrorMeta: (parentError as CustomError).meta,
+                            messageData,
+                            parentError: JSON.stringify(parentError),
+                        },
+                    },
+                );
+            }
+        } catch (error) {
+            logger.error("FLAG_MSG_ERROR:  Error flagging transaction", {
+                meta: {
+                    error: JSON.stringify(error),
+                    transactionId: messageData.value.transactionId,
+                    messageData,
+                    parentError: JSON.stringify(parentError),
+                },
+            });
+        }
     }
 
     private async processMessage(messageData: CustomMessageFormat) {
-        const handler = this.handlers()[messageData.topic]
+        const handler = this.handlers()[messageData.topic];
         if (!handler) {
-            logger.error(`No handler for topic ${messageData.topic}`)
-            return
+            logger.error(`No handler for topic ${messageData.topic}`);
+            return;
         }
 
         try {
-            await handler(messageData.value)
+            await handler(messageData.value);
         } catch (error) {
-            logger.error('MESSAGE_PROCESSING_ERROR: ' + (error as Error).message ?? "An Error occured while processing message", {
-                meta: {
-                    messageData,
-                    errorData: error,
-                    transactionId: messageData.value.transactionId
-                }
-            })
+            logger.error(
+                "MESSAGE_PROCESSING_ERROR: " + (error as Error).message ??
+                    "An Error occured while processing message",
+                {
+                    meta: {
+                        messageData,
+                        errorData: error,
+                        transactionId: messageData.value.transactionId,
+                    },
+                },
+            );
             if (error instanceof CustomError) {
-                logger.error(error.message, error.meta)
+                logger.error(error.message, error.meta);
             } else {
-                logger.error((error as Error).message)
+                logger.error((error as Error).message);
             }
 
-            console.log(error)
+            await this.flaggMessage(messageData, error as Error);
         }
     }
 
-    public async processEachMessage(messagePayload: Omit<EachMessagePayload, 'topic'> & { topic: Topic }): Promise<void> {
+    public async processEachMessage(
+        messagePayload: Omit<EachMessagePayload, "topic"> & { topic: Topic },
+    ): Promise<void> {
         const { topic, partition, message } = messagePayload;
         const prefix = `[${topic}][${partition} | ${message.offset}] / ${message.timestamp}`;
         const data: CustomMessageFormat = {
             topic,
             partition,
             offset: message?.offset,
-            value: JSON.parse(message?.value?.toString() ?? '{}') as PublisherEventAndParameters[keyof PublisherEventAndParameters],
+            value: JSON.parse(
+                message?.value?.toString() ?? "{}",
+            ) as PublisherEventAndParameters[keyof PublisherEventAndParameters],
             timestamp: message?.timestamp,
             headers: message?.headers,
-        }
+        };
 
         try {
-            const shouldLogToDB = data.value.log == undefined ? 1 : data.value.log
+            const shouldLogToDB =
+                data.value.log == undefined ? 1 : data.value.log;
 
-            shouldLogToDB && logger.info(`Received message => [${this.consumerName}]: ` + prefix)
+            shouldLogToDB &&
+                logger.info(
+                    `Received message => [${this.consumerName}]: ` + prefix,
+                );
 
-            await this.processMessage(data)
+            await this.processMessage(data);
 
-            await messagePayload.heartbeat()
+            await messagePayload.heartbeat();
         } catch (error) {
-            console.log(error)
-            logger.error('MESSAGE_PROCESSING_ERROR: ' + (error as Error).message ?? "An Error occured while processing message", {
-                meta: {
-                    messageData: messagePayload.message,
-                    errorData: error,
-                    transactionId: data.value.transactionId
-                }
-            })
+            logger.error(
+                "MESSAGE_PROCESSING_ERROR: " + (error as Error).message ??
+                    "An Error occured while processing message",
+                {
+                    meta: {
+                        messageData: messagePayload.message,
+                        errorData: error,
+                        transactionId: data.value.transactionId,
+                    },
+                },
+            );
             if (error instanceof CustomError) {
-                logger.error(error.message, error.meta)
+                logger.error(error.message, error.meta);
             } else {
-                logger.error((error as Error).message)
+                logger.error((error as Error).message);
             }
+
+            await this.flaggMessage(data, error as Error);
         }
     }
 
-    public async processEachBatch(eachBatchPayload: EachBatchPayload): Promise<void> {
+    public async processEachBatch(
+        eachBatchPayload: EachBatchPayload,
+    ): Promise<void> {
         try {
             const { batch } = eachBatchPayload;
 
-            let shouldLogToDB = 1
+            let shouldLogToDB = 1;
             for (let i = 0; i < batch.messages.length; i++) {
-                const message = batch.messages[i]
+                const message = batch.messages[i];
                 const prefix = `${batch.topic}[${batch.partition} | ${message.offset}] / ${message.timestamp}`;
 
                 const data: CustomMessageFormat = {
                     topic: batch.topic as Topic,
                     partition: batch.partition,
                     offset: message.offset,
-                    value: JSON.parse(message.value?.toString() ?? '{}') as PublisherEventAndParameters[keyof PublisherEventAndParameters],
+                    value: JSON.parse(
+                        message.value?.toString() ?? "{}",
+                    ) as PublisherEventAndParameters[keyof PublisherEventAndParameters],
                     timestamp: message.timestamp,
                     headers: message.headers,
-                }
+                };
 
-                shouldLogToDB = data.value.log == undefined ? 1 : data.value.log
+                shouldLogToDB =
+                    data.value.log == undefined ? 1 : data.value.log;
 
-                shouldLogToDB && logger.info(`- ${prefix} ${message.key}#${message.value}`, {
-                    meta: {
-                        transactionId: (message.value as any).transactionId
-                    }
-                });
+                shouldLogToDB &&
+                    logger.info(`- ${prefix} ${message.key}#${message.value}`, {
+                        meta: {
+                            transactionId: (message.value as any).transactionId,
+                        },
+                    });
 
-                await this.processMessage(data)
+                await this.processMessage(data);
 
-                shouldLogToDB && logger.info('Message processed successfully')
-                eachBatchPayload.resolveOffset(message.offset)  // Commit offset
-                await eachBatchPayload.commitOffsetsIfNecessary()
-                await eachBatchPayload.heartbeat()
+                shouldLogToDB && logger.info("Message processed successfully");
+                eachBatchPayload.resolveOffset(message.offset); // Commit offset
+                await eachBatchPayload.commitOffsetsIfNecessary();
+                await eachBatchPayload.heartbeat();
             }
 
-
-            shouldLogToDB && logger.info('Committing offsets...')
+            shouldLogToDB && logger.info("Committing offsets...");
         } catch (error) {
-            console.log(error)
+            console.log(error);
             if (error instanceof CustomError) {
-                logger.error(error.message, error.meta)
+                logger.error(error.message, error.meta);
             } else {
-                logger.error((error as Error).message)
+                logger.error((error as Error).message);
             }
         }
     }
 
     public getTopics(): Topic[] {
-        return Object.keys(this.handlers()) as Topic[]
+        return Object.keys(this.handlers()) as Topic[];
     }
 
     public getConsumerName(): string {
-        return this.consumerName
+        return this.consumerName;
     }
 }

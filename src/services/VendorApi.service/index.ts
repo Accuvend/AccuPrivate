@@ -832,7 +832,7 @@ export default class VendorService {
                                     ...mainMeta,
                                 },
                             });
-                            throw new Error("Transaction timeout");
+                            throw error;
                         }
                     }
 
@@ -1205,6 +1205,7 @@ export default class VendorService {
             phoneNumber: string;
             reference: string;
             email: string;
+            transactionId: string;
         };
         vendor: T;
     }): Promise<DataPurchaseResponse[T]> {

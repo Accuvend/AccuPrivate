@@ -46,7 +46,8 @@ router
         basicAuth("access"),
         RBACMiddelware.validateRole([RoleEnum.Admin, RoleEnum.SuperAdmin]),
         AuthenticatedController(VendorController.resendToken),
-    );
+    )
+    .post("/requery", AuthenticatedController(VendorController.initManualRequeryTransaction));
 // .get(
 //     "/requery-transaction",
 //     AuthenticatedController(

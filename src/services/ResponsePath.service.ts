@@ -28,7 +28,7 @@ export default class ResponsePathService {
 
     static async viewResponsePathForValidation({
         requestType, vendor, forErrorResponses
-    }: { requestType: string, vendor: string, forErrorResponses?: boolean }): Promise<ResponsePath[] | void | null> {
+    }: { requestType?: string, vendor: string, forErrorResponses?: boolean }): Promise<ResponsePath[] | void | null> {
         try {
             const query = {} as Record<string, string | boolean>;
             if (requestType != undefined) query['requestType'] = requestType;

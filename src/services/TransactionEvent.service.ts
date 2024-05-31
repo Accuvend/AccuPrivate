@@ -64,6 +64,49 @@ export class AirtimeTransactionEventService {
         this.phoneNumber = phoneNumber
     }
 
+    public async addScheduleRequeryEvent({ timeStamp, waitTime }: { timeStamp: string, waitTime: number }): Promise<Event> {
+        const event: ICreateEvent = {
+            transactionId: this.transaction.id,
+            eventType: TOPICS.SCHEDULE_REQUERY_FOR_AIRTIME_TRANSACTION,
+            eventText: TOPICS.SCHEDULE_REQUERY_FOR_TRANSACTION_INITIATED,
+            payload: JSON.stringify({
+                timeStamp,
+                waitTime,
+                phone: this.phoneNumber,
+                superagent: this.superAgent,
+                partnerEmail: this.partner,
+            }),
+            source: 'API',
+            eventTimestamp: new Date(),
+            id: uuidv4(),
+            status: Status.PENDING,
+        }
+
+        return await EventService.addEvent(event);
+    }
+
+    public async addScheduleRetryEvent({ timeStamp, waitTime, retryRecord }: { timeStamp: string, waitTime: number, retryRecord: Transaction['retryRecord'][number] }): Promise<Event> {
+        const event: ICreateEvent = {
+            transactionId: this.transaction.id,
+            eventType: TOPICS.SCHEDULE_RETRY_FOR_AIRTIME_TRANSACTION,
+            eventText: TOPICS.SCHEDULE_RETRY_FOR_AIRTIME_TRANSACTION,
+            payload: JSON.stringify({
+                timeStamp,
+                waitTime,
+                phone: this.phoneNumber,
+                superagent: this.superAgent,
+                partnerEmail: this.partner,
+                retryRecord: retryRecord
+            }),
+            source: 'API',
+            eventTimestamp: new Date(),
+            id: uuidv4(),
+            status: Status.PENDING,
+        }
+
+        return await EventService.addEvent(event);
+    }
+
     public async addPhoneNumberValidationRequestedEvent(): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
@@ -252,13 +295,62 @@ export class AirtimeTransactionEventService {
         return await EventService.addEvent(event);
     }
 
+    public async addGetAirtimeFromVendorRequeryInitiatedEvent(retryCount: number): Promise<Event> {
+        const event: ICreateEvent = {
+            transactionId: this.transaction.id,
+            eventType: TOPICS.AIRTIME_TRANSACTION_REQUERY_INITIATED,
+            eventText: TOPICS.AIRTIME_TRANSACTION_REQUERY_INITIATED,
+            payload: JSON.stringify({
+                transactionId: this.transaction.id,
+                phoneNumber: this.phoneNumber,
+                disco: this.transaction.disco,
+                superagent: this.superAgent,
+                partnerEmail: this.partner,
+                networProvider: this.transaction.networkProvider,
+                retryCount
+            }),
+            source: this.transaction.superagent.toUpperCase(),
+            eventTimestamp: new Date(),
+            id: uuidv4(),
+            status: Status.COMPLETE,
+        }
+
+        return await EventService.addEvent(event);
+    }
+
+    public async addGetAirtimeTokenRequestedFromVendorRequeryEvent(error: { cause: TransactionErrorCause, code: number, }, retryCount: number): Promise<Event> {
+        const event: ICreateEvent = {
+            transactionId: this.transaction.id,
+            eventType: TOPICS.GET_AIRTIME_FROM_VENDOR_REQUERY,
+            eventText: TOPICS.GET_AIRTIME_FROM_VENDOR_REQUERY,
+            payload: JSON.stringify({
+                transactionId: this.transaction.id,
+                superAgent: this.transaction.superagent,
+                amount: this.transaction.amount,
+                disco: this.transaction.disco,
+                phone: this.phoneNumber,
+                timestamp: new Date(),
+                superagent: this.superAgent,
+                partnerEmail: this.partner,
+                error,
+                retryCount
+            }),
+            source: this.transaction.superagent.toUpperCase(),
+            eventTimestamp: new Date(),
+            id: uuidv4(),
+            status: Status.COMPLETE,
+        }
+
+        return await EventService.addEvent(event);
+    }
+
     public async addAirtimePurchaseWithNewVendorEvent({ currentVendor, newVendor }: {
         currentVendor: Transaction['superagent'], newVendor: Transaction['superagent']
     }): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
-            eventType: TOPICS.RETRY_AIRTIME_PURCHASE_FROM_NEW_VENDOR,
-            eventText: TOPICS.RETRY_AIRTIME_PURCHASE_FROM_NEW_VENDOR,
+            eventText: TOPICS.RETRY_AIRTIME_PURCHASE_FROM_VENDOR,
+            eventType: TOPICS.RETRY_AIRTIME_PURCHASE_FROM_VENDOR,
             payload: JSON.stringify({
                 transactionId: this.transaction.id,
                 phoneNumber: this.phoneNumber,
@@ -282,6 +374,27 @@ export class AirtimeTransactionEventService {
             transactionId: this.transaction.id,
             eventType: TOPICS.AIRTIME_RECEIVED_FROM_VENDOR,
             eventText: TOPICS.AIRTIME_RECEIVED_FROM_VENDOR,
+            payload: JSON.stringify({
+                transactionId: this.transaction.id,
+                phoneNumber: this.phoneNumber,
+                disco: this.transaction.disco,
+                superagent: this.superAgent,
+                partnerEmail: this.partner,
+            }),
+            source: this.transaction.superagent.toUpperCase(),
+            eventTimestamp: new Date(),
+            id: uuidv4(),
+            status: Status.PENDING,
+        }
+
+        return await EventService.addEvent(event);
+    }
+
+    public async addAirtimeReceivedFromVendorRequeryEvent(): Promise<Event> {
+        const event: ICreateEvent = {
+            transactionId: this.transaction.id,
+            eventType: TOPICS.AIRTIME_RECEIVED_FROM_VENDOR_REQUERY,
+            eventText: TOPICS.AIRTIME_RECEIVED_FROM_VENDOR_REQUERY,
             payload: JSON.stringify({
                 transactionId: this.transaction.id,
                 phoneNumber: this.phoneNumber,
@@ -860,7 +973,7 @@ export default class TransactionEventService {
                 vendType: this.meterInfo.vendType,
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
-                retryRecord:  retryRecord
+                retryRecord: retryRecord
             }),
             source: 'API',
             eventTimestamp: new Date(),

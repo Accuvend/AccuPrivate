@@ -585,10 +585,6 @@ export default class VendorService {
                             ...responseData,
                             source: "BAXI" as const,
                             httpStatusCode: response.status,
-                            // status: responseData.status,
-                            // code: responseData.code,
-                            // message: responseData.message,
-                            // data: responseData.data,
                         };
                     }
 
@@ -596,10 +592,6 @@ export default class VendorService {
                         ...responseData,
                         source: "BAXI" as const,
                         httpStatusCode: response.status,
-                        // status: responseData.status,
-                        // code: responseData.code,
-                        // message: responseData.message,
-                        // data: responseData.data,
                     };
                 } catch (error) {
                     throw error;
@@ -878,12 +870,11 @@ export default class VendorService {
 
                     if (successResponse.result.status === true) {
                         return {
-                            ...response.data,
+                            ...successResponse,
+                            result: successResponse.result,
                             source: "BUYPOWERNG",
                             httpStatusCode: response.status,
-                        } as
-                            | InprogressResponseForBuyPowerRequery
-                            | FailedResponseForBuyPowerRequery;
+                        } as SuccessResponseForBuyPowerRequery;
                     }
 
                     return {

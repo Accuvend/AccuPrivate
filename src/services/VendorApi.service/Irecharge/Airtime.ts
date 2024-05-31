@@ -10,9 +10,6 @@ export class IRechargeAirtimeApi extends IRechargeBaseConfig {
         const { email, amount, phoneNumber, serviceType } = data;
 
         const reference =
-            // NODE_ENV === "development"
-            //     ? generateRandonNumbers(12)
-            //     :
             data.reference;
 
         const network = {
@@ -78,7 +75,12 @@ export class IRechargeAirtimeApi extends IRechargeBaseConfig {
             });
             console.log(response.data);
 
-            return response.data;
+            
+        return {
+            ...response.data,
+            source: "IRECHARGE" as const,
+            httpStatusCode: response.status,
+        };
         } catch (error: any) {
             if (error.response) {
                 logger.error("Vend response from IRECHARGE", {

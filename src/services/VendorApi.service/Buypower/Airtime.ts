@@ -83,18 +83,11 @@ export default class BuypowerAirtimeApi extends BuyPowerApi {
         } = data;
         const phoneNumberToRecharge = this.formatPhoneNumber(accountNumber);
         const phoneNumberForId = this.formatPhoneNumber(phoneNumber);
+
         const requestPayload = {
-            phone:
-                // NODE_ENV === "development"
-                //     ? "08186077527"
-                //     :
-                removeSpacesFromString(phoneNumberForId),
+            phone: removeSpacesFromString(phoneNumberForId),
             email,
-            meter:
-                // NODE_ENV === "development"
-                //     ? "08186077527"
-                //     :
-                removeSpacesFromString(phoneNumberToRecharge), // TODO: Remove this before pushing to production
+            meter: removeSpacesFromString(phoneNumberToRecharge), // TODO: Remove this before pushing to production
             disco: serviceType,
             paymentType: "B2B",
             vendType: "PREPAID",
@@ -127,7 +120,11 @@ export default class BuypowerAirtimeApi extends BuyPowerApi {
                     responseData: response.data,
                 },
             });
-            return response.data;
+            return {
+                ...response.data,
+                source: "BUYPOWERNG" as const,
+                httpStatusCode: response.status,
+            };
         } catch (error: any) {
             if (error instanceof AxiosError) {
                 const requery =

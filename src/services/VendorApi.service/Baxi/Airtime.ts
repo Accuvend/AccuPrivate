@@ -58,7 +58,11 @@ export default class BaxiAirtimeApi extends BaxiApiBaseConfig {
                 },
             });
 
-            return response.data;
+            return {
+                ...response.data,
+                source: "BAXI" as const,
+                httpStatusCode: response.status,
+            };
         } catch (error: any) {
             if (error.response) {
                 logger.error("Vend response from BAXI", {

@@ -46,7 +46,7 @@ export default class Transaction extends Model<ITransaction | Transaction> {
 
     @Column({ type: DataType.STRING, allowNull: true })
     tokenFromVend: string;
-    
+
     @Column({ type: DataType.STRING, allowNull: true })
     tokenFromRequery: string;
 
@@ -85,6 +85,7 @@ export default class Transaction extends Model<ITransaction | Transaction> {
     retryRecord: {
         vendor: ITransaction['superagent'],
         reference: string[],
+        accessToken?: string,
         data?: Record<string, any>,
         retryCount: number,
         attempt: number,

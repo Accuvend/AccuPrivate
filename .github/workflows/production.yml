@@ -121,6 +121,8 @@ jobs:
         
 
         echo "ZOHO_BASE_URL=$ZOHO_BASE_URL" >> .env
+        echo "ACCUVEND_RECEIPT_BASE_URL=https://receipt.accuvend.ng/transaction/details" >> .env
+        
 
 
         echo "CYBER_PAY_USERNAME=$CYBER_PAY_USERNAME" >> .env

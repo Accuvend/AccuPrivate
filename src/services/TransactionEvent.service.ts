@@ -2,6 +2,7 @@ import { TOPICS } from "../kafka/Constants";
 import { VendorPublisher } from "../kafka/modules/publishers/Vendor";
 import { TransactionErrorCause } from "../kafka/modules/util/Interface";
 import ProducerFactory from "../kafka/modules/util/Producer";
+import { IBundle } from "../models/Bundle.model";
 import Event, { ICreateEvent, Status } from "../models/Event.model";
 import Transaction from "../models/Transaction.model";
 import EventService from "./Event.service";
@@ -594,6 +595,30 @@ export class AirtimeTransactionEventService {
         };
         return await EventService.addEvent(event);
     }
+
+    public async addDataSentToUserEmail({ bundle}: { bundle: IBundle}): Promise<Event> {
+        const event: ICreateEvent = {
+            transactionId: this.transaction.id,
+            eventType: TOPICS.DATA_SENT_TO_USER_EMAIL,
+            eventText: TOPICS.DATA_SENT_TO_USER_EMAIL,
+            payload: JSON.stringify({
+                phone: {
+                    phoneNumber: this.phoneNumber,
+                    amount: this.transaction.amount,
+                },
+                bundle,
+                transactionId: this.transaction.id,
+                disco: this.transaction.disco,
+                superagent: this.superAgent,
+                partnerEmail: this.partner,
+            }),
+            source: this.transaction.superagent.toUpperCase(),
+            eventTimestamp: new Date(),
+            id: uuidv4(),
+            status: Status.COMPLETE,
+        };
+        return await EventService.addEvent(event);
+    }
 }
 export class DataTransactionEventService {
     private transaction: Transaction;
@@ -921,6 +946,27 @@ export class DataTransactionEventService {
     }
 
     public async addDataReceivedFromVendorEvent(): Promise<Event> {
+        const event: ICreateEvent = {
+            transactionId: this.transaction.id,
+            eventType: TOPICS.DATA_RECEIVED_FROM_VENDOR,
+            eventText: TOPICS.DATA_RECEIVED_FROM_VENDOR,
+            payload: JSON.stringify({
+                transactionId: this.transaction.id,
+                phoneNumber: this.phoneNumber,
+                disco: this.transaction.disco,
+                superagent: this.superAgent,
+                partnerEmail: this.partner,
+            }),
+            source: this.transaction.superagent.toUpperCase(),
+            eventTimestamp: new Date(),
+            id: uuidv4(),
+            status: Status.PENDING,
+        };
+
+        return await EventService.addEvent(event);
+    }
+
+    public async addDataReceivedFromVendorRequeryEvent(): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
             eventType: TOPICS.DATA_RECEIVED_FROM_VENDOR,

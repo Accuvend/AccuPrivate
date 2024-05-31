@@ -1,5 +1,3 @@
-import { AxiosError } from "axios";
-import Transaction, { Status } from "../../../models/Transaction.model";
 import EntityService from "../../../services/Entity/Entity.service";
 import EventService from "../../../services/Event.service";
 import NotificationService from "../../../services/Notification.service";
@@ -25,6 +23,7 @@ import { SmsService } from "../../../utils/Sms";
 import { VendorPublisher } from "../publishers/Vendor";
 import Event from "../../../models/Event.model";
 import PowerUnit from "../../../models/PowerUnit.model";
+import { AxiosError } from "axios";
 
 class NotificationHandler extends Registry {
     private static async handleTokenToSendToUser(
@@ -107,7 +106,7 @@ class NotificationHandler extends Registry {
                     meta: {
                         transactionId: transaction.id,
                         error: error.response?.data,
-                    }
+                    },
                 });
             });
         await transactionEventService.addTokenSentToUserEmailEvent();
@@ -178,11 +177,11 @@ class NotificationHandler extends Registry {
 
         // If you've not notified the partner before, notify them
         if (!notifyPartnerEvent) {
-            logger.info('Notification sent to partner', {
+            logger.info("Notification sent to partner", {
                 meta: {
                     transactionId: transaction.id,
-                }
-            })
+                },
+            });
             await NotificationUtil.sendNotificationToUser(
                 partnerEntity.id,
                 notification,
@@ -347,10 +346,112 @@ class NotificationHandler extends Registry {
                     meta: {
                         transactionId: transaction.id,
                         error: error.response?.data,
-                    }
+                    },
                 });
             });
         await transactionEventService.addAirtimeSentToUserEmail();
+
+        return;
+    }
+
+    private static async handleReceivedData(
+        data: PublisherEventAndParameters[TOPICS.DATA_RECEIVED_FROM_VENDOR],
+    ) {
+        logger.info("Inside notification handler");
+        const transaction = await TransactionService.viewSingleTransaction(
+            data.transactionId,
+        );
+        if (!transaction) {
+            throw new Error(
+                `Error fetching transaction with id ${data.transactionId}`,
+            );
+        }
+
+        const partnerEntity = await EntityService.viewSingleEntityByEmail(
+            transaction.partner.email,
+        );
+        if (!partnerEntity) {
+            throw new Error(
+                `Error fetching partner with email ${transaction.partner.email}`,
+            );
+        }
+
+        // Add notification successfull transaction
+        const notification = await NotificationService.addNotification({
+            id: uuidv4(),
+            title: "Successful transaction",
+            heading: "Successful ransaction",
+            message: `
+                Successtul transaction for ${data.phone.phoneNumber} with amount ${transaction.amount}
+
+                Bank Ref: ${transaction.bankRefId}
+                Bank Comment: ${transaction.bankComment}
+                Transaction Id: ${transaction.id},
+                Phone number: ${data.phone.phoneNumber}        e
+                Network provider: ${transaction.networkProvider}
+                Bundle: ${data.bundle.bundleName}
+                `,
+            entityId: partnerEntity.id,
+            read: false,
+        });
+
+        // Check if notifiecations have been sent to partner and user
+        const notifyPartnerEvent =
+            await EventService.viewSingleEventByTransactionIdAndType(
+                transaction.id,
+                TOPICS.TOKEN_SENT_TO_PARTNER,
+            );
+
+        const transactionEventService = new AirtimeTransactionEventService(
+            transaction,
+            transaction.superagent,
+            transaction.partner.email,
+            data.phone.phoneNumber,
+        );
+
+        // If you've not notified the partner before, notify them
+        if (!notifyPartnerEvent) {
+            await NotificationUtil.sendNotificationToUser(
+                partnerEntity.id,
+                notification,
+            );
+            await transactionEventService.addAirtimeSentToPartner();
+        }
+
+        const product = await ProductService.viewSingleProduct(
+            transaction.productCodeId,
+        );
+        if (!product) {
+            throw new Error(
+                `Error fetching product with id ${transaction.productCodeId}`,
+            );
+        }
+
+        transaction.disco = product.productName;
+
+        await EmailService.sendEmail({
+            to: transaction.partner.email,
+            subject: "Successful Airtime Purchase",
+            html: await new EmailTemplate().dataBundleReceipt({
+                transaction: transaction,
+                bundle: data.bundle,
+                phoneNumber: data.phone.phoneNumber,
+            }),
+        });
+
+        const msgTemplate = await SmsService.dataBundleTemplate(
+            transaction,
+            data.bundle.bundleName,
+        );
+        await SmsService.sendSms(data.phone.phoneNumber, msgTemplate).catch(
+            (error: AxiosError) => {
+                console.log(error.response?.data);
+                logger.error("Error sending sms", error);
+            },
+        );
+        await transactionEventService.addDataSentToUserEmail({
+            bundle: data.bundle,
+        });
 
         return;
     }
@@ -444,8 +545,10 @@ class NotificationHandler extends Registry {
         [TOPICS.TOKEN_RECIEVED_FROM_VENDOR]: this.handleReceivedToken,
         [TOPICS.TOKEN_RECIEVED_FROM_REQUERY]: this.handleTokenToSendToUser,
         [TOPICS.TOKEN_REQUEST_FAILED]: this.failedTokenRequest,
+        [TOPICS.DATA_RECEIVED_FROM_VENDOR]: this.handleReceivedData,
         [TOPICS.AIRTIME_RECEIVED_FROM_VENDOR]: this.handleReceivedAirtime,
-        [TOPICS.AIRTIME_RECEIVED_FROM_VENDOR_REQUERY]: this.handleAirtimeSendToUser,
+        [TOPICS.AIRTIME_RECEIVED_FROM_VENDOR_REQUERY]:
+            this.handleAirtimeSendToUser,
     };
 }
 
@@ -458,4 +561,3 @@ export default class NotificationConsumer extends ConsumerFactory {
         super(messageProcessor);
     }
 }
-

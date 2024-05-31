@@ -806,6 +806,7 @@ class TokenHandler extends Registry {
                                     cause: TransactionErrorCause.UNEXPECTED_ERROR,
                                 },
                             },
+                            bundle: data.bundle,
                             eventService: transactionEventService,
                             retryCount: 1,
                             superAgent: data.superAgent,
@@ -846,6 +847,7 @@ class TokenHandler extends Registry {
                             eventService: transactionEventService,
                             retryCount: 1,
                             superAgent: data.superAgent,
+                            bundle: data.bundle,
                             transactionTimedOutFromBuypower: false,
                             vendorRetryRecord: data.vendorRetryRecord,
                         },
@@ -864,6 +866,7 @@ class TokenHandler extends Registry {
                             },
                             eventService: transactionEventService,
                             retryCount: 1,
+                            bundle: data.bundle,
                             superAgent: data.superAgent,
                             transactionTimedOutFromBuypower: false,
                             vendorRetryRecord: { retryCount: 1 },
@@ -886,9 +889,14 @@ class TokenHandler extends Registry {
     private static async requeryTransaction(
         data: PublisherEventAndParameters[TOPICS.GET_DATA_FROM_VENDOR_RETRY],
     ) {
+        const logMeta = {
+            meta: { transactionId: data.transactionId },
+        };
+        logger.warn("Requerying transaction from vendor", logMeta);
         retry.count = data.retryCount;
         console.log({
-            retryCount: data.retryCount,
+            data: data,
+            retyrCount: data.retryCount,
         });
 
         // Check if token has been found
@@ -896,15 +904,84 @@ class TokenHandler extends Registry {
             data.transactionId,
         );
         if (!transaction) {
-            logger.error("Transaction not found");
+            logger.error("Transaction not found", logMeta);
             return;
         }
+        // Get the current timestamp in milliseconds
+        const now = Date.now();
 
-        const user = await transaction.$get("user");
-        const partner = await transaction.$get("partner");
-        if (!user || !partner) {
-            throw new CustomError("Transaction  required relations not found");
+        // Assuming you have another timestamp stored in a variable called 'previousTimestamp'
+        // For example:
+        const previousTimestamp = new Date(
+            transaction.transactionTimestamp,
+        ).getTime(); // This represents a timestamp for April 1, 2022
+
+        // Calculate the difference between the current timestamp and the previous timestamp in milliseconds
+        const differenceInMilliseconds = now - previousTimestamp;
+
+        // Convert milliseconds to hours
+        const differenceInHours = differenceInMilliseconds / (1000 * 60 * 60); // 1000 milliseconds * 60 seconds * 60 minutes
+
+        // Check if transaction is greater than 2hrs then stop
+        if (differenceInHours > 2) {
+            logger.info(
+                `Flagged transaction with id ${transaction.id} after hitting requery limit`,
+                {
+                    meta: { transactionId: transaction.id },
+                },
+            );
+            return await TransactionService.updateSingleTransaction(
+                transaction.id,
+                { status: Status.FLAGGED },
+            );
         }
+
+        const { user, partner } = transaction;
+
+        if (!transaction.bundleId) {
+            throw new CustomError("BundleId is required");
+        }
+
+        const dataBundle = await transaction.$get("bundle");
+        if (!dataBundle) throw new CustomError("Bundle not found");
+
+        const product = await dataBundle.$get("product");
+        if (!product) throw new CustomError("Product not found");
+
+        const vendorProducts = await dataBundle.$get("vendorProducts");
+        const vendorAndDiscos = await Promise.all(
+            vendorProducts.map(async (vendorProduct) => {
+                const vendor = await vendorProduct.$get("vendor");
+                if (!vendor) throw new CustomError("Vendor not found");
+                return {
+                    vendorName: vendor.name,
+                    discoCode: (
+                        vendorProduct.schemaData as VendorProductSchemaData.BUYPOWERNG
+                    ).code,
+                    dataCode: vendorProduct.schemaData.datacode,
+                };
+            }),
+        );
+
+        console.log({ vendorAndDiscos });
+        const vendorProduct = vendorAndDiscos.find(
+            (data) => data.vendorName === transaction.superagent,
+        );
+        const vendorProductCode = vendorProduct?.dataCode;
+        if (!vendorProductCode)
+            throw new CustomError("Vendor product code not found");
+
+        const disco = vendorProduct.discoCode;
+
+        // find MTN, GLO, AIRTEL, 9MOBILE In the product code using regex
+        const validMasterProductCode = product.masterProductCode.match(
+            /MTN|GLO|AIRTEL|9MOBILE/g,
+        );
+        if (!validMasterProductCode)
+            throw new CustomError("Product code not found");
+
+        const network = transaction.networkProvider;
+        if (!network) throw new CustomError("Network not found");
 
         const transactionEventService = new DataTransactionEventService(
             transaction,
@@ -926,146 +1003,109 @@ class TokenHandler extends Registry {
          * When requerying a transaction, the response code is 201.
          */
         const requeryResult =
-            await TokenHandlerUtil.requeryTransactionFromVendor(
+            await DataHandlerUtil.requeryTransactionFromVendor(
                 transaction,
             ).catch((e) => e);
-        const requeryResultFromBuypower = requeryResult as Awaited<
-            ReturnType<typeof VendorService.buyPowerRequeryTransaction>
-        >;
-        const requeryResultFromBaxi = requeryResult as Awaited<
-            ReturnType<typeof VendorService.baxiRequeryTransaction>
-        >;
-        const requeryResultFromIrecharge = requeryResult as Awaited<
-            ReturnType<typeof VendorService.irechargeRequeryTransaction>
-        >;
+        const validationResponse =
+            await ResponseValidationUtil.validateTransactionCondition({
+                requestType: "REQUERY",
+                vendor: vendorProduct.vendorName,
+                httpCode:
+                    requeryResult instanceof AxiosError
+                        ? requeryResult.status
+                        : requeryResult.httpStatusCode,
+                responseObject:
+                    requeryResult instanceof AxiosError
+                        ? requeryResult.response?.data
+                        : requeryResult,
+                vendType: "PREPAID",
+                // transactionType: transaction.transactionType,
+                disco,
+                transactionId: transaction.id,
+                isError: requeryResult instanceof AxiosError,
+            });
 
-        const transactionSuccessFromBuypower =
-            requeryResultFromBuypower.source === "BUYPOWERNG"
-                ? requeryResultFromBuypower.responseCode === 200
-                : false;
-        const transactionSuccessFromBaxi =
-            requeryResultFromBaxi.source === "BAXI"
-                ? requeryResultFromBaxi.responseCode === 200
-                : false;
-        const transactionSuccessFromIrecharge =
-            requeryResultFromIrecharge.source === "IRECHARGE"
-                ? requeryResultFromIrecharge.status === "00" &&
-                  requeryResultFromIrecharge.vend_status === "successful"
-                : false;
+        await transactionEventService.addDataTransactionRequery();
+        const error = { code: 202, cause: TransactionErrorCause.UNKNOWN };
+        const eventMessage = {
+            phone: data.phone,
+            disco: disco,
+            transactionId: transaction.id,
+            error: error,
+        };
 
-        const transactionSuccess = TEST_FAILED
-            ? false
-            : transactionSuccessFromBuypower ||
-              transactionSuccessFromBaxi ||
-              transactionSuccessFromIrecharge;
-        console.log({
-            transactionSuccess,
-            transactionSuccessFromBuypower,
-            transactionSuccessFromBaxi,
-            transactionSuccessFromIrecharge,
-        });
-        console.log({
-            requeryResultFromIrecharge,
-        });
-        if (!transactionSuccess) {
-            /**
-             * Transaction may be unsuccessful but it doesn't mean it has failed
-             * The transaction can still be pending
-             * If transaction failed, switch to a new vendor
-             */
-            let requeryFromNewVendor = false;
-            let requeryFromSameVendor = false;
-            let error: {
-                code: number;
-                cause: TransactionErrorCause;
-            } = { code: 202, cause: TransactionErrorCause.UNKNOWN };
-            if (requeryResult.source === "BUYPOWERNG") {
-                let transactionFailed =
-                    requeryResultFromBuypower.responseCode === 202;
-                transactionFailed = TEST_FAILED
-                    ? retry.count > retry.retryCountBeforeSwitchingVendor
-                    : transactionFailed; // TOGGLE - Will simulate failed buypower transaction
-                if (transactionFailed) requeryFromNewVendor = true;
-                else {
-                    requeryFromSameVendor = true;
-                    error.code = requeryResultFromBuypower.responseCode;
-                    error.cause =
-                        requeryResultFromBuypower.responseCode === 201
-                            ? TransactionErrorCause.TRANSACTION_TIMEDOUT
-                            : TransactionErrorCause.TRANSACTION_FAILED;
-                }
-            } else if (requeryResult.source === "BAXI") {
-                // TODO: Add logic to handle baxi requery
-            } else if (requeryResult.source === "IRECHARGE") {
-                let transactionFailed = !["00", "15", "43"].includes(
-                    requeryResultFromIrecharge.status,
-                );
-                transactionFailed = TEST_FAILED
-                    ? retry.count > retry.retryCountBeforeSwitchingVendor
-                    : transactionFailed; // TOGGLE - Will simulate failed irecharge transaction
-                if (transactionFailed) requeryFromNewVendor = true;
-                else {
-                    if (requeryResultFromIrecharge.status !== "00") {
-                        requeryFromSameVendor = true;
-                        error.code = 202;
-                        error.cause = TransactionErrorCause.TRANSACTION_FAILED;
-                    }
-                }
-            }
-
-            if (TEST_FAILED) {
-                requeryFromNewVendor =
-                    retry.testForSwitchingVendor &&
-                    data.retryCount >= retry.retryCountBeforeSwitchingVendor;
-            }
-
-            logger.error(
-                `Error requerying transaction with id ${data.transactionId} 1213 `,
-            );
-
-            if (requeryFromNewVendor) {
-                return await TokenHandlerUtil.triggerEventToRetryTransactionWithNewVendor(
+        switch (validationResponse.action) {
+            case -1:
+                logger.info("Transaction condition pending - Requery", logMeta);
+                await DataHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
                     {
-                        phone: data.phone,
-                        transaction,
-                        transactionEventService,
-                        vendorRetryRecord: data.vendorRetryRecord,
-                    },
-                );
-            }
-
-            if (requeryFromSameVendor) {
-                return await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
-                    {
-                        eventService: transactionEventService,
                         eventData: {
-                            phone: data.phone,
-                            transactionId: data.transactionId,
-                            error: error,
+                            ...eventMessage,
+                            error: {
+                                ...eventMessage.error,
+                                cause: TransactionErrorCause.UNEXPECTED_ERROR,
+                            },
                         },
-                        retryCount: data.retryCount + 1,
+                        bundle: data.bundle,
+                        eventService: transactionEventService,
+                        retryCount: 1,
                         superAgent: data.superAgent,
                         transactionTimedOutFromBuypower: false,
                         vendorRetryRecord: data.vendorRetryRecord,
                     },
                 );
-            }
-        }
+                break;
+            case 0:
+                logger.error("Transaction condition failed - Retry", logMeta);
+                await DataHandlerUtil.triggerEventToRetryTransactionWithNewVendor(
+                    {
+                        transaction,
+                        transactionEventService,
+                        phone: data.phone,
+                        vendorRetryRecord: data.vendorRetryRecord,
+                    },
+                );
+                break;
+            case 1:
+                logger.info("Transaction condition passed - Complete", logMeta);
+                await transactionEventService.addDataReceivedFromVendorRequeryEvent();
+                await VendorPublisher.publishEventForDataReceivedFromVendor({
+                    phone: data.phone,
+                    transactionId: transaction.id,
+                    user: {
+                        name: transaction.user.name as string,
+                        email: transaction.user.email,
+                        address: transaction.user.address,
+                        phoneNumber: transaction.user.phoneNumber,
+                    },
+                    partner: {
+                        email: transaction.partner.email,
+                    },
+                    bundle: data.bundle,
+                });
 
-        await transactionEventService.addDataTransactionRequery();
-        await VendorPublisher.publishEventForDataReceivedFromVendor({
-            phone: data.phone,
-            transactionId: transaction.id,
-            user: {
-                name: transaction.user.name as string,
-                email: transaction.user.email,
-                address: transaction.user.address,
-                phoneNumber: transaction.user.phoneNumber,
-            },
-            partner: {
-                email: transaction.partner.email,
-            },
-        });
+                break;
+            default:
+                logger.error("Transaction condition were not met", logMeta);
+                await DataHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
+                    {
+                        eventData: {
+                            ...eventMessage,
+                            error: {
+                                ...eventMessage.error,
+                                cause: TransactionErrorCause.UNEXPECTED_ERROR,
+                            },
+                        },
+                        eventService: transactionEventService,
+                        retryCount: 1,
+                        bundle: data.bundle,
+                        superAgent: data.superAgent,
+                        transactionTimedOutFromBuypower: false,
+                        vendorRetryRecord: { retryCount: 1 },
+                    },
+                );
+                break;
+        }
     }
 
     private static async scheduleRequeryTransaction(

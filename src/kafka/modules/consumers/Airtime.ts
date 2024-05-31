@@ -92,10 +92,10 @@ type ProcessVendRequestReturnData<
 > = T extends "BUYPOWERNG"
     ? Awaited<ReturnType<typeof BuypowerApi.Airtime.purchase>>
     : T extends "IRECHARGE"
-    ? Awaited<ReturnType<typeof IRechargeApi.Airtime.purchase>>
-    : T extends "BAXI"
-    ? Awaited<ReturnType<typeof BaxiApi.Airtime.purchase>>
-    : never;
+      ? Awaited<ReturnType<typeof IRechargeApi.Airtime.purchase>>
+      : T extends "BAXI"
+        ? Awaited<ReturnType<typeof BaxiApi.Airtime.purchase>>
+        : never;
 
 const retry = {
     count: 0,
@@ -165,7 +165,6 @@ export class AirtimeHandlerUtil {
             logMeta,
         );
 
-
         await eventService.addGetAirtimeFromVendorRetryEvent(
             _eventMessage.error,
             retryCount,
@@ -185,12 +184,13 @@ export class AirtimeHandlerUtil {
             timeStamp: new Date(),
             retryCount,
             superAgent,
-            waitTime: await getCurrentWaitTimeForRequeryEvent(retryCount, superAgent),
-            vendorRetryRecord: transaction.retryRecord[
-                transaction.retryRecord.length - 1
-            ],
+            waitTime: await getCurrentWaitTimeForRequeryEvent(
+                retryCount,
+                superAgent,
+            ),
+            vendorRetryRecord:
+                transaction.retryRecord[transaction.retryRecord.length - 1],
         };
-
 
         const partner = await transaction.$get("partner");
         if (!partner)
@@ -254,13 +254,13 @@ export class AirtimeHandlerUtil {
         retryRecord =
             retryRecord.length === 0
                 ? [
-                    {
-                        vendor: transaction.superagent,
-                        retryCount: 1,
-                        reference: [transaction.reference],
-                        attempt: 1,
-                    },
-                ]
+                      {
+                          vendor: transaction.superagent,
+                          retryCount: 1,
+                          reference: [transaction.reference],
+                          attempt: 1,
+                      },
+                  ]
                 : retryRecord;
 
         // Make sure to use the same vendor thrice before switching to another vendor
@@ -300,11 +300,11 @@ export class AirtimeHandlerUtil {
         const newVendor = useCurrentVendor
             ? currentVendor.vendor
             : await TokenHandlerUtil.getNextBestVendorForVendRePurchase(
-                transaction.productCodeId,
-                transaction.superagent,
-                transaction.previousVendors,
-                parseFloat(transaction.amount),
-            );
+                  transaction.productCodeId,
+                  transaction.superagent,
+                  transaction.previousVendors,
+                  parseFloat(transaction.amount),
+              );
         if (
             newVendor != currentVendor.vendor ||
             currentVendor.retryCount > retry.retryCountBeforeSwitchingVendor
@@ -341,7 +341,7 @@ export class AirtimeHandlerUtil {
 
         const newTransactionReference =
             retryRecord[retryRecord.length - 1].reference[
-            retryRecord[retryRecord.length - 1].reference.length - 1
+                retryRecord[retryRecord.length - 1].reference.length - 1
             ];
         let accesToken = transaction.irechargeAccessToken;
 
@@ -401,6 +401,7 @@ export class AirtimeHandlerUtil {
                 serviceType: data.serviceProvider,
                 amount: data.amount,
                 email: data.email,
+                transactionId: transaction.id,
                 reference:
                     transaction.superagent === "IRECHARGE"
                         ? transaction.vendorReferenceId
@@ -470,7 +471,7 @@ export class AirtimeHandlerUtil {
         } catch (error) {
             logger.error(
                 "An error occured while requerying from " +
-                transaction.superagent,
+                    transaction.superagent,
                 {
                     meta: {
                         transactionId: transaction.id,
@@ -619,7 +620,7 @@ class AirtimeHandler extends Registry {
                 serviceProvider:
                     transaction.networkProvider as TokenPurchaseData["serviceProvider"],
             });
-            console.log({ tokenInfo })
+            console.log({ tokenInfo });
 
             console.log({
                 point: "Airtime purchase initiated",
@@ -628,12 +629,13 @@ class AirtimeHandler extends Registry {
             logger.info("Vend request processed", logMeta);
             const error = { code: 202, cause: TransactionErrorCause.UNKNOWN };
 
-            // For irecharge airtime access token is gotten after vend, this token will be required to requery transaction later 
-            if (!(tokenInfo instanceof AxiosError) && tokenInfo.source === 'IRECHARGE') {
+            // For irecharge airtime access token is gotten after vend, this token will be required to requery transaction later
+            if (
+                !(tokenInfo instanceof AxiosError) &&
+                tokenInfo.source === "IRECHARGE"
+            ) {
                 // Update the access token in the retry record
-                const vendorRetryRecord = transaction.retryRecord
-                    .slice()
-                    .pop();
+                const vendorRetryRecord = transaction.retryRecord.slice().pop();
 
                 let updatedRetryRecord = transaction.retryRecord;
 
@@ -644,23 +646,23 @@ class AirtimeHandler extends Registry {
                         accessToken: tokenInfo.ref,
                     };
 
-                    updatedRetryRecord = transaction.retryRecord.map((record) => {
-                        if (record.vendor === vendorRetryRecord.vendor) {
-                            return vendorRetryRecord;
-                        }
+                    updatedRetryRecord = transaction.retryRecord.map(
+                        (record) => {
+                            if (record.vendor === vendorRetryRecord.vendor) {
+                                return vendorRetryRecord;
+                            }
 
-                        return record;
-                    });
+                            return record;
+                        },
+                    );
                 } else {
-                    logger.warn("Vendor retry record not found", logMeta)
+                    logger.warn("Vendor retry record not found", logMeta);
                 }
-
 
                 await TransactionService.updateSingleTransaction(
                     transaction.id,
                     {
-                        irechargeAccessToken:
-                            tokenInfo.ref,
+                        irechargeAccessToken: tokenInfo.ref,
                         retryRecord: updatedRetryRecord,
                     },
                 );
@@ -685,7 +687,7 @@ class AirtimeHandler extends Registry {
                             ? tokenInfo.response?.data
                             : tokenInfo,
                     vendType: "PREPAID", // This isn't required for airtime, it won't be used when validating requests
-                    transactionType: transaction.transactionType,
+                    // transactionType: transaction.transactionType,
                     disco: disco,
                     transactionId: transaction.id,
                     isError: tokenInfo instanceof AxiosError,
@@ -772,10 +774,9 @@ class AirtimeHandler extends Registry {
                             retryCount: 1,
                             superAgent: data.superAgent,
                             transactionTimedOutFromBuypower: false,
-                            vendorRetryRecord:
-                                transaction.retryRecord[
-                                transaction.retryRecord.length - 1
-                                ],
+                            vendorRetryRecord: {
+                                retryCount: 1,
+                            },
                         },
                     );
                     break;
@@ -899,7 +900,7 @@ class AirtimeHandler extends Registry {
                             ? requeryResult.response?.data
                             : requeryResult,
                     vendType: "PREPAID",
-                    transactionType: transaction.transactionType,
+                    // transactionType: transaction.transactionType,
                     disco: discoCode,
                     transactionId: transaction.id,
                     isError: requeryResult instanceof AxiosError,
@@ -991,7 +992,7 @@ class AirtimeHandler extends Registry {
                             transactionTimedOutFromBuypower: false,
                             vendorRetryRecord:
                                 transaction.retryRecord[
-                                transaction.retryRecord.length - 1
+                                    transaction.retryRecord.length - 1
                                 ],
                         },
                     );
@@ -1050,8 +1051,7 @@ class AirtimeHandler extends Registry {
                     {
                         meta: {
                             transactionId:
-                                data.scheduledMessagePayload
-                                    .transactionId,
+                                data.scheduledMessagePayload.transactionId,
                             currentMessagePayload: data,
                         },
                     },
@@ -1059,13 +1059,12 @@ class AirtimeHandler extends Registry {
                 return;
             }
 
-            const transactionEventService =
-                new AirtimeTransactionEventService(
-                    existingTransaction,
-                    existingTransaction.superagent,
-                    data.scheduledMessagePayload.phone.phoneNumber,
-                    data.scheduledMessagePayload.superAgent,
-                );
+            const transactionEventService = new AirtimeTransactionEventService(
+                existingTransaction,
+                existingTransaction.superagent,
+                data.scheduledMessagePayload.phone.phoneNumber,
+                data.scheduledMessagePayload.superAgent,
+            );
             await transactionEventService.addGetAirtimeTokenRequestedFromVendorRequeryEvent(
                 {
                     cause: TransactionErrorCause.RESCHEDULED_BEFORE_WAIT_TIME,
@@ -1073,7 +1072,7 @@ class AirtimeHandler extends Registry {
                 },
                 data.scheduledMessagePayload.retryCount + 1,
             );
-           
+
             return await VendorPublisher.publishEventForGetAirtimeRequestedFromVendorRequery(
                 data.scheduledMessagePayload,
             );
@@ -1085,22 +1084,18 @@ class AirtimeHandler extends Registry {
 
         // logger.info("Rescheduling requery for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
         // Else, schedule a new event to requery transaction from vendor
-        return await VendorPublisher.publishEventToScheduleAirtimeRequery(
-            {
-                scheduledMessagePayload: data.scheduledMessagePayload,
-                timeStamp: data.timeStamp,
-                delayInSeconds: data.delayInSeconds,
-                log: 0,
-            },
-        );
-
+        return await VendorPublisher.publishEventToScheduleAirtimeRequery({
+            scheduledMessagePayload: data.scheduledMessagePayload,
+            timeStamp: data.timeStamp,
+            delayInSeconds: data.delayInSeconds,
+            log: 0,
+        });
     }
 
     private static async scheduleRetryTransaction(
         data: PublisherEventAndParameters[TOPICS.SCHEDULE_RETRY_FOR_AIRTIME_TRANSACTION],
     ) {
         // Check the timeStamp, and the delayInSeconds
-
 
         const { timeStamp, delayInSeconds } = data;
 
@@ -1130,53 +1125,42 @@ class AirtimeHandler extends Registry {
                 throw new CustomError("Transaction not found");
             }
 
-            const transactionEventService =
-                new AirtimeTransactionEventService(
-                    existingTransaction,
-                    existingTransaction.superagent,
-                    data.scheduledMessagePayload.partner.email,
-                    data.scheduledMessagePayload.phone.phoneNumber,
-                );
+            const transactionEventService = new AirtimeTransactionEventService(
+                existingTransaction,
+                existingTransaction.superagent,
+                data.scheduledMessagePayload.partner.email,
+                data.scheduledMessagePayload.phone.phoneNumber,
+            );
 
             await TransactionService.updateSingleTransaction(
                 data.scheduledMessagePayload.transactionId,
                 {
                     superagent: data.scheduledMessagePayload.newVendor,
-                    retryRecord:
-                        data.scheduledMessagePayload.retryRecord,
+                    retryRecord: data.scheduledMessagePayload.retryRecord,
                     vendorReferenceId:
-                        data.scheduledMessagePayload
-                            .newTransactionReference,
+                        data.scheduledMessagePayload.newTransactionReference,
                     reference:
-                        data.scheduledMessagePayload
-                            .newTransactionReference,
+                        data.scheduledMessagePayload.newTransactionReference,
                     irechargeAccessToken:
-                        data.scheduledMessagePayload
-                            .irechargeAccessToken,
+                        data.scheduledMessagePayload.irechargeAccessToken,
                     previousVendors:
                         data.scheduledMessagePayload.previousVendors,
                 },
             );
 
-            await VendorPublisher.publishEventForAirtimePurchaseRetryFromVendorWithNewVendor(
-                data.scheduledMessagePayload,
-            );
-            return await VendorPublisher.publshEventForAirtimePurchaseInitiate(
+            return  await VendorPublisher.publishEventForAirtimePurchaseRetryFromVendorWithNewVendor(
                 data.scheduledMessagePayload,
             );
         }
 
         // logger.info("Rescheduling retry for transaction", { meta: { transactionId: data.scheduledMessagePayload.transactionId } })
         // Else, schedule a new event to requery transaction from vendor
-        return await VendorPublisher.publishEventToScheduleAirtimeRetry(
-            {
-                scheduledMessagePayload: data.scheduledMessagePayload,
-                timeStamp: data.timeStamp,
-                delayInSeconds: data.delayInSeconds,
-                log: 0,
-            },
-        );
-
+        return await VendorPublisher.publishEventToScheduleAirtimeRetry({
+            scheduledMessagePayload: data.scheduledMessagePayload,
+            timeStamp: data.timeStamp,
+            delayInSeconds: data.delayInSeconds,
+            log: 0,
+        });
     }
 
     static registry = {

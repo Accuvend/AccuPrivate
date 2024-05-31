@@ -147,5 +147,19 @@ export class SmsService {
             Date: ${transaction.transactionTimestamp}
         `;
     };
-}
 
+    static dataBundleTemplate = async (
+        transaction: Transaction,
+        bundleName: string,
+    ) => {
+        return `
+            Payment successful for ${transaction.transactionType}
+
+            Transaction amount: ${transaction.amount}
+
+            Date: ${transaction.transactionTimestamp}
+
+            Bundle: ${bundleName}
+        `;
+    };
+}

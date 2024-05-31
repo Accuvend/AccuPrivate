@@ -340,6 +340,7 @@ export interface PublisherEventAndParameters
         log?: 1 | 0;
         phone: { phoneNumber: string; amount: number };
         user: User;
+        bundle: IBundle;
         partner: Partner;
         transactionId: string;
     };
@@ -350,6 +351,7 @@ export interface PublisherEventAndParameters
             amount: number;
         };
         transactionId: string;
+        bundle: IBundle;
         timeStamp: Date;
         error: { code: number; cause: TransactionErrorCause };
         retryCount: number;

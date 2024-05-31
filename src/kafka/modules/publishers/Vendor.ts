@@ -656,6 +656,7 @@ export class VendorPublisher extends ProducerFactory {
                 phone: data.phone,
                 transactionId: data.transactionId,
                 partner: data.partner,
+                bundle: data.bundle,
                 user: data.user,
             },
         });

@@ -82,6 +82,9 @@ module.exports = {
                 "SCHEDULE_RETRY_FOR_TRANSACTION",
                 "SCHEDULE_REQUERY_FOR_TRANSACTION_INITIATED",
                 "SCHEDULE_RETRY_FOR_AIRTIME_TRANSACTION",
+                "GET_DATA_FROM_VENDOR_REQUERY",
+                "SCHEDULE_REQUERY_FOR_DATA_TRANSACTION",
+                "SCHEDULE_RETRY_FOR_DATA_TRANSACTION",
             ),
             allowNull: false,
         });
@@ -98,6 +101,7 @@ module.exports = {
             'DROP TYPE "enum_Events_eventType";',
         );
         // List all enum values except the new ones for down migration if necessary
+
         await queryInterface.changeColumn("Events", "eventType", {
             type: Sequelize.ENUM(
                 "METER_VALIDATION_FAILED",
@@ -171,6 +175,9 @@ module.exports = {
                 "SCHEDULE_RETRY_FOR_TRANSACTION",
                 "SCHEDULE_REQUERY_FOR_TRANSACTION_INITIATED",
                 "SCHEDULE_RETRY_FOR_AIRTIME_TRANSACTION",
+                "GET_DATA_FROM_VENDOR_REQUERY",
+                "SCHEDULE_REQUERY_FOR_DATA_TRANSACTION",
+                "SCHEDULE_RETRY_FOR_DATA_TRANSACTION",
             ),
             allowNull: false,
         });

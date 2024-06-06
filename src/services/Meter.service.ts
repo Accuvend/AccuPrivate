@@ -47,11 +47,24 @@ export default class MeterService {
         return meter;
     }
 
+    static async viewSingleMeterByMeterNumberDisco({
+        meterNumber,
+        disco,
+    }: {
+        meterNumber: string,
+        disco: string,
+    }): Promise<Meter | null> {
+        const meter: Meter | null = await Meter.findOne({
+            where: { meterNumber, disco },
+        });
+        return meter;
+    }
+
     static async viewMetersWithCustomQuery(query: any): Promise<Meter[]> {
         const meters: Meter[] = await Meter.findAll(query);
         return meters;
     }
 
-    static async updateSingleMeter() {}
+    static async updateSingleMeter() { }
 }
 

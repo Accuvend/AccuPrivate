@@ -713,14 +713,14 @@ export default class VendorController {
 
                 // // TODO: Publish event for disco up to kafka
                 const existingMeter =
-                    await MeterService.viewSingleMeterByMeterNumber(
-                        meterNumber,
-                    );
+                    await MeterService.viewSingleMeterByMeterNumberDisco({
+                        meterNumber, disco
+                    });
                 const userHasUsedMeterBefore = existingMeter
                     ? await UserMeterService.findByUserAndMeterId({
-                          userId: user.id,
-                          meterId: existingMeter.id,
-                      })
+                        userId: user.id,
+                        meterId: existingMeter.id,
+                    })
                     : false;
 
                 if (userHasUsedMeterBefore && !existingMeter) {

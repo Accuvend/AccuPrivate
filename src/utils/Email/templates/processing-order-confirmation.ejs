@@ -63,7 +63,7 @@ const originalAmount = transaction.amount;
 const percentageToRemove = 1.5;
 const amountNow = transaction.amount * (percentageToRemove / 100);
 
-const parsedReceiptUrl = receiptUrl + '/' + transaction.id;
+const parsedReceiptUrl = orderConfirmationUrl + '/' + transaction.id;
 
 const newAmount = originalAmount + 100 + amountNow;
 
@@ -95,6 +95,14 @@ const formattedDate = transactionDate.toLocaleDateString('en-UK', {
             </div>
         </td>
     </tr>
+    <tr>
+        <td style="height:40px; width: 100%; padding-bottom: 10px;">&nbsp;
+            <div style="text-align:center;">
+                <p>Your transaction has been accepted and is currently in progress. Please exercise patience while we process your transaction </p>    
+            </div>
+        </td>
+    </tr>
+
     <tr>
         <td style=" width:100%">
                         <div style="border: 1px  solid #ebebeb;  width: 85%; margin: 0 auto; border-radius: 5%;">
@@ -152,14 +160,12 @@ const formattedDate = transactionDate.toLocaleDateString('en-UK', {
                 </div>
             </div>
             <hr style="margin-top:25px; width:90%; border:1px solid #ebebeb ">
-
-            <hr style="margin-top:25px; width:90%; border:1px solid #ebebeb ">
                 <div style="padding-top: 5px;  font-size: small;">
                     <div>
                         <span style="float: left; padding-left: 5%;">Status</span>
                     </div>
                     <div>
-                        <span style="float:right;   border: 1px  solid #ebebeb; color: #3ebd64;  background:#ccffe5;  margin-right: 15px; padding-left: 5px; padding-right: 5px; ">COMPLETE</span>
+                        <span style="float:right;   border: 1px  solid #ebebeb; color: #3ebd64;  background:#fff9c4;  margin-right: 15px; padding-left: 5px; padding-right: 5px; ">PROCESSING</span>
                     </div>
                 </div>
                 <hr style="margin-top:25px; width:90%; border:1px solid #ebebeb ">
@@ -293,10 +299,10 @@ const formattedDate = transactionDate.toLocaleDateString('en-UK', {
             
             <div style="padding-top: 5px; font-size: small; ">
                 <div>
-                    <span style="float: left; padding-left: 5%;  ">Link to receipt</span>
+                    <span style="float: left; padding-left: 5%;  ">Order confirmation link</span>
                 </div>
                 <div>
-                    <a href=<%= parsedReceiptUrl %>  style="float:right; padding-right: 5%; "> Your Receipt</a>
+                    <a href=<%= parsedReceiptUrl %>  style="float:right; padding-right: 5%; "> Confirmation URL</a>
                 </div>
             </div>
            

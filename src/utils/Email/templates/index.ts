@@ -1,6 +1,10 @@
 import ejs from "ejs";
 import fs from "fs";
-import { ACCUVEND_RECEIPT_BASE_URL, LOGO_URL } from "../../Constants";
+import {
+    ACCUVEND_ORDER_CONFIRMATION_BASE_URL,
+    ACCUVEND_RECEIPT_BASE_URL,
+    LOGO_URL,
+} from "../../Constants";
 import { IReceiptEmailTemplateProps } from "../../Interface";
 import Transaction from "../../../models/Transaction.model";
 import { randomUUID } from "crypto";
@@ -59,7 +63,7 @@ class EmailTemplate {
                     meterNumber,
                     address,
                     name,
-                    receiptUrl: ACCUVEND_RECEIPT_BASE_URL,
+                    orderConfirmationUrl: ACCUVEND_ORDER_CONFIRMATION_BASE_URL,
                 },
             ),
         );

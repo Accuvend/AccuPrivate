@@ -1,7 +1,16 @@
 // Import necessary modules and dependencies
-import { Table, Column, Model, DataType, IsUUID, PrimaryKey, HasMany } from "sequelize-typescript";
-import Meter  from "./Meter.model";
-import Transaction  from "./Transaction.model";
+import {
+    Table,
+    Column,
+    Model,
+    DataType,
+    IsUUID,
+    PrimaryKey,
+    HasMany,
+} from "sequelize-typescript";
+import Meter from "./Meter.model";
+import Transaction from "./Transaction.model";
+import UserMeter from "./UserMeter.model";
 
 // Define a table for the User model
 @Table
@@ -35,21 +44,23 @@ export default class User extends Model<User | IUser> {
     // Establish a "HasMany" relationship with the Transaction model, indicating that a user can have multiple transactions
     @HasMany(() => Transaction)
     transactions: Transaction[];
-}
 
+    @HasMany(() => UserMeter)
+    userMeters: UserMeter[];
+}
 
 // Define an interface for a User
 export interface IUser {
-    id: string;             // A unique identifier for the user
-    address?: string;        // The user's address
-    email: string;          // The user's email address
-    name?: string;           // The user's name
-    phoneNumber: string;   // The user's phone number
+    id: string; // A unique identifier for the user
+    address?: string; // The user's address
+    email: string; // The user's email address
+    name?: string; // The user's name
+    phoneNumber: string; // The user's phone number
 }
 
 // Define an interface for creating a new User by extending the IUser interface
 export interface ICreateUser extends IUser {
-    // No additional properties are required for creating a user, 
+    // No additional properties are required for creating a user,
     // so ICreateUser inherits the properties from IUser.
 }
 

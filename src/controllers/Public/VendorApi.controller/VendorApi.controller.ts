@@ -60,6 +60,12 @@ import { TokenUtil } from "../../../utils/Auth/Token";
 import VendorModelService from "../../../services/Vendor.service";
 import { AxiosError } from "axios";
 import PowerUnitService from "../../../services/PowerUnit.service";
+import { PartnerProfile } from "../../../models/Entity/Profiles";
+import UserMeterService from "../../../services/UserMeter.service";
+import UserMeter from "../../../models/UserMeter.model";
+import { Database } from "../../../models";
+import sequelize from "sequelize";
+import { throws } from "assert";
 
 enum MessageType {
     INFORMATION = "INFORMATION",
@@ -618,7 +624,7 @@ export default class VendorController {
                     transaction,
                 });
                 const userInfo = {
-                    name: (response as any).name,
+                    name: "",
                     email: email,
                     address: (response as any).address,
                     phoneNumber: phoneNumber,
@@ -706,14 +712,53 @@ export default class VendorController {
                 });
 
                 // // TODO: Publish event for disco up to kafka
-                const meter: Meter = await MeterService.addMeter({
-                    id: uuidv4(),
-                    address: (response as any).address,
-                    meterNumber: meterNumber,
-                    userId: user.id,
-                    disco: disco,
-                    vendType,
-                });
+                const existingMeter =
+                    await MeterService.viewSingleMeterByMeterNumber(
+                        meterNumber,
+                    );
+                const userHasUsedMeterBefore = existingMeter
+                    ? await UserMeterService.findByUserAndMeterId({
+                          userId: user.id,
+                          meterId: existingMeter.id,
+                      })
+                    : false;
+
+                if (userHasUsedMeterBefore && !existingMeter) {
+                    throw new InternalServerError("Meter not found", {
+                        userId: user.id,
+                        meterNumber,
+                    });
+                }
+
+                let meter: Meter;
+                const sequelizeTransaction = await Database.transaction();
+                try {
+                    meter =
+                        existingMeter ??
+                        (await MeterService.addMeter(
+                            {
+                                id: uuidv4(),
+                                address: (response as any).address,
+                                meterNumber: meterNumber,
+                                userId: user.id,
+                                ownersName: response.name,
+                                disco: disco,
+                                vendType,
+                            },
+                            sequelizeTransaction,
+                        ));
+
+                    !userHasUsedMeterBefore &&
+                        (await UserMeterService.create({
+                            id: uuidv4(),
+                            userId: user.id,
+                            meterId: meter.id,
+                        }, sequelizeTransaction));
+                    await sequelizeTransaction.commit();
+                } catch (error) {
+                    await sequelizeTransaction.rollback();
+                    throw error;
+                }
 
                 logger.info("Meter validation info", {
                     meta: {

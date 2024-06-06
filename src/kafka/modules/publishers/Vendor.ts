@@ -362,6 +362,7 @@ export class VendorPublisher extends ProducerFactory {
                     vendType: data.meter.vendType,
                     id: data.meter.id,
                 },
+                requeryCount: data.requeryCount,
                 error: data.error,
                 transactionId: data.transactionId,
                 timeStamp: data.timeStamp,
@@ -474,7 +475,7 @@ export class VendorPublisher extends ProducerFactory {
                     vendType: data.meter.vendType,
                     id: data.meter.id,
                     token: data.meter.token,
-                },
+            },
                 user: {
                     name: data.user.name,
                     email: data.user.email,

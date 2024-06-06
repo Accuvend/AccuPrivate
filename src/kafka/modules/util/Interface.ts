@@ -177,6 +177,7 @@ export interface PublisherEventAndParameters
         retryCount: number;
         superAgent: Transaction["superagent"];
         waitTime: number;
+        requeryCount: number;
         vendorRetryRecord: VendorRetryRecord;
     };
     [TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_INITIATED]: {

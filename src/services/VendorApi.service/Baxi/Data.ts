@@ -72,6 +72,7 @@ export default class BaxiDataApi extends BaxiApiBaseConfig {
                 meta: {
                     requestData: requestPayload,
                     responseData: response.data,
+                    ...logMeta,
                 },
             });
             return {

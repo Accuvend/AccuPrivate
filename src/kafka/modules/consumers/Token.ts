@@ -166,6 +166,7 @@ export class TokenHandlerUtil {
         manual = false,
         vendorRetryRecord,
         superAgent,
+        requeryCount,
     }: TriggerRequeryTransactionTokenProps) {
         const _eventMessage = {
             ...eventData,

@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 import TransactionService from "../../../services/Transaction.service";
 import Transaction, {
+    ITransaction,
     PaymentType,
     Status,
     TransactionType,
@@ -39,7 +40,6 @@ import {
     generateRandonNumbers,
 } from "../../../utils/Helper";
 import logger, { Logger } from "../../../utils/Logger";
-import ResponseTrimmer from "../../../utils/ResponseTrimmer";
 import BundleService from "../../../services/Bundle.service";
 import { IBundle } from "../../../models/Bundle.model";
 import { VendorControllerValdator } from "./VendorApi.controller";
@@ -110,125 +110,6 @@ class AirtimeValidator {
 }
 
 export class AirtimeVendController {
-    static async validateAirtimeRequest(
-        req: Request,
-        res: Response,
-        next: NextFunction,
-    ) {
-        const { phoneNumber, amount, email, networkProvider, channel } =
-            req.body;
-        let disco = networkProvider;
-
-        const existingProductCodeForDisco =
-            await ProductService.viewProductCodeByProductName(disco);
-        if (!existingProductCodeForDisco) {
-            throw new NotFoundError("Product code not found for disco");
-        }
-
-        disco = existingProductCodeForDisco.masterProductCode;
-
-        // TODO: Add request type for request authenticated by API keys
-        const partnerId = (req as any).key;
-
-        // TODO: I'm using this for now to allow the schema validation since product code hasn't been created for airtime
-        if (existingProductCodeForDisco.category.toUpperCase() !== "AIRTIME") {
-            throw new BadRequestError("Invalid product code for airtime");
-        }
-
-        const reference = generateRandomString(10);
-
-        const superAgent = await TokenHandlerUtil.getBestVendorForPurchase(
-            existingProductCodeForDisco.id,
-            1000,
-        );
-        const transaction: Transaction =
-            await TransactionService.addTransactionWithoutValidatingUserRelationship(
-                {
-                    id: uuidv4(),
-                    amount: amount,
-                    status: Status.PENDING,
-                    disco: disco,
-                    superagent: superAgent,
-                    paymentType: PaymentType.PAYMENT,
-                    transactionTimestamp: new Date(),
-                    partnerId: partnerId,
-                    reference,
-                    networkProvider: networkProvider,
-                    productType: existingProductCodeForDisco.category,
-                    vendorReferenceId:
-                        superAgent.toUpperCase() === "IRECHARGE"
-                            ? generateRandonNumbers(10)
-                            : reference,
-                    transactionType: TransactionType.AIRTIME,
-                    productCodeId: existingProductCodeForDisco.id,
-                    previousVendors: [superAgent],
-                    retryRecord: [],
-                    channel,
-                },
-            );
-
-        const transactionEventService = new AirtimeTransactionEventService(
-            transaction,
-            superAgent,
-            partnerId,
-            phoneNumber,
-        );
-        await transactionEventService.addPhoneNumberValidationRequestedEvent();
-
-        await AirtimeValidator.validateAirtimeRequest({
-            phoneNumber,
-            amount,
-            disco,
-        });
-        await transactionEventService.addPhoneNumberValidationRequestedEvent();
-
-        const userInfo = {
-            id: uuidv4(),
-            phoneNumber: phoneNumber,
-            amount: amount,
-            email: email,
-        };
-        await transactionEventService.addCRMUserInitiatedEvent({
-            user: userInfo,
-        });
-        CRMPublisher.publishEventForInitiatedUser({
-            user: userInfo,
-            transactionId: transaction.id,
-        });
-
-        const sequelizeTransaction = await Database.transaction();
-        try {
-            const user = await UserService.addUserIfNotExists(
-                {
-                    id: userInfo.id,
-                    email: email,
-                    phoneNumber: phoneNumber,
-                },
-                sequelizeTransaction,
-            );
-            console.log("pre update");
-            await transaction.update(
-                { userId: user.id },
-                { transaction: sequelizeTransaction },
-            );
-            console.log("post update");
-            await sequelizeTransaction.commit();
-        } catch (error) {
-            await sequelizeTransaction.rollback();
-            throw error;
-        }
-
-        res.status(200).json({
-            message: "Request validated successfully",
-            data: {
-                transaction: {
-                    transactionId: transaction.id,
-                    status: transaction.status,
-                },
-            },
-        });
-    }
-
     static async seedDataToDb(req: Request, res: Response, next: NextFunction) {
         console.log("Start seeding data to the database...");
 
@@ -553,10 +434,10 @@ export class AirtimeVendController {
                 const _validity = days
                     ? days[1]
                     : months
-                      ? months[1]
-                      : years
-                        ? years[1]
-                        : 0;
+                        ? months[1]
+                        : years
+                            ? years[1]
+                            : 0;
                 const validity = `${_validity} ${days ? "days" : months ? "months" : years ? "years" : "days"}`;
 
                 const bundleData = {
@@ -623,17 +504,116 @@ export class AirtimeVendController {
         res: Response,
         next: NextFunction,
     ) {
-        const { transactionId, bankRefId, bankComment } = req.query as Record<
+        const { phoneNumber, amount, email, networkProvider, channel } =
+            req.query as Record<string, string>;
+        let disco = networkProvider;
+
+        const existingProductCodeForDisco =
+            await ProductService.viewProductCodeByProductName(disco);
+        if (!existingProductCodeForDisco) {
+            throw new NotFoundError("Product code not found for disco");
+        }
+
+        disco = existingProductCodeForDisco.masterProductCode;
+
+        // TODO: Add request type for request authenticated by API keys
+        const partnerId = (req as any).key;
+
+        // TODO: I'm using this for now to allow the schema validation since product code hasn't been created for airtime
+        if (existingProductCodeForDisco.category.toUpperCase() !== "AIRTIME") {
+            throw new BadRequestError("Invalid product code for airtime");
+        }
+
+        const reference = generateRandomString(10);
+
+        const superAgent = await TokenHandlerUtil.getBestVendorForPurchase(
+            existingProductCodeForDisco.id,
+            1000,
+        );
+        const transaction: Transaction =
+            await TransactionService.addTransactionWithoutValidatingUserRelationship(
+                {
+                    id: uuidv4(),
+                    amount: amount,
+                    status: Status.PENDING,
+                    disco: disco,
+                    superagent: superAgent,
+                    paymentType: PaymentType.PAYMENT,
+                    transactionTimestamp: new Date(),
+                    partnerId: partnerId,
+                    reference,
+                    networkProvider: networkProvider,
+                    productType: existingProductCodeForDisco.category,
+                    vendorReferenceId:
+                        superAgent.toUpperCase() === "IRECHARGE"
+                            ? generateRandonNumbers(10)
+                            : reference,
+                    transactionType: TransactionType.AIRTIME,
+                    productCodeId: existingProductCodeForDisco.id,
+                    previousVendors: [superAgent],
+                    retryRecord: [],
+                    channel: channel as ITransaction['channel'],
+                },
+            );
+
+        const transactionEventService = new AirtimeTransactionEventService(
+            transaction,
+            superAgent,
+            partnerId,
+            phoneNumber,
+        );
+        await transactionEventService.addPhoneNumberValidationRequestedEvent();
+
+        await AirtimeValidator.validateAirtimeRequest({
+            phoneNumber,
+            amount,
+            disco,
+        });
+        await transactionEventService.addPhoneNumberValidationRequestedEvent();
+
+        const userInfo = {
+            id: uuidv4(),
+            phoneNumber: phoneNumber,
+            amount: amount,
+            email: email,
+        };
+        await transactionEventService.addCRMUserInitiatedEvent({
+            user: userInfo,
+        });
+        CRMPublisher.publishEventForInitiatedUser({
+            user: userInfo,
+            transactionId: transaction.id,
+        });
+
+        const sequelizeTransaction = await Database.transaction();
+        try {
+            const user = await UserService.addUserIfNotExists(
+                {
+                    id: userInfo.id,
+                    email: email,
+                    phoneNumber: phoneNumber,
+                },
+                sequelizeTransaction,
+            );
+            console.log("pre update");
+            await transaction.update(
+                { userId: user.id },
+                { transaction: sequelizeTransaction },
+            );
+            console.log("post update");
+            await sequelizeTransaction.commit();
+        } catch (error) {
+            await sequelizeTransaction.rollback();
+            throw error;
+        }
+
+
+        const { bankRefId, bankComment } = req.query as Record<
             string,
             string
         >;
 
-        const transaction: Transaction | null =
-            await TransactionService.viewSingleTransaction(transactionId);
-        if (!transaction) {
-            throw new NotFoundError("Transaction not found");
-        }
-
+        const transactionId = transaction.id
         const user = await transaction.$get("user");
         if (!user) {
             throw new InternalServerError(
@@ -680,12 +660,6 @@ export class AirtimeVendController {
             throw new BadRequestError("Duplicate reference");
         }
 
-        const transactionEventService = new AirtimeTransactionEventService(
-            transaction,
-            transaction.superagent,
-            transaction.partnerId,
-            user.phoneNumber,
-        );
         await transactionEventService.addAirtimePurchaseInitiatedEvent({
             amount: transaction.amount,
         });
@@ -728,7 +702,8 @@ export class AirtimeVendController {
                 retryCount: 1,
             },
             partner: partnerEntity,
-            user: user,
+            user
+            // user: user,
         });
 
         const responseData = {

@@ -120,6 +120,7 @@ export default class BuypowerDataApi extends BuyPowerApi {
                 meta: {
                     requestData: requestPayload,
                     responseData: response.data,
+                    ...logMeta,
                 },
             });
             return {

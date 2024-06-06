@@ -92,13 +92,15 @@ class DataValidator {
 }
 
 export class DataVendController {
-    static async validateDataRequest(
-        req: Request,
-        res: Response,
-        next: NextFunction,
-    ) {
-        console.log({ VENDOR_URL: VENDOR_URL });
-        const { phoneNumber, email, bundleCode, channel } = req.body;
+    static async requestData(req: Request, res: Response, next: NextFunction) {
+        const {
+            bankRefId,
+            bankComment,
+            phoneNumber,
+            email,
+            bundleCode,
+            channel,
+        } = req.query as Record<string, string>;
         // TODO: Add request type for request authenticated by API keys
         const partnerId = (req as any).key;
 
@@ -129,6 +131,8 @@ export class DataVendController {
             dataBundle.bundleAmount,
         );
 
+        console.log({ vendors: dataBundle.vendors });
+
         const transactionId = uuidv4();
         const transaction: Transaction =
             await TransactionService.addTransactionWithoutValidatingUserRelationship(
@@ -150,7 +154,7 @@ export class DataVendController {
                     productType: "DATA",
                     vendorReferenceId: await generateVendorReference(),
                     retryRecord: [],
-                    channel,
+                    channel: channel as Transaction["channel"],
                 },
             );
 
@@ -205,30 +209,7 @@ export class DataVendController {
             throw error;
         }
 
-        res.status(200).json({
-            message: "Request validated successfully",
-            data: {
-                transaction: {
-                    transactionId: transaction.id,
-                    status: transaction.status,
-                },
-            },
-        });
-    }
-
-    static async requestData(req: Request, res: Response, next: NextFunction) {
-        const { transactionId, bankRefId, bankComment } = req.query as Record<
-            string,
-            string
-        >;
         console.log("data ");
-
-        const transaction: Transaction | null =
-            await TransactionService.viewSingleTransaction(transactionId);
-        if (!transaction) {
-            throw new NotFoundError("Transaction not found");
-        }
-
         const user = await transaction.$get("user");
         if (!user) {
             throw new InternalServerError(
@@ -248,45 +229,25 @@ export class DataVendController {
             throw new BadRequestError("Transaction already completed");
         }
 
-        // Check if reference has been used before
-        const existingTransaction: Transaction | null =
-            await TransactionService.viewSingleTransactionByBankRefID(
-                bankRefId,
-            );
-        if (existingTransaction) {
-            throw new BadRequestError("Duplicate reference");
-        }
-
-        if (transaction.status === (Status.COMPLETE as any)) {
-            throw new BadRequestError("Transaction already completed");
-        }
-
-        const bundle = await transaction.$get("bundle");
-        if (!bundle) {
-            throw new InternalServerError(
-                "Bundle record not found for already validated request",
-            );
-        }
-
-        const transactionEventService = new DataTransactionEventService(
-            transaction,
-            transaction.superagent,
-            transaction.partnerId,
-            user.phoneNumber,
-        );
-        await transactionEventService.addDataPurchaseInitiatedEvent({
-            amount: transaction.amount,
-        });
-
         await TransactionService.updateSingleTransaction(transactionId, {
             status: Status.INPROGRESS,
             bankRefId: bankRefId,
             bankComment: bankComment,
+        }).catch((e) => {
+            if (e.name === "SequelizeUniqueConstraintError") {
+                // Check if the key is the bankRefId
+                if (e.errors[0].message.includes("bankRefId")) {
+                    throw new BadRequestError(
+                        "BankRefId should be a unique id",
+                    );
+                }
+            }
+
+            throw e;
         });
 
         console.log({
             transaction: transaction.dataValues,
-            existingTransaction: existingTransaction,
         });
         if (!transaction.bundleId) {
             throw new BadRequestError("Bundle code is required");
@@ -298,10 +259,10 @@ export class DataVendController {
                 phoneNumber: user.phoneNumber,
                 amount: parseFloat(transaction.amount),
             },
-            bundle: bundle,
             superAgent: transaction.superagent,
             partner: partner,
             user: user,
+            bundle: dataBundle.dataValues,
             vendorRetryRecord: {
                 retryCount: 1,
             },

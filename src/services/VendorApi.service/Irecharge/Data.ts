@@ -73,6 +73,7 @@ export class IRechargeDataApi extends IRechargeBaseConfig {
                 meta: {
                     requestData: params,
                     responseData: response.data,
+                    ...logMeta,
                 },
             });
             console.log({ params, response: response.data });

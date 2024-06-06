@@ -772,6 +772,7 @@ export class TokenHandlerUtil {
             }),
         );
 
+        console.log({ vendorProducts})
         // Check other vendors, sort them according to their commission rates
         // If the current vendor is the vendor with the highest commission rate, then switch to the vendor with the next highest commission rate
         // If the next vendor has been used before, switch to the next vendor with the next highest commission rate

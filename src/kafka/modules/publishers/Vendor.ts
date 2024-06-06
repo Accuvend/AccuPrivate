@@ -700,6 +700,7 @@ export class VendorPublisher extends ProducerFactory {
                 log: data.log,
                 phone: data.phone,
                 error: data.error,
+                bundle: data.bundle,
                 transactionId: data.transactionId,
                 timeStamp: data.timeStamp,
                 retryCount: data.retryCount,
@@ -718,6 +719,8 @@ export class VendorPublisher extends ProducerFactory {
             message: {
                 log: data.log,
                 phone: data.phone,
+                vendorRetryRecord: data.vendorRetryRecord,
+                bundle: data.bundle,
                 transactionId: data.transactionId,
                 superAgent: data.superAgent,
                 newVendor: data.newVendor,

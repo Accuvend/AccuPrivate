@@ -21,7 +21,7 @@ import { v4 as uuidv4 } from "uuid";
 import ProductService from "../../../services/Product.service";
 import { SmsService } from "../../../utils/Sms";
 import { VendorPublisher } from "../publishers/Vendor";
-import Event from "../../../models/Event.model";
+import Event, { Status } from "../../../models/Event.model";
 import PowerUnit from "../../../models/PowerUnit.model";
 import { AxiosError } from "axios";
 
@@ -272,16 +272,18 @@ class NotificationHandler extends Registry {
                 transaction: transaction,
                 phoneNumber: data.phone.phoneNumber,
             }),
-        });
-
-        const msgTemplate = await SmsService.airtimeTemplate(transaction);
-        await SmsService.sendSms(data.phone.phoneNumber, msgTemplate).catch(
-            (error: AxiosError) => {
-                console.log(error.response?.data);
-                logger.error("Error sending sms", error);
-            },
+        }).then(
+            async () =>
+                await transactionEventService.addAirtimeSentToUserEmail(),
         );
-        await transactionEventService.addAirtimeSentToUserEmail();
+
+        // const msgTemplate = await SmsService.airtimeTemplate(transaction);
+        // await SmsService.sendSms(data.phone.phoneNumber, msgTemplate).catch(
+        //     (error: AxiosError) => {
+        //         console.log(error.response?.data);
+        //         logger.error("Error sending sms", error);
+        //     },
+        // );
 
         return;
     }

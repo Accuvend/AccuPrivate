@@ -53,6 +53,7 @@ import {
     ResponseValidationUtil,
     TokenHandlerUtil,
     getCurrentWaitTimeForRequeryEvent,
+    getCurrentWaitTimeForSwitchEvent,
 } from "./Token";
 import { parse } from "path";
 import { timeStamp } from "console";
@@ -199,11 +200,13 @@ export class DataHandlerUtil {
         transaction,
         transactionEventService,
         phone,
+        bundle,
         vendorRetryRecord,
     }: {
         transaction: Transaction;
         transactionEventService: DataTransactionEventService;
         phone: { phoneNumber: string; amount: number };
+        bundle: IBundle;
         vendorRetryRecord: VendorRetryRecord;
     }) {
         console.log({ vendorRetryRecord });
@@ -368,6 +371,10 @@ export class DataHandlerUtil {
                     email: user.email,
                     address: user.address,
                     phoneNumber: user.phoneNumber,
+                },
+                bundle,
+                vendorRetryRecord: {
+                    retryCount: currentVendor.retryCount,
                 },
                 newVendor,
                 phone: phone,
@@ -825,6 +832,7 @@ class TokenHandler extends Registry {
                             transaction,
                             transactionEventService,
                             phone: data.phone,
+                            bundle: data.bundle,
                             vendorRetryRecord: data.vendorRetryRecord,
                         },
                     );
@@ -1060,6 +1068,7 @@ class TokenHandler extends Registry {
                 await DataHandlerUtil.triggerEventToRetryTransactionWithNewVendor(
                     {
                         transaction,
+                        bundle: data.bundle,
                         transactionEventService,
                         phone: data.phone,
                         vendorRetryRecord: data.vendorRetryRecord,

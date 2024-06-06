@@ -27,9 +27,9 @@ router
         AirtimeVendController.validateAirtimeRequest,
     )
     .get("/airtime", validateApiKey, AirtimeVendController.requestAirtime)
-    .get("/seed", AirtimeVendController.seedDataToDb)
-    .get("/seed/data", AirtimeVendController.seedDataBundlesToDb)
-
+    // .get("/seed", AirtimeVendController.seedDataToDb)
+    // .get("/seed/data", AirtimeVendController.seedDataBundlesToDb)
+    //
     .post(
         "/validate/data/phone",
         validateApiKey,
@@ -71,4 +71,3 @@ router
     );
 
 export default router;
-

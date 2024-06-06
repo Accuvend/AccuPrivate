@@ -749,11 +749,14 @@ export default class VendorController {
                         ));
 
                     !userHasUsedMeterBefore &&
-                        (await UserMeterService.create({
-                            id: uuidv4(),
-                            userId: user.id,
-                            meterId: meter.id,
-                        }, sequelizeTransaction));
+                        (await UserMeterService.create(
+                            {
+                                id: uuidv4(),
+                                userId: user.id,
+                                meterId: meter.id,
+                            },
+                            sequelizeTransaction,
+                        ));
                     await sequelizeTransaction.commit();
                 } catch (error) {
                     await sequelizeTransaction.rollback();
@@ -1604,6 +1607,7 @@ export default class VendorController {
                         },
                         eventService: transactionEventService,
                         retryCount: 1,
+                        requeryCount: 1,
                         superAgent: lastSuperAgentUsed,
                         tokenInResponse: null,
                         transactionTimedOutFromBuypower: false,
@@ -1725,6 +1729,7 @@ export default class VendorController {
                                 cause: TransactionErrorCause.UNEXPECTED_ERROR,
                             },
                         },
+                        requeryCount: 1,
                         eventService: transactionEventService,
                         retryCount: 1,
                         superAgent: lastSuperAgentUsed,
@@ -1745,6 +1750,7 @@ export default class VendorController {
                                 cause: TransactionErrorCause.NO_TOKEN_IN_RESPONSE,
                             },
                         },
+                        requeryCount: 1,
                         eventService: transactionEventService,
                         retryCount: 1,
                         superAgent: lastSuperAgentUsed,

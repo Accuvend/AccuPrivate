@@ -1,0 +1,336 @@
+<html>
+
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accuvend Processing Order </title>
+
+    <style>
+        @font-face {
+            font-family: 'newfont';
+            src: url('https://ui-fonts-bucket.s3.eu-west-2.amazonaws.com/PayPalSansBigRegular.ttf');
+
+        }
+       
+
+        html {
+            font-family: 'newfont';
+            
+        }
+         /* Media query for mobile */
+          @media only screen and (max-width: 600px) {
+            html {
+                width: 100%;
+            }
+            div{
+                font-size: 8px;
+              
+            }
+        .token {
+           font-size: large; 
+           font-weight: 100;
+           }
+            
+            h1{
+                font-size: 10px;
+            }
+         
+        }
+        .ordercon {
+           font-size: large; 
+           font-weight: 100;
+           }
+
+        /* Media query for laptop */
+        @media only screen and (min-width: 601px) {
+            html{
+                width: 100%;
+            }
+            .token {
+           font-size: x-large; 
+           font-weight: 100;
+       }
+           
+        } 
+    </style>
+</head>
+<%
+
+transaction.amount = parseFloat(transaction.amount, 10);
+const originalAmount = transaction.amount;
+const percentageToRemove = 1.5;
+const amountNow = transaction.amount * (percentageToRemove / 100);
+
+const parsedReceiptUrl = receiptUrl + '/' + transaction.id;
+
+const newAmount = originalAmount + 100 + amountNow;
+
+
+const formattedAmount = newAmount;
+ 
+
+const rawTimestamp = transaction.transactionTimestamp.toString().split('GMT')[0];
+const transactionDate = new Date(rawTimestamp)
+const formattedDate = transactionDate.toLocaleDateString('en-UK', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    
+}) //new Date(rawTimestamp).toISOString().split("T")[0] + " " + new Date(rawTimestamp).getUTCHours() + ":" + new Date(rawTimestamp).getUTCMinutes()
+
+%>
+<div class="container">
+<table width="100%" border="0" align="center" cellpadding="0" cellspacing="0"
+    style="max-width:670px;background:#fff; border-radius:3px; text-align:center;-webkit-box-shadow:0 6px 18px 0 rgba(0,0,0,.06);-moz-box-shadow:0 6px 18px 0 rgba(0,0,0,.06);box-shadow:0 6px 18px 0 rgba(0,0,0,.06);">
+    <tr>
+        <td style="height:40px; padding-bottom: 10px;">&nbsp;
+            <div style="text-align:center;">
+                <a href="https://accuvend.ng" title="logo" target="_blank">
+                    <img width="60px" src="https://ui-fonts-bucket.s3.eu-west-2.amazonaws.com/accuvend-logo.png">
+
+                </a>
+            </div>
+        </td>
+    </tr>
+    <tr>
+        <td style=" width:100%">
+                        <div style="border: 1px  solid #ebebeb;  width: 85%; margin: 0 auto; border-radius: 5%;">
+                <div style=" background:#f0f1f1; font-size: small; padding-bottom: 10px; padding-top: 5px; border-radius: 5%; margin-bottom: 10px; ">
+
+                    <span >Transaction Details</span>
+                </div>
+            <div style="padding-top: 5px;  font-size: small;">
+                
+                <div>
+                    <span style="float: left; padding-left: 5%;">Date</span>
+                </div>
+                <div>
+                    <span style="float:right; padding-right: 5%;"><%= formattedDate %></span>
+                </div>
+            </div>
+            <hr style="margin-top:25px; width:90%; border:1px solid #ebebeb ">
+
+            <div style="padding-top: 5px;  font-size: small;">
+                <div>
+                    <span style="float: left; padding-left: 5%;">Customer Name</span>
+                </div>
+                <div>
+                    <span style="float:right; padding-right: 5%;"><%= name %> </span>
+                </div>
+            </div>
+            <hr style="margin-top:25px; width:90%; border:1px solid #ebebeb ">
+
+            <div style="padding-top: 5px;  font-size: small;">
+                <div>
+                    <span style="float: left; padding-left: 5%;">Meter Number</span>
+                </div>
+                <div>
+                    <span style="float:right; padding-right: 5%;"><%= meterNumber %></span>
+                </div>
+            </div>
+            <hr style="margin-top:25px; width:90%; border:1px solid #ebebeb ">
+
+            <div style="padding-top: 5px;  font-size: small;">
+                <div>
+                    <span style="float: left; padding-left: 5%;">Transaction Type</span>
+                </div>
+                <div>
+                    <span style="float:right; padding-right: 5%;">PREPAID</span>
+                </div>
+            </div>
+            <hr style="margin-top:25px; width:90%; border:1px solid #ebebeb ">
+
+            <div style="padding-top: 5px;  font-size: small;">
+                <div>
+                    <span style="float: left; padding-left: 5%;">Amount</span>
+                </div>
+                <div>
+                    <span style="float:right; padding-right: 5%;">&#8358; <%= formattedAmount.toFixed(2).toString().replace(/\B(?=(\d{3})+(?!\d))/g, "," ) %></span>
+                </div>
+            </div>
+            <hr style="margin-top:25px; width:90%; border:1px solid #ebebeb ">
+
+            <hr style="margin-top:25px; width:90%; border:1px solid #ebebeb ">
+                <div style="padding-top: 5px;  font-size: small;">
+                    <div>
+                        <span style="float: left; padding-left: 5%;">Status</span>
+                    </div>
+                    <div>
+                        <span style="float:right;   border: 1px  solid #ebebeb; color: #3ebd64;  background:#ccffe5;  margin-right: 15px; padding-left: 5px; padding-right: 5px; ">COMPLETE</span>
+                    </div>
+                </div>
+                <hr style="margin-top:25px; width:90%; border:1px solid #ebebeb ">
+                
+
+
+            <% if(transaction.disco==='ABA' ){ %>
+                <div style="padding-top: 5px;  font-size: small;">
+                    <div>
+                        <span style="float: left; padding-left: 5%;">Disco</span>
+                    </div>
+                    <div>
+                        <span style="float:right; padding-right: 5%;"><%= transaction.disco %></span> <img style="float: right; padding-right: 2%; "  width="30px"   src="https://ui-fonts-bucket.s3.eu-west-2.amazonaws.com/ABA.png">
+                    </div>
+                </div>
+                <hr style="width:90%; margin-top:25px;    border:1px solid #ebebeb ">
+                <%} else if (transaction.disco==='ABUJA' ){ %>
+                    <div style="padding-top: 5px;  font-size: small;">
+                        <div>
+                            <span style="float: left; padding-left: 5%;">Disco</span>
+                        </div>
+                        <div>
+                            <span style="float:right; padding-right: 5%;"><%= transaction.disco %></span> <img style="float: right; padding-right: 2%; "  width="30px"   src="https://ui-fonts-bucket.s3.eu-west-2.amazonaws.com/ABUJA.jpeg">
+                        </div>
+                    </div>
+                    <hr style="width:90%; margin-top:25px;    border:1px solid #ebebeb ">
+                    <% } else if (transaction.disco==='BENIN' ){ %>
+                        <div style="padding-top: 5px; font-size: small;">
+                            <div>
+                                <span style="float: left;  padding-left: 5%;">Disco</span>
+                            </div>
+                            <div>
+                                <span style=" float: right; padding-right: 5%;"><%= transaction.disco %></span> <img style="padding-right: 2%; float: right;" width="30px"   src="https://ui-fonts-bucket.s3.eu-west-2.amazonaws.com/BENIN.jpeg">
+                            </div>
+                        </div>
+                        <hr style="width:90%; margin-top:25px;    border:1px solid #ebebeb ">
+                        <% } else if (transaction.disco==='EKO' ){ %>
+                            <div style="padding-top: 5px;  font-size: small;">
+                                <div>
+                                    <span style="float: left; padding-left: 5%;">Disco</span>
+                                </div>
+                                <div>
+                                    <span style="float:right; padding-right: 5%;"><%= transaction.disco %></span> <img style="float: right; padding-right: 2%; "  width="30px" src="https://ui-fonts-bucket.s3.eu-west-2.amazonaws.com/EKO.jpeg">
+                                </div>
+                            </div>
+                            <hr style="width:90%; margin-top:25px;    border:1px solid #ebebeb ">
+                            <% } else if (transaction.disco==='ENUGU' ){ %>
+                                <div style="padding-top: 5px;  font-size: small;">
+                                    <div>
+                                        <span style="float: left; padding-left: 5%;">Disco</span>
+                                    </div>
+                                    <div>
+                                        <span style="float:right; padding-right: 5%;"><%= transaction.disco %></span> <img style="float: right; padding-right: 2%; "  width="30px"   src="https://ui-fonts-bucket.s3.eu-west-2.amazonaws.com/ENUGU.jpeg">
+                                    </div>
+                                </div>
+                                <hr style="width:90%; margin-top:25px;    border:1px solid #ebebeb ">
+                                <% } else if (transaction.disco==='IBADAN' ){ %>
+                                    <div style="padding-top: 5px;  font-size: small;">
+                                        <div>
+                                            <span style="float: left; padding-left: 5%;">Disco</span>
+                                        </div>
+                                        <div>
+                                            <span style="float:right; padding-right: 5%;"><%= transaction.disco %></span> <img style="float: right; padding-right: 2%; "  width="30px"   src="https://ui-fonts-bucket.s3.eu-west-2.amazonaws.com/IBADAN.jpeg">
+                                        </div>
+                                    </div>
+                                    <hr style="width:90%; margin-top:25px;    border:1px solid #ebebeb ">
+                                    <% } else if (transaction.disco==='JOS' ){ %>
+                                        <div style="padding-top: 5px; font-size: small;">
+                                            <div>
+                                                <span style="float: left; padding-left: 5%;">Disco</span>
+                                            </div>
+                                            <div>
+                                                <span style="float:right; padding-right: 5%;"><%= transaction.disco %></span> <img style="float: right; padding-right: 2%; "  width="30px"   src="https://ui-fonts-bucket.s3.eu-west-2.amazonaws.com/JOS.jpeg">
+                                            </div>
+                                        </div>
+                                        <hr style="width:90%; margin-top:25px;    border:1px solid #ebebeb ">
+                                        <% } else if (transaction.disco==='KADUNA' ){ %>
+                                            <div style="padding-top: 5px;    font-size: small;">
+                                                <div>
+                                                    <span style="float: left; padding-left: 5%;">Disco</span>
+                                                </div>
+                                                <div>
+                                                    <span style="float:right; padding-right: 5%;"><%= transaction.disco %></span> <img style="float: right; padding-right: 2%; "  width="30px"   src="https://ui-fonts-bucket.s3.eu-west-2.amazonaws.com/KADUNA.jpeg">
+                                                </div>
+                                            </div>
+                                            <hr style="width:90%; margin-top:25px;    border:1px solid #ebebeb ">
+                                            <% } else if (transaction.disco==='KANO' ){ %>
+                                                <div style="padding-top: 5px;    font-size: small;">
+                                                    <div>
+                                                        <span style="float: left; padding-left: 5%;">Disco</span>
+                                                    </div>
+                                                    <div>
+                                                        <span style="float:right; padding-right: 5%;"><%= transaction.disco %></span> <img style="float: right; padding-right: 2%; "  width="30px"   src="https://ui-fonts-bucket.s3.eu-west-2.amazonaws.com/KADUNA.jpeg">
+                                                    </div>
+                                                </div>
+                                                <hr style="width:90%; margin-top:25px;    border:1px solid #ebebeb ">
+                                                <% } else if (transaction.disco==='PORTHARCOURT' ){ %>
+                                                    <div style="padding-top: 5px;    font-size: small;">
+                                                        <div>
+                                                            <span style="float: left; padding-left: 5%;">Disco</span>
+                                                        </div>
+                                                        <div>
+                                                            <span style="float:right; padding-right: 5%;"><%= transaction.disco %></span> <img style="float: right; padding-right: 2%; "  width="30px"   src="https://ui-fonts-bucket.s3.eu-west-2.amazonaws.com/PORTHARCOURT.jpeg">
+                                                        </div>
+                                                    </div>
+                                                    <hr style="width:90%; margin-top:25px;    border:1px solid #ebebeb ">
+                                                    <% } else if (transaction.disco==='YOLA' ){ %>
+                                                        <div style="padding-top: 5px;    font-size: small;">
+                                                            <div>
+                                                                <span style="float: left; padding-left: 5%;">Disco</span>
+                                                            </div>
+                                                            <div>
+                                                                <span style="float:right; padding-right: 5%;"><%= transaction.disco %></span> <img style="float: right; padding-right: 2%; "  width="30px"   src="https://ui-fonts-bucket.s3.eu-west-2.amazonaws.com/YOLA.jpeg">
+                                                            </div>
+                                                        </div>
+                                                        <hr style="width:90%; margin-top:25px;    border:1px solid #ebebeb ">
+                                                        <% } else if (transaction.disco==='IKEJA' ){ %>
+                                                            <div style="padding-top: 5px;    font-size: small;">
+                                                                <div>
+                                                                    <span style="float: left; padding-left: 5%;">Disco</span>
+                                                                </div>
+                                                                <div>
+                                                                    <span style="float:right; padding-right: 5%;"><%= transaction.disco %></span> <img style="float: right; padding-right: 2%; "  width="30px"   src="https://ui-fonts-bucket.s3.eu-west-2.amazonaws.com/IKEJA.jpeg">
+                                                                </div>
+                                                            </div>
+                                                            <hr style="width:90%; margin-top:25px;    border:1px solid #ebebeb ">
+                                                            <% } else{ %>
+                                                                <div></div>
+                                                                <% } %>
+
+            
+            <div style="padding-top: 5px; font-size: small; ">
+                <div>
+                    <span style="float: left; padding-left: 5%;  ">Link to receipt</span>
+                </div>
+                <div>
+                    <a href=<%= parsedReceiptUrl %>  style="float:right; padding-right: 5%; "> Your Receipt</a>
+                </div>
+            </div>
+           
+            <hr style="margin-top:25px; margin-bottom: 20px; width:90%; border:1px solid #ebebeb ">
+            
+        </div>
+
+
+
+
+        
+        </td>
+    </tr>
+    <tr>
+        <td>
+            
+        </td>
+    </tr>
+    <tr>
+        <td>
+            
+        </td>
+
+
+
+    </tr>
+
+
+
+
+    <tr>
+        <td style="height:40px;">&nbsp;</td>
+    </tr>
+</div>
+</table>
+
+</html>

@@ -212,6 +212,7 @@ export class DataVendController {
             string,
             string
         >;
+        console.log("data ");
 
         const transaction: Transaction | null =
             await TransactionService.viewSingleTransaction(transactionId);

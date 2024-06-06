@@ -251,7 +251,7 @@ export class TokenHandlerUtil {
                     superAgent: transaction.superagent,
                     timeStamp: new Date(),
                     vendorRetryRecord: {
-                        ...transaction.retryRecord,
+                        // ...transaction.retryRecord,
                         retryCount: 1,
                     },
                     waitTime: 0,
@@ -306,13 +306,13 @@ export class TokenHandlerUtil {
         retryRecord =
             retryRecord.length === 0
                 ? [
-                      {
-                          vendor: transaction.superagent,
-                          retryCount: 1,
-                          reference: [transaction.reference],
-                          attempt: 1,
-                      },
-                  ]
+                    {
+                        vendor: transaction.superagent,
+                        retryCount: 1,
+                        reference: [transaction.reference],
+                        attempt: 1,
+                    },
+                ]
                 : retryRecord;
 
         // Make sure to use the same vendor thrice before switching to another vendor
@@ -352,11 +352,11 @@ export class TokenHandlerUtil {
         const newVendor = useCurrentVendor
             ? currentVendor.vendor
             : await TokenHandlerUtil.getNextBestVendorForVendRePurchase(
-                  transaction.productCodeId,
-                  transaction.superagent,
-                  transaction.previousVendors,
-                  parseFloat(transaction.amount),
-              );
+                transaction.productCodeId,
+                transaction.superagent,
+                transaction.previousVendors,
+                parseFloat(transaction.amount),
+            );
         if (
             newVendor != currentVendor.vendor ||
             currentVendor.retryCount > retry.retryCountBeforeSwitchingVendor
@@ -394,7 +394,7 @@ export class TokenHandlerUtil {
 
         const newTransactionReference =
             retryRecord[retryRecord.length - 1].reference[
-                retryRecord[retryRecord.length - 1].reference.length - 1
+            retryRecord[retryRecord.length - 1].reference.length - 1
             ];
         let accesToken = transaction.irechargeAccessToken;
 
@@ -466,7 +466,7 @@ export class TokenHandlerUtil {
                     address: user.address,
                     phoneNumber: user.phoneNumber,
                 },
-                superAgent: transaction.superagent,
+                superAgent: transaction.retryRecord[0]?.vendor,
                 vendorRetryRecord: {
                     retryCount: 1,
                 },
@@ -598,7 +598,7 @@ export class TokenHandlerUtil {
                     }).catch((e) => {
                         logger.error(
                             "An error occured while vending from " +
-                                data.transaction.superagent,
+                            data.transaction.superagent,
                             {
                                 meta: {
                                     transactionId: data.transaction.id,
@@ -621,7 +621,7 @@ export class TokenHandlerUtil {
         } catch (error) {
             logger.error(
                 "An error occured while vending from " +
-                    data.transaction.superagent,
+                data.transaction.superagent,
                 {
                     meta: {
                         transactionId: data.transaction.id,
@@ -661,7 +661,7 @@ export class TokenHandlerUtil {
         } catch (error) {
             logger.error(
                 "An error occured while requerying from " +
-                    transaction.superagent,
+                transaction.superagent,
                 {
                     meta: {
                         transactionId: transaction.id,
@@ -818,9 +818,9 @@ type IAction = -1 | 0 | 1;
 type IVendType = "PREPAID" | "POSTPAID";
 type TxnValidationResponse =
     | ({ action: 1; tokenUnits: string } & (
-          | { token: string; vendType: "PREPAID" }
-          | { vendType: "POSTPAID" }
-      ))
+        | { token: string; vendType: "PREPAID" }
+        | { vendType: "POSTPAID" }
+    ))
     | { action: -1 | 0; vendType: IVendType };
 
 export class ResponseValidationUtil {
@@ -1010,27 +1010,29 @@ export class ResponseValidationUtil {
                 // Requery transaction if no token was found and vendType is PREPAID
                 if (!dbQueryParams["TK"] && vendType === "PREPAID") {
                     // Check if disco is down
-                    const discoUp =
-                        await VendorService.buyPowerCheckDiscoUp(disco);
+                    const discoUp = await VendorService.buyPowerCheckDiscoUp(
+                        disco,
+                        transactionId,
+                    );
                     discoUp
                         ? logger.info(
-                              `DISCO_UP_STATUS:  Disco ${disco} status is ${discoUp}`,
-                              {
-                                  meta: {
-                                      transactionId: transactionId,
-                                      disco: disco,
-                                  },
-                              },
-                          )
+                            `DISCO_UP_STATUS:  Disco ${disco} status is ${discoUp}`,
+                            {
+                                meta: {
+                                    transactionId: transactionId,
+                                    disco: disco,
+                                },
+                            },
+                        )
                         : logger.error(
-                              `DISCO_UP_STATUS:  Disco ${disco} status is ${discoUp}`,
-                              {
-                                  meta: {
-                                      transactionId: transactionId,
-                                      disco: disco,
-                                  },
-                              },
-                          );
+                            `DISCO_UP_STATUS:  Disco ${disco} status is ${discoUp}`,
+                            {
+                                meta: {
+                                    transactionId: transactionId,
+                                    disco: disco,
+                                },
+                            },
+                        );
                 }
 
                 // If no masterResponseCode was set requery transaction
@@ -1272,7 +1274,7 @@ class TokenHandler extends Registry {
                                     : undefined;
                             const discoLogo =
                                 DISCO_LOGO[
-                                    _product.productName as keyof typeof DISCO_LOGO
+                                _product.productName as keyof typeof DISCO_LOGO
                                 ] ?? LOGO_URL;
                             let powerUnit =
                                 await PowerUnitService.viewSinglePowerUnitByTransactionId(
@@ -1281,27 +1283,27 @@ class TokenHandler extends Registry {
 
                             powerUnit = powerUnit
                                 ? await PowerUnitService.updateSinglePowerUnit(
-                                      powerUnit.id,
-                                      {
-                                          tokenFromVend: token,
-                                          tokenUnits: response.tokenUnits,
-                                          transactionId: data.transactionId,
-                                      },
-                                  )
+                                    powerUnit.id,
+                                    {
+                                        tokenFromVend: token,
+                                        tokenUnits: response.tokenUnits,
+                                        transactionId: data.transactionId,
+                                    },
+                                )
                                 : await PowerUnitService.addPowerUnit({
-                                      id: uuidv4(),
-                                      transactionId: data.transactionId,
-                                      disco: data.meter.disco,
-                                      discoLogo,
-                                      amount: transaction.amount,
-                                      meterId: data.meter.id,
-                                      superagent:
-                                          data.superAgent as ITransaction["superagent"],
-                                      tokenFromVend: token,
-                                      tokenNumber: 0,
-                                      tokenUnits: response.tokenUnits,
-                                      address: transaction.meter.address,
-                                  });
+                                    id: uuidv4(),
+                                    transactionId: data.transactionId,
+                                    disco: data.meter.disco,
+                                    discoLogo,
+                                    amount: transaction.amount,
+                                    meterId: data.meter.id,
+                                    superagent:
+                                        data.superAgent as ITransaction["superagent"],
+                                    tokenFromVend: token,
+                                    tokenNumber: 0,
+                                    tokenUnits: response.tokenUnits,
+                                    address: transaction.meter.address,
+                                });
                             token &&
                                 (await TransactionService.updateSingleTransaction(
                                     data.transactionId,
@@ -1380,10 +1382,7 @@ class TokenHandler extends Registry {
                                     superAgent: data.superAgent,
                                     tokenInResponse: null,
                                     transactionTimedOutFromBuypower: false,
-                                    vendorRetryRecord:
-                                        transaction.retryRecord[
-                                            transaction.retryRecord.length - 1
-                                        ],
+                                    vendorRetryRecord: data.vendorRetryRecord,
                                 },
                             );
                     }
@@ -1603,7 +1602,7 @@ class TokenHandler extends Registry {
 
                             const discoLogo =
                                 DISCO_LOGO[
-                                    _product.productName as keyof typeof DISCO_LOGO
+                                _product.productName as keyof typeof DISCO_LOGO
                                 ] ?? LOGO_URL;
                             let powerUnit =
                                 await PowerUnitService.viewSinglePowerUnitByTransactionId(
@@ -1627,27 +1626,27 @@ class TokenHandler extends Registry {
                             );
                             powerUnit = powerUnit
                                 ? await PowerUnitService.updateSinglePowerUnit(
-                                      powerUnit.id,
-                                      {
-                                          token: tokenInResponse,
-                                          transactionId: data.transactionId,
-                                          tokenUnits: response.tokenUnits,
-                                      },
-                                  )
+                                    powerUnit.id,
+                                    {
+                                        token: tokenInResponse,
+                                        transactionId: data.transactionId,
+                                        tokenUnits: response.tokenUnits,
+                                    },
+                                )
                                 : await PowerUnitService.addPowerUnit({
-                                      id: uuidv4(),
-                                      transactionId: data.transactionId,
-                                      disco: data.meter.disco,
-                                      discoLogo,
-                                      amount: transaction.amount,
-                                      meterId: data.meter.id,
-                                      superagent:
-                                          data.superAgent as ITransaction["superagent"],
-                                      token: tokenInResponse,
-                                      tokenNumber: 0,
-                                      tokenUnits: response.tokenUnits,
-                                      address: transaction.meter.address,
-                                  });
+                                    id: uuidv4(),
+                                    transactionId: data.transactionId,
+                                    disco: data.meter.disco,
+                                    discoLogo,
+                                    amount: transaction.amount,
+                                    meterId: data.meter.id,
+                                    superagent:
+                                        data.superAgent as ITransaction["superagent"],
+                                    token: tokenInResponse,
+                                    tokenNumber: 0,
+                                    tokenUnits: response.tokenUnits,
+                                    address: transaction.meter.address,
+                                });
 
                             const twoMinsExpiry = 2 * 60;
                             tokenInResponse &&
@@ -1710,10 +1709,7 @@ class TokenHandler extends Registry {
                                     superAgent: data.superAgent,
                                     tokenInResponse: null,
                                     transactionTimedOutFromBuypower: false,
-                                    vendorRetryRecord:
-                                        transaction.retryRecord[
-                                            transaction.retryRecord.length - 1
-                                        ],
+                                    vendorRetryRecord: data.vendorRetryRecord,
                                 },
                             );
                     }

@@ -1,5 +1,17 @@
 // Import necessary modules and dependencies
-import { Table, Column, Model, DataType, IsUUID, PrimaryKey, ForeignKey, BelongsTo, HasMany, HasOne, BeforeCreate } from "sequelize-typescript";
+import {
+    Table,
+    Column,
+    Model,
+    DataType,
+    IsUUID,
+    PrimaryKey,
+    ForeignKey,
+    BelongsTo,
+    HasMany,
+    HasOne,
+    BeforeCreate,
+} from "sequelize-typescript";
 import User from "./User.model";
 import Partner from "./Entity/Profiles/PartnerProfile.model";
 import Event from "./Event.model";
@@ -12,23 +24,23 @@ import Bundle from "./Bundle.model";
 
 // Define enums for status and payment type
 export enum Status {
-    COMPLETE = 'COMPLETE',
-    PENDING = 'PENDING',
-    FAILED = 'FAILED',
-    INPROGRESS = 'INPROGRESS',
-    FLAGGED = 'FLAGGED'
+    COMPLETE = "COMPLETE",
+    PENDING = "PENDING",
+    FAILED = "FAILED",
+    INPROGRESS = "INPROGRESS",
+    FLAGGED = "FLAGGED",
 }
 
 export enum PaymentType {
-    REVERSAL = 'REVERSAL',
-    PAYMENT = 'PAYMENT'
+    REVERSAL = "REVERSAL",
+    PAYMENT = "PAYMENT",
 }
 
 export enum TransactionType {
-    AIRTIME = 'AIRTIME',
-    ELECTRICITY = 'ELECTRICITY',
-    DATA = 'DATA',
-    CABLE = 'CABLE',
+    AIRTIME = "AIRTIME",
+    ELECTRICITY = "ELECTRICITY",
+    DATA = "DATA",
+    CABLE = "CABLE",
 }
 
 // Define the Sequelize model for the "Transaction" table
@@ -41,7 +53,7 @@ export default class Transaction extends Model<ITransaction | Transaction> {
     id: string;
 
     // amount associated with the transaction
-    @Column({ type: DataType.STRING, allowNull: false, defaultValue: '0' })
+    @Column({ type: DataType.STRING, allowNull: false, defaultValue: "0" })
     amount: string;
 
     @Column({ type: DataType.STRING, allowNull: true })
@@ -51,11 +63,21 @@ export default class Transaction extends Model<ITransaction | Transaction> {
     tokenFromRequery: string;
 
     // Status of the transaction (complete, pending, or failed)
-    @Column({ type: DataType.ENUM, values: Object.values(Status), defaultValue: Status.PENDING, allowNull: false })
+    @Column({
+        type: DataType.ENUM,
+        values: Object.values(Status),
+        defaultValue: Status.PENDING,
+        allowNull: false,
+    })
     status: Status;
 
     // Type of payment (reversal or payment)
-    @Column({ type: DataType.ENUM, values: Object.values(PaymentType), defaultValue: PaymentType.PAYMENT, allowNull: false })
+    @Column({
+        type: DataType.ENUM,
+        values: Object.values(PaymentType),
+        defaultValue: PaymentType.PAYMENT,
+        allowNull: false,
+    })
     paymentType: PaymentType;
 
     // Timestamp of the transaction
@@ -113,7 +135,14 @@ export default class Transaction extends Model<ITransaction | Transaction> {
     bundleId?: string
 
     @Column({ type: DataType.ARRAY(DataType.STRING), allowNull: true })
-    previousVendors: string[]
+    previousVendors: string[];
+
+    @Column({
+        type: DataType.ARRAY(DataType.STRING),
+        defaultValue: [],
+        allowNull: true,
+    })
+    vendTimeStamps: string[];
 
     // Foreign key for the associated User
     @ForeignKey(() => User)
@@ -252,7 +281,8 @@ export interface ITransaction {
     productType: string;
     networkProvider?: string;
     bundleId?: string;
-    channel: 'USSD' | 'WEB' | 'MOBILE' | 'POS' | 'ATM' | 'OTHERS'
+    channel: "USSD" | "WEB" | "MOBILE" | "POS" | "ATM" | "OTHERS";
+    vendTimeStamps?: string[];
 }
 
 // Define an interface representing the creation of a transaction (ICreateTransaction).

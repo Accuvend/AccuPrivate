@@ -504,6 +504,7 @@ export class TokenHandlerUtil {
 
         logger.info("Scheduled retry event", meta);
 
+        await TransactionService.updateSingleTransaction(transaction.id, { superagent: newVendor });
         await VendorPublisher.publishEventToScheduleRetry({
             scheduledMessagePayload: {
                 meter: meter,

@@ -70,7 +70,7 @@ export default class TransactionService {
         // Retrieve all transactions from the database
         const transactions: Transaction[] = await Transaction.findAll({
             where: {},
-            include: [PowerUnit, Event, Partner, User, Meter, Bundle],
+            include: [PowerUnit, Event, Partner, User, Meter, Bundle, PaymentProvider ],
             order: [["transactionTimestamp", "DESC"]],
         });
         return transactions;

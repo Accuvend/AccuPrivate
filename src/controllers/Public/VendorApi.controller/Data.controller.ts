@@ -32,6 +32,7 @@ import {
 } from "../../../utils/Helper";
 import ResponseTrimmer from "../../../utils/ResponseTrimmer";
 import BundleService from "../../../services/Bundle.service";
+import PaymentProviderService from "../../../services/PaymentProvider.service";
 require("newrelic");
 
 class DataValidator {
@@ -100,6 +101,7 @@ export class DataVendController {
             email,
             bundleCode,
             channel,
+            paymentProviderId,
         } = req.query as Record<string, string>;
         // TODO: Add request type for request authenticated by API keys
         const partnerId = (req as any).key;
@@ -125,6 +127,14 @@ export class DataVendController {
             throw new BadRequestError("Invalid product code for data");
         }
 
+        const existingPaymentProvider =
+            await PaymentProviderService.viewSinglePaymentProvider(
+                paymentProviderId,
+            );
+        if (!existingPaymentProvider) {
+            throw new NotFoundError("Payment provider not found");
+        }
+
         const amount = dataBundle.bundleAmount.toString();
         const superAgent = await DataHandlerUtil.getBestVendorForPurchase(
             dataBundle.id,
@@ -139,6 +149,7 @@ export class DataVendController {
                 {
                     id: transactionId,
                     amount: amount,
+                    paymentProviderId,
                     status: Status.PENDING,
                     disco: disco,
                     bundleId: dataBundle.id,

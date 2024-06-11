@@ -21,6 +21,7 @@ import { generateRandomString } from "../utils/Helper";
 import { NigerianDate } from "../utils/Date";
 import ProductCode from "./ProductCode.model";
 import Bundle from "./Bundle.model";
+import PaymentProvider from "./PaymentProvider.model";
 
 // Define enums for status and payment type
 export enum Status {
@@ -121,8 +122,10 @@ export default class Transaction extends Model<ITransaction | Transaction> {
     @Column({ type: DataType.STRING, allowNull: true })
     productCodeId: string;
 
+    @ForeignKey(() => PaymentProvider)
+    @IsUUID(4)
     @Column({ type: DataType.STRING, allowNull: true })
-    irechargeAccessToken: string
+    paymentProviderId: string;
 
     @Column({ type: DataType.STRING, allowNull: true })
     vendorReferenceId: string
@@ -195,6 +198,9 @@ export default class Transaction extends Model<ITransaction | Transaction> {
 
     @BelongsTo(() => Bundle)
     bundle: Bundle;
+
+    @BelongsTo(() => PaymentProvider)
+    paymentProvider: PaymentProvider;
 
     @Column({
         type: DataType.DATE,

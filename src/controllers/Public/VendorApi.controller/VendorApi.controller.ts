@@ -66,6 +66,7 @@ import UserMeter from "../../../models/UserMeter.model";
 import { Database } from "../../../models";
 import sequelize from "sequelize";
 import { throws } from "assert";
+import PaymentProviderService from "../../../services/PaymentProvider.service";
 
 enum MessageType {
     INFORMATION = "INFORMATION",
@@ -84,6 +85,7 @@ interface valideMeterRequestBody {
     email: string;
     channel: ITransaction["channel"];
     amount: number;
+    paymentProviderId: string;
 }
 
 interface vendTokenRequestBody {
@@ -487,6 +489,7 @@ export default class VendorController {
                     vendType,
                     channel,
                     amount,
+                    paymentProviderId
                 }: valideMeterRequestBody = req.body;
                 let { disco } = req.body;
                 const partnerId = (req as any).key;
@@ -510,6 +513,16 @@ export default class VendorController {
                 if (!existingProductCodeForDisco) {
                     throw new NotFoundError(
                         "Product code not found for disco",
+                        errorMeta,
+                    );
+                }
+
+                const existingPaymentProvider = await PaymentProviderService.viewSinglePaymentProvider(
+                    paymentProviderId
+                );
+                if (!existingPaymentProvider) {
+                    throw new NotFoundError(
+                        "Payment provider not found",
                         errorMeta,
                     );
                 }
@@ -557,6 +570,7 @@ export default class VendorController {
                             disco: disco,
                             partnerId: partnerId,
                             reference: transactionId,
+                            paymentProviderId, 
                             transactionType:
                                 transactionTypes[
                                 existingProductCodeForDisco.category

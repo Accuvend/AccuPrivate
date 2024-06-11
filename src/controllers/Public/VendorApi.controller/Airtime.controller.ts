@@ -43,6 +43,7 @@ import logger, { Logger } from "../../../utils/Logger";
 import BundleService from "../../../services/Bundle.service";
 import { IBundle } from "../../../models/Bundle.model";
 import { VendorControllerValdator } from "./VendorApi.controller";
+import PaymentProviderService from "../../../services/PaymentProvider.service";
 
 class AirtimeValidator {
     static validatePhoneNumber(phoneNumber: string) {
@@ -504,7 +505,7 @@ export class AirtimeVendController {
         res: Response,
         next: NextFunction,
     ) {
-        const { phoneNumber, amount, email, networkProvider, channel } =
+        const { paymentProviderId, phoneNumber, amount, email, networkProvider, channel } =
             req.query as Record<string, string>;
         let disco = networkProvider;
 
@@ -512,6 +513,11 @@ export class AirtimeVendController {
             await ProductService.viewProductCodeByProductName(disco);
         if (!existingProductCodeForDisco) {
             throw new NotFoundError("Product code not found for disco");
+        }
+
+        const existingPaymentProvider = await PaymentProviderService.viewSinglePaymentProvider(paymentProviderId)
+        if (!existingPaymentProvider) {
+            throw new NotFoundError("Payment provider not found");
         }
 
         disco = existingProductCodeForDisco.masterProductCode;
@@ -541,6 +547,7 @@ export class AirtimeVendController {
                     paymentType: PaymentType.PAYMENT,
                     transactionTimestamp: new Date(),
                     partnerId: partnerId,
+                    paymentProviderId,
                     reference,
                     networkProvider: networkProvider,
                     productType: existingProductCodeForDisco.category,

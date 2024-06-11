@@ -13,6 +13,7 @@ import Meter from "../models/Meter.model";
 import { Op, literal } from "sequelize";
 import { Sequelize } from "sequelize-typescript";
 import Bundle from "../models/Bundle.model";
+import PaymentProvider from "../models/PaymentProvider.model";
 
 // Define the TransactionService class for handling transaction-related operations
 export default class TransactionService {
@@ -266,10 +267,11 @@ export default class TransactionService {
                     "bundleId",
                     "retryRecord",
                     "reference",
+                    "paymentProviderId",
                     //...attributesMap
                 ],
-                include: [PowerUnit, Event, Partner, User, Meter, Bundle],
-            }
+                include: [PowerUnit, Event, Partner, User, Meter, Bundle, PaymentProvider],
+            },
         );
         return transaction;
         /**PREVIOUS UTILIZIED CODE */
@@ -288,7 +290,7 @@ export default class TransactionService {
         // Retrieve a single transaction by its UUID
         const transaction: Transaction | null = await Transaction.findOne({
             where: { bankRefId: bankRefId },
-            include: [PowerUnit, Event, Partner, User, Meter],
+            include: [PowerUnit, Event, Partner, User, Meter,PaymentProvider],
         });
         return transaction;
     }

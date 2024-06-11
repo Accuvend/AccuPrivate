@@ -18,12 +18,13 @@ import productCodeRoute from "./ProductCode.routes";
 import masterRoute from "./MasterProduct.routes";
 import sysLogRoute from "./Syslog.routes";
 import waitTimeRoute from "./WaitTime.routes";
-import MockEndpointRoute from './MockEndPoint.route'
+import MockEndpointRoute from "./MockEndPoint.route";
 import discoStatusRoute from "./DiscoStatus.routes";
 import bundleRoute from "./Bundle.routes";
 import responsePathRoute from "./ResponsePath.routes";
 import errorCodeRoute from "./ErrorCode.routes";
-import complaintV2Route from "./compalintV2.routes"
+import complaintV2Route from "./compalintV2.routes";
+import paymentProviderRoute from "./PaymentProvider.routes";
 
 const router = Router();
 
@@ -45,13 +46,14 @@ router
     .use("/complaints", complainRoute)
     .use("/productcode", productCodeRoute)
     .use("/master", masterRoute)
-    .use('/master/bundle', bundleRoute)
+    .use("/master/bundle", bundleRoute)
     .use("/syslog", sysLogRoute)
     .use("/discostatus", discoStatusRoute)
     .use("/waittime", waitTimeRoute)
-    .use('/mock', MockEndpointRoute)
-    .use('/response_path', responsePathRoute)
-    .use('/error_code', errorCodeRoute)
-    .use('/complaint/v2',complaintV2Route)
+    .use("/mock", MockEndpointRoute)
+    .use("/response_path", responsePathRoute)
+    .use("/error_code", errorCodeRoute)
+    .use("/complaint/v2", complaintV2Route)
+    .use("/payment_provider", paymentProviderRoute);
 
 export default router;

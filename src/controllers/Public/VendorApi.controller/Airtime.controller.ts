@@ -435,13 +435,13 @@ export class AirtimeVendController {
         for (let i = 0; i < networkProviders.length; i++) {
             const networkProvider = networkProviders[i] as typeof networkProviders[number];
             console.log(`Creating products for network provider: ${networkProvider}`);
-            const productCodes ={
+            const productCodes = {
                 AIRTEL: 'TCATLVD',
                 MTN: 'TCMTNVD',
                 GLO: 'TCGLOVD',
                 '9MOBILE': 'TC9MBVD',
             }
-            const networkProviderBundleData = { bundles: SEED_DATA_WITH_BUNDLE_FLOW[networkProvider], productCode: productCodes[networkProvider]}
+            const networkProviderBundleData = { bundles: SEED_DATA_WITH_BUNDLE_FLOW[networkProvider], productCode: productCodes[networkProvider] }
             const networkProviderBundles = networkProviderBundleData.bundles;
 
             const productInfo: IProduct = {

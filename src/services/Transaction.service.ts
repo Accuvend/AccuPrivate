@@ -1,20 +1,16 @@
 // Import required modules, types, and models
-import Transaction from "../models/Transaction.model";
+import Transaction, { Status } from "../models/Transaction.model";
 import {
-    ITransaction,
     ICreateTransaction,
     IUpdateTransaction,
 } from "../models/Transaction.model";
 import EventService from "./Event.service";
-import { v4 as uuidv4 } from "uuid";
-import Event, { Status } from "../models/Event.model";
-import logger from "../utils/Logger";
+import Event from "../models/Event.model";
 import PowerUnit from "../models/PowerUnit.model";
 import Partner from "../models/Entity/Profiles/PartnerProfile.model";
 import User from "../models/User.model";
 import Meter from "../models/Meter.model";
 import { Op, literal } from "sequelize";
-import { generateRandomString } from "../utils/Helper";
 import { Sequelize } from "sequelize-typescript";
 import Bundle from "../models/Bundle.model";
 
@@ -22,6 +18,17 @@ import Bundle from "../models/Bundle.model";
 export default class TransactionService {
     // Create an instance of EventService for handling events
     private static eventService: EventService = new EventService();
+
+    static async flaggTransaction(transactionId: string) {
+        const transaction = await Transaction.findByPk(transactionId);
+        if (!transaction) {
+            throw new Error("Transaction not found");
+        }
+
+        transaction.status = Status.FLAGGED;
+        await transaction.save();
+        return transaction;
+    }
 
     static async addTransactionWithoutValidatingUserRelationship(
         transaction: Omit<ICreateTransaction, "userId">

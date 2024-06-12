@@ -1,5 +1,10 @@
 // Import required modules and types
-import axios, { AxiosError, AxiosInstance, AxiosRequestConfig, HttpStatusCode } from "axios";
+import axios, {
+    AxiosError,
+    AxiosInstance,
+    AxiosRequestConfig,
+    HttpStatusCode,
+} from "axios";
 import {
     BaseResponse,
     IBaxiGetProviderResponse,
@@ -42,11 +47,11 @@ import {
 } from "./Baxi/Config";
 import { info } from "console";
 
-import newrelic from 'newrelic'
+import newrelic from "newrelic";
 
 export interface PurchaseResponse extends BaseResponse {
     source: "BUYPOWERNG";
-    httpStatusCode: number,
+    httpStatusCode: number;
     status: string;
     statusCode: string;
     responseCode: 200;
@@ -87,7 +92,7 @@ export interface PurchaseResponse extends BaseResponse {
 
 interface TimedOutResponse extends BaseResponse {
     source: "BUYPOWERNG";
-    httpStatusCode: number,
+    httpStatusCode: number;
     data: {
         status: false;
         error: true;
@@ -99,7 +104,7 @@ interface TimedOutResponse extends BaseResponse {
 
 interface _RequeryBuypowerSuccessResponse extends BaseResponse {
     source: "BUYPOWERNG";
-    httpStatusCode: number,
+    httpStatusCode: number;
     result: {
         status: true;
         data: {
@@ -121,16 +126,17 @@ interface _RequeryBuypowerSuccessResponse extends BaseResponse {
     };
 }
 
-export interface SuccessResponseForBuyPowerRequery extends _RequeryBuypowerSuccessResponse {
+export interface SuccessResponseForBuyPowerRequery
+    extends _RequeryBuypowerSuccessResponse {
     source: "BUYPOWERNG";
-    httpStatusCode: number,
+    httpStatusCode: number;
     result: _RequeryBuypowerSuccessResponse["result"];
     // data: _RequeryBuypowerSuccessResponse["result"]["data"];
 }
 
 interface InprogressResponseForBuyPowerRequery {
     source: "BUYPOWERNG";
-    httpStatusCode: number,
+    httpStatusCode: number;
     status: false;
     message: string;
     responseCode: 201;
@@ -138,7 +144,7 @@ interface InprogressResponseForBuyPowerRequery {
 
 interface FailedResponseForBuyPowerRequery {
     source: "BUYPOWERNG";
-    httpStatusCode: number,
+    httpStatusCode: number;
     status: false;
     message: string;
     responseCode: 202;
@@ -146,7 +152,7 @@ interface FailedResponseForBuyPowerRequery {
 
 interface IRechargeSuccessfulVendResponse {
     source: "IRECHARGE";
-    httpStatusCode: number,
+    httpStatusCode: number;
     status: "00" | "15" | "43"; // there are other response codes, but these are the only necessary ones. only '00' will have the response data shown below
     message: "Successful";
     wallet_balance: string;
@@ -160,9 +166,9 @@ interface IRechargeSuccessfulVendResponse {
 
 interface IRechargeRequeryResponse {
     source: "IRECHARGE";
-    httpStatusCode: number,
+    httpStatusCode: number;
     status: "00" | "15" | "43";
-    vend_status: "successful" | 'failed';
+    vend_status: "successful" | "failed";
     vend_code: "00";
     token: string;
     units: `${number}`;
@@ -171,7 +177,7 @@ interface IRechargeRequeryResponse {
 
 interface IRechargeMeterValidationResponse {
     status: "00";
-    httpStatusCode: number,
+    httpStatusCode: number;
     message: string;
     access_token: string;
     customer: {
@@ -276,11 +282,13 @@ export class IRechargeVendorService {
             this.PUBLIC_KEY;
         const hash = this.generateHash(combinedString);
 
-        const response =
-            await newrelic.startBackgroundTransaction('IRecharge:ValidateMeterApiCall', async () =>
+        const response = await newrelic.startBackgroundTransaction(
+            "IRecharge:ValidateMeterApiCall",
+            async () =>
                 await this.client.get<IRechargeMeterValidationResponse>(
                     `/get_meter_info.php/?vendor_code=${this.VENDOR_CODE}&reference_id=${reference}&meter=${meterNumber}&disco=${disco}&response_format=json&hash=${hash}`,
-                ))
+                ),
+        );
 
         return { ...response.data, httpStatusCode: response.status };
     }
@@ -341,7 +349,7 @@ export class IRechargeVendorService {
                 response_format: "json",
                 hash,
             },
-        }
+        };
         logger.info("Vend request sent to irecharge", {
             meta: {
                 reference,
@@ -354,28 +362,35 @@ export class IRechargeVendorService {
                 ...mainMeta,
             },
         });
-        const response = await newrelic.startBackgroundTransaction('IRecharge:VendApiCall', async () =>
-            await this.client.get<IRechargeSuccessfulVendResponse>(
-                "/vend_power.php",
-                {
-                    params: {
-                        vendor_code: this.VENDOR_CODE,
-                        reference_id: reference,
-                        meter: meterNumber,
-                        disco,
-                        amount,
-                        email,
-                        phone,
-                        access_token: accessToken,
-                        response_format: "json",
-                        hash,
+        const response = await newrelic.startBackgroundTransaction(
+            "IRecharge:VendApiCall",
+            async () =>
+                await this.client.get<IRechargeSuccessfulVendResponse>(
+                    "/vend_power.php",
+                    {
+                        params: {
+                            vendor_code: this.VENDOR_CODE,
+                            reference_id: reference,
+                            meter: meterNumber,
+                            disco,
+                            amount,
+                            email,
+                            phone,
+                            access_token: accessToken,
+                            response_format: "json",
+                            hash,
+                        },
                     },
-                },
-            ))
+                ),
+        );
 
-        console.log({ response })
+        console.log({ response });
 
-        const responseData = { ...response.data, source: "IRECHARGE", httpStatusCode: response.status };
+        const responseData = {
+            ...response.data,
+            source: "IRECHARGE",
+            httpStatusCode: response.status,
+        };
         return responseData;
     }
 
@@ -404,7 +419,7 @@ export class IRechargeVendorService {
                 response_format: "json",
                 hash,
             },
-        }
+        };
         logger.info("Requerying transaction with irecharge", {
             meta: { accessToken, serviceType, transactionId, ...mainMeta },
         });
@@ -419,82 +434,103 @@ export class IRechargeVendorService {
 
         console.log({ params });
 
-        const response = await newrelic.startBackgroundTransaction('IRecharge:RequeryApiCall', async () =>
-            await this.client.get<IRechargeRequeryResponse>(
-                "/vend_status.php",
-                { params },
-            ))
+        const response = await newrelic.startBackgroundTransaction(
+            "IRecharge:RequeryApiCall",
+            async () =>
+                await this.client.get<IRechargeRequeryResponse>(
+                    "/vend_status.php",
+                    { params },
+                ),
+        );
 
         logger.info("Requery response from irecharge", {
             meta: { responseData: response.data, transactionId, ...mainMeta },
         });
-        return { ...response.data, source: "IRECHARGE", httpStatusCode: response.status };
+        return {
+            ...response.data,
+            source: "IRECHARGE",
+            httpStatusCode: response.status,
+        };
     }
 }
 
-export class VendorAirtimeService { }
+export class VendorAirtimeService {}
 // Define the VendorService class for handling provider-related operations
 export default class VendorService {
     // Static method for obtaining a Baxi vending token
     static async baxiVendToken(body: IVendToken) {
         const { reference, meterNumber, disco, amount, phone } = body;
-        return newrelic.startBackgroundTransaction('Baxi:VendTokenEndPoint', async () => {
-            try {
-                const mainMeta = {
-                    description: {
-                        url: this.baxiAxios().defaults.baseURL + "/electricity/request",
-                        method: "POST",
-                    },
-                    data: {
-                        amount,
-                        phone,
-                        account_number: meterNumber,
-                        service_type: disco,
-                        agentId: "baxi",
-                        agentReference: reference,
-                    },
-                };
-                logger.info("Vend request sent to baxi", {
-                    meta: {
-                        ...mainMeta,
-                        transactionId: body.transactionId,
-                    },
-                });
-                const response = await newrelic.startBackgroundTransaction('Baxi:VendTokenApiCall', async () =>
-                    await this.baxiAxios().post<
-                        BaxiSuccessfulPuchaseResponse["Postpaid" | "Prepaid"]
-                    >("/electricity/request", {
-                        amount,
-                        phone,
-                        account_number: meterNumber,
-                        service_type: disco,
-                        agentId: "baxi",
-                        agentReference: reference,
-                    }))
+        return newrelic.startBackgroundTransaction(
+            "Baxi:VendTokenEndPoint",
+            async () => {
+                try {
+                    const mainMeta = {
+                        description: {
+                            url:
+                                this.baxiAxios().defaults.baseURL +
+                                "/electricity/request",
+                            method: "POST",
+                        },
+                        data: {
+                            amount,
+                            phone,
+                            account_number: meterNumber,
+                            service_type: disco,
+                            agentId: "baxi",
+                            agentReference: reference,
+                        },
+                    };
+                    logger.info("Vend request sent to baxi", {
+                        meta: {
+                            ...mainMeta,
+                            transactionId: body.transactionId,
+                        },
+                    });
+                    const response = await newrelic.startBackgroundTransaction(
+                        "Baxi:VendTokenApiCall",
+                        async () =>
+                            await this.baxiAxios().post<
+                                BaxiSuccessfulPuchaseResponse[
+                                    | "Postpaid"
+                                    | "Prepaid"]
+                            >("/electricity/request", {
+                                amount,
+                                phone,
+                                account_number: meterNumber,
+                                service_type: disco,
+                                agentId: "baxi",
+                                agentReference: reference,
+                            }),
+                    );
 
-                console.log({ responseFromBaxi: response })
+                    console.log({ responseFromBaxi: response });
 
-                console.log({
-                    info: "Vend response from baxi",
-                    data: response.data,
-                });
+                    console.log({
+                        info: "Vend response from baxi",
+                        data: response.data,
+                    });
 
-                logger.info("Vend response from baxi", {
-                    meta: {
-                        ...mainMeta,
-                        responseData: response.data,
-                        transactionId: body.transactionId,
-                    },
-                });
-                return { ...response.data, source: "BAXI" as const, httpStatusCode: response.status };
-            } catch (error: any) {
-                console.log({
-                    message: error.message,
-                    response: error.response?.data?.errors,
-                });
-                throw error
-            }
-        })
+                    logger.info("Vend response from baxi", {
+                        meta: {
+                            ...mainMeta,
+                            responseData: response.data,
+                            transactionId: body.transactionId,
+                        },
+                    });
+                    return {
+                        ...response.data,
+                        source: "BAXI" as const,
+                        httpStatusCode: response.status,
+                    };
+                } catch (error: any) {
+                    console.log({
+                        message: error.message,
+                        response: error.response?.data?.errors,
+                    });
+                    throw error;
+                }
+            },
+        );
     }
 
     static async baxiRequeryTransaction<
@@ -506,62 +542,70 @@ export default class VendorService {
         transactionId: string;
         reference: string;
     }) {
+        return newrelic.startBackgroundTransaction(
+            "Baxi:RequeryEndPoint",
+            async () => {
+                try {
+                    const mainMeta = {
+                        description: {
+                            url:
+                                this.baxiAxios().defaults.baseURL +
+                                "/superagent/transaction/requery",
+                            method: "GET",
+                        },
+                        params: { agentReference: reference },
+                    };
+                    logger.info("Requerying transaction with baxi", {
+                        meta: { reference, transactionId },
+                    });
 
-        return newrelic.startBackgroundTransaction('Baxi:RequeryEndPoint', async () => {
-            try {
-                const mainMeta = {
-                    description: {
-                        url:
-                            this.baxiAxios().defaults.baseURL +
-                            "/superagent/transaction/requery",
-                        method: "GET",
-                    },
-                    params: { agentReference: reference },
-                };
-                logger.info("Requerying transaction with baxi", {
-                    meta: { reference, transactionId },
-                });
+                    console.log({
+                        reference,
+                        transactionId,
+                        pos: "Requerying transaction with baxi",
+                    });
+                    const response = await this.baxiAxios().get<
+                        BaxiRequeryResultForPurchase[T]
+                    >(
+                        `/superagent/transaction/requery?agentReference=${reference}`,
+                    );
 
-                console.log({ reference, transactionId, pos: 'Requerying transaction with baxi' })
-                const response = await this.baxiAxios().get<
-                    BaxiRequeryResultForPurchase[T]
-                >(`/superagent/transaction/requery?agentReference=${reference}`);
+                    const responseData = response.data;
+                    console.log({ responseFromBaxi: response });
 
-                const responseData = response.data;
-                console.log({ responseFromBaxi: response })
+                    console.log({
+                        info: "Requery response from baxi",
+                        data: responseData,
+                    });
+                    logger.info("Requery response from baxi", {
+                        meta: { responseData, transactionId, ...mainMeta },
+                    });
+                    if (responseData.status === "success") {
+                        return {
+                            ...responseData,
+                            source: "BAXI" as const,
+                            httpStatusCode: response.status,
+                            // status: responseData.status,
+                            // code: responseData.code,
+                            // message: responseData.message,
+                            // data: responseData.data,
+                        };
+                    }
 
-                console.log({
-                    info: "Requery response from baxi",
-                    data: responseData,
-                });
-                logger.info("Requery response from baxi", {
-                    meta: { responseData, transactionId, ...mainMeta },
-                });
-                if (responseData.status === "success") {
                     return {
                         ...responseData,
                         source: "BAXI" as const,
-                        httpStatusCode: response.status
+                        httpStatusCode: response.status,
                         // status: responseData.status,
                         // code: responseData.code,
                         // message: responseData.message,
                         // data: responseData.data,
                     };
+                } catch (error) {
+                    throw error;
                 }
-
-                return {
-                    ...responseData,
-                    source: "BAXI" as const,
-                    httpStatusCode: response.status
-                    // status: responseData.status,
-                    // code: responseData.code,
-                    // message: responseData.message,
-                    // data: responseData.data,
-                };
-            } catch (error) {
-                throw error;
-            }
-        })
+            },
+        );
     }
 
     // Static method for validating a meter with Baxi
@@ -590,11 +634,14 @@ export default class VendorService {
             meta: { disco, meterNumber, vendType, transactionId, ...mainMeta },
         });
         try {
-            const response = await newrelic.startBackgroundTransaction('Baxi:ValidateMeterApiCall', async () =>
-                await this.baxiAxios().post<IBaxiValidateMeterResponse>(
-                    "/electricity/verify",
-                    postData,
-                ))
+            const response = await newrelic.startBackgroundTransaction(
+                "Baxi:ValidateMeterApiCall",
+                async () =>
+                    await this.baxiAxios().post<IBaxiValidateMeterResponse>(
+                        "/electricity/verify",
+                        postData,
+                    ),
+            );
 
             const responseData = response.data;
 
@@ -621,9 +668,11 @@ export default class VendorService {
         try {
             const mainMeta = {
                 description: {
-                    url: this.baxiAxios().defaults.baseURL + "/electricity/billers",
+                    url:
+                        this.baxiAxios().defaults.baseURL +
+                        "/electricity/billers",
                     method: "GET",
-                }
+                },
             };
             logger.info("Fetching available discos from baxi", {
                 meta: mainMeta,
@@ -676,13 +725,16 @@ export default class VendorService {
         } catch (error) {
             console.error(error);
             logger.error(error);
-            throw new Error();
+            throw error;
         }
     }
 
     static baxiAxios(): AxiosInstance {
         const AxiosCreate = axios.create({
-            baseURL: NODE_ENV === 'production' ? VENDOR_URL.BAXI.PROD : VENDOR_URL.BAXI.DEV,
+            baseURL:
+                NODE_ENV === "production"
+                    ? VENDOR_URL.BAXI.PROD
+                    : VENDOR_URL.BAXI.DEV,
             headers: {
                 "x-api-key": BAXI_TOKEN,
             },
@@ -695,7 +747,10 @@ export default class VendorService {
     static buyPowerAxios(): AxiosInstance {
         // Create an Axios instance with BuyPower URL and token in the headers
         const AxiosCreate = axios.create({
-            baseURL: NODE_ENV === 'production' ? VENDOR_URL.BUYPOWERNG.PROD : VENDOR_URL.BUYPOWERNG.DEV,
+            baseURL:
+                NODE_ENV === "production"
+                    ? VENDOR_URL.BUYPOWERNG.PROD
+                    : VENDOR_URL.BUYPOWERNG.DEV,
             headers: {
                 Authorization: `Bearer ${BUYPOWER_TOKEN}`,
             },
@@ -709,74 +764,82 @@ export default class VendorService {
         body: IVendToken,
     ): Promise<PurchaseResponse | TimedOutResponse> {
         // Define data to be sent in the POST request
-        return await newrelic.startBackgroundTransaction('buypower:VendTokenEndPoint', async () => {
-            const postData = {
-                orderId: body.reference,
-                meter: body.meterNumber,
-                disco: body.disco,
-                paymentType: "B2B",
-                vendType: body.vendType.toUpperCase(),
-                amount: body.amount,
-                phone: body.phone.replace('+', ''),
-            };
+        return await newrelic.startBackgroundTransaction(
+            "buypower:VendTokenEndPoint",
+            async () => {
+                const postData = {
+                    orderId: body.reference,
+                    meter: body.meterNumber,
+                    disco: body.disco,
+                    paymentType: "B2B",
+                    vendType: body.vendType.toUpperCase(),
+                    amount: body.amount,
+                    phone: body.phone.replace("+", ""),
+                };
 
-            const mainMeta = {
-                description: {
-                    url: this.buyPowerAxios().defaults.baseURL + "/vend?strict=0",
-                    method: "POST",
-                },
-                data: postData,
-                transactionId: body.transactionId
-            };
-
-            try {
-                logger.info("Vending request to buypower", {
-                    meta: { postData, ...mainMeta },
-                });
-                // Make a POST request using the BuyPower Axios instance
-                const response = await newrelic.startBackgroundTransaction('buypower:VendTokenApiCall', async () =>
-                    await this.buyPowerAxios().post<
-                        PurchaseResponse | TimedOutResponse
-                    >(`/vend?strict=0`, postData)
-                )
-
-                console.log({
-                    requestData: postData,
-                    info: "Vend response from buypower",
-                    data: response.data,
-                });
-                logger.info("Vend response from buypower", {
-                    meta: {
-                        requestData: postData,
-                        responseData: response.data,
-                        ...mainMeta,
+                const mainMeta = {
+                    description: {
+                        url:
+                            this.buyPowerAxios().defaults.baseURL +
+                            "/vend?strict=0",
+                        method: "POST",
                     },
-                });
-                return { ...response.data, source: "BUYPOWERNG" as const, httpStatusCode: response.status };
-            } catch (error: any) {
-                if (error instanceof AxiosError) {
-                    const requery =
-                        error.response?.data?.message ===
-                        "An unexpected error occurred. Please requery." ||
-                        error.response?.data?.responseCode === 500;
-                    if (requery) {
-                        logger.error(error.message, {
-                            meta: {
-                                stack: error.stack,
-                                responseData: error.response?.data,
-                                ...mainMeta,
-                            },
-                        });
-                        throw new Error("Transaction timeout");
+                    data: postData,
+                    transactionId: body.transactionId,
+                };
+
+                try {
+                    logger.info("Vending request to buypower", {
+                        meta: { postData, ...mainMeta },
+                    });
+                    // Make a POST request using the BuyPower Axios instance
+                    const response = await newrelic.startBackgroundTransaction(
+                        "buypower:VendTokenApiCall",
+                        async () =>
+                            await this.buyPowerAxios().post<
+                                PurchaseResponse | TimedOutResponse
+                            >(`/vend?strict=0`, postData),
+                    );
+
+                    console.log({
+                        requestData: postData,
+                        info: "Vend response from buypower",
+                        data: response.data,
+                    });
+                    logger.info("Vend response from buypower", {
+                        meta: {
+                            requestData: postData,
+                            responseData: response.data,
+                            ...mainMeta,
+                        },
+                    });
+                    return {
+                        ...response.data,
+                        source: "BUYPOWERNG" as const,
+                        httpStatusCode: response.status,
+                    };
+                } catch (error: any) {
+                    if (error instanceof AxiosError) {
+                        const requery =
+                            error.response?.data?.message ===
+                                "An unexpected error occurred. Please requery." ||
+                            error.response?.data?.responseCode === 500;
+                        if (requery) {
+                            logger.error(error.message, {
+                                meta: {
+                                    stack: error.stack,
+                                    responseData: error.response?.data,
+                                    ...mainMeta,
+                                },
+                            });
+                            throw new Error("Transaction timeout");
+                        }
                     }
+
+                    throw error;
                 }
-
-                throw error;
-            }
-
-            // TODO: Use event emitter to requery transaction after 10s
-        })
-
+            },
+        );
     }
 
     static async buyPowerRequeryTransaction({
@@ -786,44 +849,55 @@ export default class VendorService {
         reference: string;
         transactionId: string;
     }) {
-        return await newrelic.startBackgroundTransaction('buyPower:RequeryEndPoint', async () => {
-            try {
-                logger.info("Requerying transaction with buypower", {
-                    meta: { reference, transactionId },
-                });
-                const response = await newrelic.startBackgroundTransaction('buypower:RequeryApiCall', async () =>
-                    await this.buyPowerAxios().get<BuypowerRequeryResponse>(
-                        `/transaction/${reference}`,
-                    )
-                )
+        return await newrelic.startBackgroundTransaction(
+            "buyPower:RequeryEndPoint",
+            async () => {
+                try {
+                    logger.info("Requerying transaction with buypower", {
+                        meta: { reference, transactionId },
+                    });
+                    const response = await newrelic.startBackgroundTransaction(
+                        "buypower:RequeryApiCall",
+                        async () =>
+                            await this.buyPowerAxios().get<BuypowerRequeryResponse>(
+                                `/transaction/${reference}`,
+                            ),
+                    );
 
-                logger.info("Requery response from buypower", {
-                    meta: { responseData: response.data, transactionId },
-                });
+                    logger.info("Requery response from buypower", {
+                        meta: { responseData: response.data, transactionId },
+                    });
 
-                const successResponse =
-                    response.data as _RequeryBuypowerSuccessResponse;
-                console.log({
-                    requestData: { reference },
-                    info: "Requery response from buypower",
-                    data: successResponse,
-                });
+                    const successResponse =
+                        response.data as _RequeryBuypowerSuccessResponse;
+                    console.log({
+                        requestData: { reference },
+                        info: "Requery response from buypower",
+                        data: successResponse,
+                    });
 
-                if (successResponse.result.status === true) {
+                    if (successResponse.result.status === true) {
+                        return {
+                            ...response.data,
+                            source: "BUYPOWERNG",
+                            httpStatusCode: response.status,
+                        } as
+                            | InprogressResponseForBuyPowerRequery
+                            | FailedResponseForBuyPowerRequery;
+                    }
+
                     return {
-                        ...successResponse,
-                        result: successResponse.result,
-                        source: "BUYPOWERNG", httpStatusCode: response.status
-                    } as SuccessResponseForBuyPowerRequery;
+                        ...response.data,
+                        source: "BUYPOWERNG",
+                        httpStatusCode: response.status,
+                    } as
+                        | InprogressResponseForBuyPowerRequery
+                        | FailedResponseForBuyPowerRequery;
+                } catch (error) {
+                    throw error;
                 }
-
-                return { ...response.data, source: "BUYPOWERNG", httpStatusCode: response.status } as
-                    | InprogressResponseForBuyPowerRequery
-                    | FailedResponseForBuyPowerRequery;
-            } catch (error) {
-                throw error;
-            }
-        })
+            },
+        );
     }
 
     // Static method for validating a meter with BuyPower
@@ -885,18 +959,25 @@ export default class VendorService {
     }
 
     // Static method for checking Disco updates with BuyPower
-    static async buyPowerCheckDiscoUp(disco: string): Promise<boolean> {
+    static async buyPowerCheckDiscoUp(
+        disco: string,
+        transactionId?: string,
+    ): Promise<boolean> {
         try {
             // Make a GET request to check Disco updates
-            const response = await this.buyPowerAxios().get(
-                `${BUYPOWER_URL}/discos/status`,
-            );
+            const response = await this.buyPowerAxios().get(`/discos/status`);
             const data = response.data;
+
+            logger.info(
+                `DISCO_STATUS: ${disco.toUpperCase()} => ${data[disco.toUpperCase()]}`,
+                { transactionId, responseData: response.data },
+            );
             if (data[disco.toUpperCase()] === true) return true;
             else return false;
         } catch (error) {
-            logger.info(error);
-            throw new Error();
+            console.log(error);
+            logger.error(error);
+            throw error;
         }
     }
 
@@ -933,7 +1014,7 @@ export default class VendorService {
             return providers;
         } catch (error) {
             logger.error(error);
-            throw new Error();
+            throw error;
         }
     }
 
@@ -963,7 +1044,7 @@ export default class VendorService {
         } catch (error) {
             console.error(error);
             logger.error(error);
-            throw new Error();
+            throw error;
         }
     }
 
@@ -971,7 +1052,7 @@ export default class VendorService {
         disco: string,
         meterNumber: string,
         reference: string,
-        transactionId: string
+        transactionId: string,
     ) {
         const response = await IRechargeVendorService.validateMeter({
             disco,
@@ -983,15 +1064,15 @@ export default class VendorService {
             info: "Meter validation request",
             input: { disco, meterNumber, reference },
         });
-        logger.info('Meter validation with IRECHARGE', {
+        logger.info("Meter validation with IRECHARGE", {
             meta: {
                 responseData: response,
                 transactionId,
                 disco,
                 meterNumber,
                 reference,
-            }
-        })
+            },
+        });
         return response;
     }
 
@@ -1009,44 +1090,57 @@ export default class VendorService {
             email,
         } = body;
 
-        return await newrelic.startBackgroundTransaction('irecharge:VendTokenEndPoint', async () => {
-            console.log({
-                requestData: body,
-                info: "Vending token with IRecharge",
-                data: {
+        return await newrelic.startBackgroundTransaction(
+            "irecharge:VendTokenEndPoint",
+            async () => {
+                console.log({
+                    requestData: body,
+                    info: "Vending token with IRecharge",
+                    data: {
+                        reference,
+                        meterNumber,
+                        disco,
+                        amount,
+                        phone,
+                        vendType,
+                        accessToken,
+                        email,
+                    },
+                });
+                logger.info("Vending request to IRecharge", {
+                    meta: {
+                        requestData: body,
+                        transactionId: body.transactionId,
+                    },
+                });
+                const response = await IRechargeVendorService.vend({
+                    disco,
                     reference,
                     meterNumber,
-                    disco,
-                    amount,
-                    phone,
-                    vendType,
                     accessToken,
+                    transactionId: body.transactionId,
+                    amount: parseInt(amount, 10),
+                    phone,
                     email,
-                },
-            });
-            logger.info("Vending request to IRecharge", {
-                meta: { requestData: body, transactionId: body.transactionId },
-            });
-            const response = await IRechargeVendorService.vend({
-                disco,
-                reference,
-                meterNumber,
-                accessToken,
-                transactionId: body.transactionId,
-                amount: parseInt(amount, 10),
-                phone,
-                email,
-                vendType,
-            });
-            console.log({
-                info: "Vend response",
-                data: response,
-            });
-            logger.info("Vend response from IRecharge", {
-                meta: { responseData: response, transactionId: body.transactionId },
-            });
-            return { ...response, source: "IRECHARGE" as const, httpStatusCode: response.httpStatusCode };
-        })
+                    vendType,
+                });
+                console.log({
+                    info: "Vend response",
+                    data: response,
+                });
+                logger.info("Vend response from IRecharge", {
+                    meta: {
+                        responseData: response,
+                        transactionId: body.transactionId,
+                    },
+                });
+                return {
+                    ...response,
+                    source: "IRECHARGE" as const,
+                    httpStatusCode: response.httpStatusCode,
+                };
+            },
+        );
     }
 
     static async irechargeRequeryTransaction({
@@ -1058,21 +1152,22 @@ export default class VendorService {
         accessToken: string;
         serviceType: "power" | "airtime" | "data" | "tv";
     }) {
-
-        return newrelic.startBackgroundTransaction('irecharge:RequeryEndPoint', async () => {
-            const response = await IRechargeVendorService.requery({
-                serviceType,
-                accessToken,
-                transactionId,
-            });
-            console.log({
-                requestData: { serviceType, accessToken },
-                info: "Requery response from irecharge",
-                data: response,
-            });
-            return response;
-        })
-
+        return newrelic.startBackgroundTransaction(
+            "irecharge:RequeryEndPoint",
+            async () => {
+                const response = await IRechargeVendorService.requery({
+                    serviceType,
+                    accessToken,
+                    transactionId,
+                });
+                console.log({
+                    requestData: { serviceType, accessToken },
+                    info: "Requery response from irecharge",
+                    data: response,
+                });
+                return response;
+            },
+        );
     }
 
     static async purchaseAirtime<T extends Vendor>({
@@ -1147,7 +1242,7 @@ export default class VendorService {
         };
         vendor: T;
     }): Promise<ElectricityPurchaseResponse[T]> {
-        let response: ElectricityPurchaseResponse[T]
+        let response: ElectricityPurchaseResponse[T];
 
         try {
             if (vendor === "BUYPOWERNG") {
@@ -1166,22 +1261,22 @@ export default class VendorService {
                 throw new Error("UNAVAILABLE_VENDOR");
             }
 
-            logger.info('Transposed Response from' + vendor, {
+            logger.info("Transposed Response from" + vendor, {
                 meta: {
                     transactionId: data.transactionId,
                     response,
-                }
-            })
+                },
+            });
 
-            return response
+            return response;
         } catch (error) {
-            logger.error('Error from vend request to ' + vendor, {
+            logger.error("Error from vend request to " + vendor, {
                 meta: {
                     transactionId: data.transactionId,
                     error,
-                }
-            })
-            throw error
+                },
+            });
+            throw error;
         }
     }
 }

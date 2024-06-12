@@ -1,8 +1,20 @@
 // Import necessary modules and dependencies
-import { Table, Column, Model, DataType, IsUUID, PrimaryKey, BelongsTo, ForeignKey, HasMany, BelongsToMany } from "sequelize-typescript";
+import {
+    Table,
+    Column,
+    Model,
+    DataType,
+    IsUUID,
+    PrimaryKey,
+    BelongsTo,
+    ForeignKey,
+    HasMany,
+    BelongsToMany,
+} from "sequelize-typescript";
 import User from "./User.model";
 import PowerUnit from "./PowerUnit.model";
 import Transaction from "./Transaction.model";
+import UserMeter from "./UserMeter.model";
 
 // Define the Sequelize model for the "Meter" table
 @Table
@@ -26,7 +38,10 @@ export default class Meter extends Model<Meter | IMeter> {
     disco: string;
 
     @Column({ type: DataType.STRING, allowNull: false })
-    vendType: IMeter['vendType'];
+    vendType: IMeter["vendType"];
+
+    @Column({ type: DataType.STRING, allowNull: true })
+    ownersName: string;
 
     // Foreign key for the associated User
     @ForeignKey(() => User)
@@ -45,16 +60,20 @@ export default class Meter extends Model<Meter | IMeter> {
     // Transactions associated with the meter
     @HasMany(() => Transaction)
     transactions: Transaction[];
+
+    @HasMany(() => UserMeter)
+    userMeters: UserMeter[];
 }
 
 // Interface to represent a Meter object with specific properties
 export interface IMeter {
-    id: string;          // Unique identifier for the meter
-    address: string;     // address associated with the meter
+    id: string; // Unique identifier for the meter
+    address: string; // address associated with the meter
     meterNumber: string; // Meter number for identification
-    userId: string;      // Identifier of the associated user
-    disco: string;      // Disco name for meter 
-    vendType: 'PREPAID' | 'POSTPAID'
+    userId: string; // Identifier of the associated user
+    ownersName?: string; // Identifier of the associated user
+    disco: string; // Disco name for meter
+    vendType: "PREPAID" | "POSTPAID";
 }
 
 // Interface to represent thep structure of data for creating a new Meter
@@ -66,3 +85,4 @@ export interface ICreateMeter extends IMeter {
 export interface IUpdateMeter {
     // (You can add specific properties here if needed when updating an existing meter)
 }
+

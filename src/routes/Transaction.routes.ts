@@ -2,6 +2,9 @@ import express, { Router } from "express";
 import TransactionController from "../controllers/Public/Transaction.controller";
 import { basicAuth, validateApiKey } from "../middlewares/Auth";
 import { AuthenticatedController } from "../utils/Interface";
+import VendorController from "../controllers/Public/VendorApi.controller/VendorApi.controller";
+import RBACMiddelware from "../middlewares/Rbac";
+import { RoleEnum } from "../models/Role.model";
 
 export const router: Router = express.Router();
 
@@ -26,6 +29,12 @@ router
             TransactionController.getYesterdaysTransactions,
         ),
     )
+    .post(
+        "/resend",
+        basicAuth("access"),
+        RBACMiddelware.validateRole([RoleEnum.Admin, RoleEnum.SuperAdmin]),
+        AuthenticatedController(VendorController.resendToken),
+    );
 // .get(
 //     "/requery-transaction",
 //     AuthenticatedController(

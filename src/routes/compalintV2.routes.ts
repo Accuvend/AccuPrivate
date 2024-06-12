@@ -15,7 +15,7 @@ export const router: Router = express.Router();
 router
 .get('/admin/all', basicAuth('access') ,RBACMiddelware.validateRole([RoleEnum.SuperAdmin , RoleEnum.Admin]),AuthenticatedController(ComplaintController.getComplaintAdmin))
 .post('/create',uploadsMulter.single('uploads'), basicAuth('access'), RBACMiddelware.validateRole([RoleEnum.Partner]), AuthenticatedController(ComplaintController.createComplaint))
-.post('/create/complaint', uploadsMulter.single('uploads'), validateApiKey, RBACMiddelware.validateRole([RoleEnum.Partner]), AuthenticatedController(ComplaintController.createComplaint))
+.post('/api/create', uploadsMulter.single('uploads'), validateApiKey, AuthenticatedController(ComplaintController.createComplaint))
 .get('/partner/all', basicAuth('access'), RBACMiddelware.validateRole([RoleEnum.Partner]), AuthenticatedController(ComplaintController.getComplaintsPartner))
 
 

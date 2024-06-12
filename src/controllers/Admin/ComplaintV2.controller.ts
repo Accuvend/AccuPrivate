@@ -14,6 +14,7 @@ import { PartnerProfileService } from "../../services/Entity/Profiles";
 import Entity from "../../models/Entity/Entity.model";
 import Transaction from "../../models/Transaction.model";
 import TransactionService from "../../services/Transaction.service";
+import { PartnerProfile } from "../../models/Entity/Profiles";
 require("newrelic");
 
 
@@ -95,10 +96,12 @@ export class ComplaintController {
         else if (_route === '/create') channel = 'PARTNER PORTAL'
         else channel = 'OTHERS'
         
-        // Extracting the entity ID from the authenticated user data
-        const {
-            entity: { id },
-        } = req.user.user;
+        // Extracting the entity ID from the authenticated user data for basic Auth
+        const id =  req?.user?.user?.entity?.id || null;
+
+        // Extracting the entity ID from the authenticated user data for Api Key 
+        const partnerId  = (req as any).key;
+        
 
         const transaction: Transaction | null = await TransactionService.viewSingleTransaction(transactionId)
         try {
@@ -125,10 +128,18 @@ export class ComplaintController {
             }
 
             // Fetching entity details
-            const entity: Entity | null = await EntityService.viewSingleEntity(
-                id
-            );
+            let entity : Entity | null | undefined
+            if(id){
+                entity = await EntityService.viewSingleEntity(
+                    id
+                );
+            }else if(partnerId){
+                let partner: PartnerProfile | null = await PartnerProfileService.viewSinglePartner(partnerId)
+                entity = partner?.entity
+            }
+
             if (!entity) throw new Error("Entity doesn't exist ");
+            
 
             // Creating complaint schema based on request data
             const complaintSchema: ICreateComplaint = {

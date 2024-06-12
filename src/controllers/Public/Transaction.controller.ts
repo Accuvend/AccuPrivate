@@ -334,9 +334,13 @@ export default class TransactionController {
         }
 
         // Retrieves the ID of the authenticated user's partner profile
-        const {
-            profile: { id },
-        } = req.user.user;
+        const partnerBasicAuthId  = req?.user?.user?.profile?.id;
+
+        const partnerApiKeyId = (req as any).key;
+
+        let id = ''
+        if(partnerApiKeyId) id = partnerApiKeyId
+        if(partnerBasicAuthId ) id = partnerBasicAuthId
 
         // Retrieves the partner profile based on the ID
         const partner = await PartnerService.viewSinglePartner(id);

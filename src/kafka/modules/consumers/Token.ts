@@ -1153,7 +1153,7 @@ class TokenHandler extends Registry {
 
                     // Purchase token from vendor
                     // Keep record of the last time the transaction was requeued
-                    await TransactionService.updateSingleTransaction(transaction.id, { vendTimeStamps: [...(transaction.vendTimeStamps ?? []), new Date()] })
+                    await TransactionService.updateSingleTransaction(transaction.id, { vendTimeStamps: [...(transaction.vendTimeStamps ?? []), new Date().toString()] })
                     const tokenInfo = await TokenHandlerUtil.processVendRequest(
                         {
                             transaction:
@@ -1478,7 +1478,7 @@ class TokenHandler extends Registry {
                         differenceInMilliseconds / (1000 * 60 * 60); // 1000 milliseconds * 60 seconds * 60 minutes
 
                     // Check if the difference is greater than two hours
-                    const flaggTransaction = differenceInHoursFromLastVend > 2 || differenceInHours > 2;
+                    const flaggTransaction = differenceInHoursFromLastVend > 2 || differenceInHours > ((2/60) * 2);
                     //check if transaction is greater than 2hrs then stop
                     if (flaggTransaction) {
                         logger.info(

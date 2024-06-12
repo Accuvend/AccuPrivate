@@ -347,8 +347,8 @@ export class VendorControllerValdator {
                         superAgent.toUpperCase() === "BUYPOWERNG"
                             ? await validateWithBuypower()
                             : superAgent.toUpperCase() === "BAXI"
-                                ? await validateWithBaxi()
-                                : await validateWithIrecharge();
+                              ? await validateWithBaxi()
+                              : await validateWithIrecharge();
                     if (response instanceof Error) {
                         throw response;
                     }
@@ -573,7 +573,7 @@ export default class VendorController {
                             paymentProviderId, 
                             transactionType:
                                 transactionTypes[
-                                existingProductCodeForDisco.category
+                                    existingProductCodeForDisco.category
                                 ],
                             productCodeId: existingProductCodeForDisco.id,
                             retryRecord: [],
@@ -581,7 +581,7 @@ export default class VendorController {
                             vendorReferenceId: await generateVendorReference(),
                             productType:
                                 transactionTypes[
-                                existingProductCodeForDisco.category
+                                    existingProductCodeForDisco.category
                                 ],
                             channel,
                         },
@@ -696,11 +696,11 @@ export default class VendorController {
                 const discoUp =
                     superagent.toUpperCase() === "BUYPOWERNG"
                         ? await VendorService.buyPowerCheckDiscoUp(
-                            vendorDiscoCode,
-                        ).catch((e) => e)
+                              vendorDiscoCode,
+                          ).catch((e) => e)
                         : await VendorService.baxiCheckDiscoUp(
-                            vendorDiscoCode,
-                        ).catch((e) => e);
+                              vendorDiscoCode,
+                          ).catch((e) => e);
 
                 const discoUpEvent =
                     discoUp instanceof Boolean
@@ -727,14 +727,14 @@ export default class VendorController {
 
                 // // TODO: Publish event for disco up to kafka
                 const existingMeter =
-                    await MeterService.viewSingleMeterByMeterNumberDisco({
-                        meterNumber, disco
-                    });
+                    await MeterService.viewSingleMeterByMeterNumber(
+                        meterNumber,
+                    );
                 const userHasUsedMeterBefore = existingMeter
                     ? await UserMeterService.findByUserAndMeterId({
-                        userId: user.id,
-                        meterId: existingMeter.id,
-                    })
+                          userId: user.id,
+                          meterId: existingMeter.id,
+                      })
                     : false;
 
                 if (userHasUsedMeterBefore && !existingMeter) {
@@ -1062,7 +1062,7 @@ export default class VendorController {
 
                             logger.info(
                                 "Token from interval received => " +
-                                tokenFromVendor,
+                                    tokenFromVendor,
                             );
 
                             // Send response if token has been gotten from vendor
@@ -1520,11 +1520,11 @@ export default class VendorController {
         const discoCode = vendorProduct.schemaData.code;
         const requeryResult =
             await TokenHandlerUtil.requeryTransactionFromVendor(
-                transaction,
+                { ...transaction, superagent: vendor.name as ITransaction['superagent'] } as Transaction,  
             ).catch((e) => e ?? {});
 
         logger.info("Requeried transaction successfully", logMeta);
-        console.log({ requeryResult: requeryResult });
+        console.log({ requeryResult: requeryResult.response?.data });
         const response =
             await ResponseValidationUtil.validateTransactionCondition({
                 requestType: "REQUERY",
@@ -1571,6 +1571,9 @@ export default class VendorController {
             lastSuperAgentUsed,
             partner.email,
         );
+        await TransactionService.updateSingleTransaction(transaction.id, {
+            status: Status.INPROGRESS,
+        });
         switch (response.action) {
             case -1:
                 logger.error(
@@ -1630,7 +1633,7 @@ export default class VendorController {
                     response.vendType == "PREPAID" ? response.token : undefined;
                 const discoLogo =
                     DISCO_LOGO[
-                    product.productName as keyof typeof DISCO_LOGO
+                        product.productName as keyof typeof DISCO_LOGO
                     ] ?? LOGO_URL;
                 let powerUnit =
                     await PowerUnitService.viewSinglePowerUnitByTransactionId(
@@ -1639,27 +1642,27 @@ export default class VendorController {
 
                 powerUnit = powerUnit
                     ? await PowerUnitService.updateSinglePowerUnit(
-                        powerUnit.id,
-                        {
-                            tokenFromVend: token,
-                            tokenUnits: response.tokenUnits,
-                            transactionId: transactionId,
-                        },
-                    )
+                          powerUnit.id,
+                          {
+                              tokenFromVend: token,
+                              tokenUnits: response.tokenUnits,
+                              transactionId: transactionId,
+                          },
+                      )
                     : await PowerUnitService.addPowerUnit({
-                        id: uuidv4(),
-                        transactionId: transactionId,
-                        disco: meter.disco,
-                        discoLogo,
-                        amount: transaction.amount,
-                        meterId: meter.id,
-                        superagent:
-                            lastSuperAgentUsed as ITransaction["superagent"],
-                        tokenFromVend: token,
-                        tokenNumber: 0,
-                        tokenUnits: response.tokenUnits,
-                        address: transaction.meter.address,
-                    });
+                          id: uuidv4(),
+                          transactionId: transactionId,
+                          disco: meter.disco,
+                          discoLogo,
+                          amount: transaction.amount,
+                          meterId: meter.id,
+                          superagent:
+                              lastSuperAgentUsed as ITransaction["superagent"],
+                          tokenFromVend: token,
+                          tokenNumber: 0,
+                          tokenUnits: response.tokenUnits,
+                          address: transaction.meter.address,
+                      });
                 token &&
                     (await TransactionService.updateSingleTransaction(
                         transactionId,
@@ -1710,9 +1713,9 @@ export default class VendorController {
                                 cause: TransactionErrorCause.UNEXPECTED_ERROR,
                             },
                         },
-                        requeryCount: 1,
                         eventService: transactionEventService,
                         retryCount: 1,
+                        requeryCount: 1,
                         superAgent: lastSuperAgentUsed,
                         tokenInResponse: null,
                         transactionTimedOutFromBuypower: false,
@@ -1731,9 +1734,9 @@ export default class VendorController {
                                 cause: TransactionErrorCause.NO_TOKEN_IN_RESPONSE,
                             },
                         },
-                        requeryCount: 1,
                         eventService: transactionEventService,
                         retryCount: 1,
+                        requeryCount: 1,
                         superAgent: lastSuperAgentUsed,
                         tokenInResponse: null,
                         transactionTimedOutFromBuypower: false,

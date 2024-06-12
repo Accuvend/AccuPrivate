@@ -99,20 +99,24 @@ export default class Transaction extends Model<ITransaction | Transaction> {
 
     // superagent associated with the transaction
     @Column({ type: DataType.STRING, allowNull: false })
-    superagent: ITransaction['superagent'];
+    superagent: ITransaction["superagent"];
 
-    @Column({ type: DataType.STRING, allowNull: true, defaultValue: () => generateRandomString(10) })
+    @Column({
+        type: DataType.STRING,
+        allowNull: true,
+        defaultValue: () => generateRandomString(10),
+    })
     reference: string;
 
     @Column({ type: DataType.JSONB, allowNull: true, defaultValue: [] })
     retryRecord: {
-        vendor: ITransaction['superagent'],
-        reference: string[],
-        accessToken?: string,
-        data?: Record<string, any>,
-        retryCount: number,
-        attempt: number,
-    }[]
+        vendor: ITransaction["superagent"];
+        reference: string[];
+        accessToken?: string;
+        data?: Record<string, any>;
+        retryCount: number;
+        attempt: number;
+    }[];
 
     @Column({ type: DataType.STRING, allowNull: true })
     productType: string;
@@ -128,14 +132,17 @@ export default class Transaction extends Model<ITransaction | Transaction> {
     paymentProviderId: string;
 
     @Column({ type: DataType.STRING, allowNull: true })
-    vendorReferenceId: string
+    irechargeAccessToken: string;
 
     @Column({ type: DataType.STRING, allowNull: true })
-    networkProvider: string
+    vendorReferenceId: string;
+
+    @Column({ type: DataType.STRING, allowNull: true })
+    networkProvider: string;
 
     @ForeignKey(() => Bundle)
     @Column({ type: DataType.STRING, allowNull: true })
-    bundleId?: string
+    bundleId?: string;
 
     @Column({ type: DataType.ARRAY(DataType.STRING), allowNull: true })
     previousVendors: string[];
@@ -153,8 +160,12 @@ export default class Transaction extends Model<ITransaction | Transaction> {
     @Column
     userId: string;
 
-    @Column({ type: DataType.ENUM, values: Object.values(TransactionType), allowNull: true })
-    transactionType: TransactionType
+    @Column({
+        type: DataType.ENUM,
+        values: Object.values(TransactionType),
+        allowNull: true,
+    })
+    transactionType: TransactionType;
 
     // Belongs to a User
     @BelongsTo(() => User)
@@ -194,7 +205,7 @@ export default class Transaction extends Model<ITransaction | Transaction> {
     meter: Meter;
 
     @Column({ type: DataType.STRING, allowNull: true })
-    channel: 'USSD' | 'WEB' | 'MOBILE' | 'POS' | 'ATM' | 'OTHERS'
+    channel: "USSD" | "WEB" | "MOBILE" | "POS" | "ATM" | "OTHERS";
 
     @BelongsTo(() => Bundle)
     bundle: Bundle;
@@ -218,7 +229,7 @@ export default class Transaction extends Model<ITransaction | Transaction> {
 
     @BeforeCreate
     static async checkIfAccesstokenExistForIRecharge(transaction: Transaction) {
-        if (transaction.superagent === 'IRECHARGE') {
+        if (transaction.superagent === "IRECHARGE") {
             if (!transaction.irechargeAccessToken) {
                 // throw new Error('irechargeAccessToken is required')
             }
@@ -229,7 +240,7 @@ export default class Transaction extends Model<ITransaction | Transaction> {
     static async checkIfDiscoExistForElectricity(transaction: Transaction) {
         if (transaction.transactionType === TransactionType.ELECTRICITY) {
             if (!transaction.disco) {
-                throw new Error('disco is required')
+                throw new Error("disco is required");
             }
         }
     }
@@ -237,23 +248,27 @@ export default class Transaction extends Model<ITransaction | Transaction> {
     @BeforeCreate
     static async checkDiscoForAirtime(transaction: Transaction) {
         if (transaction.transactionType === TransactionType.AIRTIME) {
-            if (['MTN', 'GLO', 'AIRTEL', '9MOBILE', 'ETISALAT'].indexOf(transaction.disco.toUpperCase()) === -1) {
+            if (
+                ["MTN", "GLO", "AIRTEL", "9MOBILE", "ETISALAT"].indexOf(
+                    transaction.disco.toUpperCase(),
+                ) === -1
+            ) {
                 // throw new Error('disco is required')
             }
         }
     }
 
     @BeforeCreate
-    static async checkIfProductCodeExistForElectricity(transaction: Transaction) {
+    static async checkIfProductCodeExistForElectricity(
+        transaction: Transaction,
+    ) {
         if (transaction.transactionType === TransactionType.ELECTRICITY) {
             if (!transaction.productCodeId) {
-                throw new Error('productCodeId is required')
+                throw new Error("productCodeId is required");
             }
         }
     }
-
 }
-
 
 // Define an interface representing a transaction (ITransaction) with various properties.
 export interface ITransaction {
@@ -265,25 +280,26 @@ export interface ITransaction {
     disco?: string; // Disco associated with the transaction
     bankRefId?: string; // Bank reference ID related to the transaction
     bankComment?: string; // Comments or notes from the bank regarding the transaction
-    superagent: 'BUYPOWERNG' | 'BAXI' | 'IRECHARGE'; // superagent associated with the transaction
+    superagent: "BUYPOWERNG" | "BAXI" | "IRECHARGE"; // superagent associated with the transaction
     transactionType: TransactionType;
     userId: string; // Unique identifier of the user associated with the transaction
     partnerId: string; // Unique identifier of the Partner associated with the transaction
     meterId?: string; // Unique identifier of the Meter associated with the transaction
     reference: string;
+    paymentProviderId: string;
     productCodeId: string;
     irechargeAccessToken?: string;
     vendorReferenceId: string;
     previousVendors: string[];
-    tokenFromVend?: string
+    tokenFromVend?: string;
     tokenFromRequery?: string;
     retryRecord: {
-        vendor: ITransaction['superagent'],
-        reference: string[],
-        data?: Record<string, any>,
-        retryCount: number,
-        attempt: number,
-    }[],
+        vendor: ITransaction["superagent"];
+        reference: string[];
+        data?: Record<string, any>;
+        retryCount: number;
+        attempt: number;
+    }[];
     productType: string;
     networkProvider?: string;
     bundleId?: string;
@@ -305,11 +321,12 @@ export interface IUpdateTransaction {
 
 type DateQuery = {
     transactionTimestamp?: { $between: [Date, Date] } | Date;
-    createdAt: { $between: [Date, Date] } | Date,
-}
+    createdAt: { $between: [Date, Date] } | Date;
+};
 export interface IQueryTransaction {
     where: {
         [K in keyof Omit<ITransaction, keyof DateQuery>]?: ITransaction[K];
-    } & DateQuery,
-    offset?: number, limit?: number
+    } & DateQuery;
+    offset?: number;
+    limit?: number;
 }

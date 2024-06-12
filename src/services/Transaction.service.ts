@@ -32,7 +32,7 @@ export default class TransactionService {
     }
 
     static async addTransactionWithoutValidatingUserRelationship(
-        transaction: Omit<ICreateTransaction, "userId">
+        transaction: Omit<ICreateTransaction, "userId">,
     ): Promise<Transaction> {
         console.log({ transaction });
         const transactionData = Transaction.build({
@@ -42,7 +42,7 @@ export default class TransactionService {
 
         await transactionData.save({ validate: false });
         const _transaction = await TransactionService.viewSingleTransaction(
-            transactionData.id
+            transactionData.id,
         );
         if (!_transaction) {
             throw new Error("Error fetching transaction");
@@ -53,7 +53,7 @@ export default class TransactionService {
 
     // Static method for adding a new transaction
     static async addTransaction(
-        transaction: ICreateTransaction
+        transaction: ICreateTransaction,
     ): Promise<Transaction> {
         // Build a new transaction object
         const newTransaction: Transaction = Transaction.build(transaction);
@@ -71,14 +71,22 @@ export default class TransactionService {
         // Retrieve all transactions from the database
         const transactions: Transaction[] = await Transaction.findAll({
             where: {},
-            include: [PowerUnit, Event, Partner, User, Meter, Bundle, PaymentProvider ],
+            include: [
+                PowerUnit,
+                Event,
+                Partner,
+                User,
+                Meter,
+                Bundle,
+                PaymentProvider,
+            ],
             order: [["transactionTimestamp", "DESC"]],
         });
         return transactions;
     }
 
     static async viewTransactionsWithCustomQuery(
-        query: Record<string, any>
+        query: Record<string, any>,
     ): Promise<Transaction[]> {
         // Retrieve all transactions from the database
         // Sort from latest
@@ -155,7 +163,7 @@ export default class TransactionService {
      * @returns A Promise resolving to an array of transactions that match the query criteria.
      */
     static async viewTransactionsWithCustomQueryAndInclude(
-        queryandinclude: Record<string, any>
+        queryandinclude: Record<string, any>,
     ): Promise<Transaction[]> {
         // Retrieve transactions from the database based on the provided query and included associations
         const transactions: Transaction[] = await Transaction.findAll({
@@ -193,7 +201,7 @@ export default class TransactionService {
     }
 
     static async viewTransactionsCountWithCustomQuery(
-        query: Record<string, any>
+        query: Record<string, any>,
     ): Promise<number> {
         // Counting transactions from the database
         const transactionCount: number = await Transaction.count({
@@ -203,7 +211,7 @@ export default class TransactionService {
     }
 
     static async viewTransactionsAmountWithCustomQuery(
-        query: Record<string, any>
+        query: Record<string, any>,
     ): Promise<number> {
         // Summing the total amount of transactions from the database
 
@@ -214,7 +222,7 @@ export default class TransactionService {
                 [
                     Sequelize.fn(
                         "sum",
-                        Sequelize.cast(Sequelize.col("amount"), "DECIMAL")
+                        Sequelize.cast(Sequelize.col("amount"), "DECIMAL"),
                     ),
                     "total_amount",
                 ],
@@ -225,7 +233,7 @@ export default class TransactionService {
 
     // Static method for viewing a single transaction by UUID
     static async viewSingleTransaction(
-        uuid: string
+        uuid: string,
     ): Promise<Transaction | null> {
         // Retrieve a single transaction by its UUID
 
@@ -285,12 +293,12 @@ export default class TransactionService {
     }
 
     static async viewSingleTransactionByBankRefID(
-        bankRefId: string
+        bankRefId: string,
     ): Promise<Transaction | null> {
         // Retrieve a single transaction by its UUID
         const transaction: Transaction | null = await Transaction.findOne({
             where: { bankRefId: bankRefId },
-            include: [PowerUnit, Event, Partner, User, Meter,PaymentProvider],
+            include: [PowerUnit, Event, Partner, User, Meter, PaymentProvider],
         });
         return transaction;
     }
@@ -298,14 +306,14 @@ export default class TransactionService {
     // Static method for updating a single transaction by UUID
     static async updateSingleTransaction(
         uuid: string,
-        updateTransaction: IUpdateTransaction
+        updateTransaction: IUpdateTransaction,
     ): Promise<Transaction | null> {
         // Update the transaction in the database
         const updateResult: [number] = await Transaction.update(
             updateTransaction,
             {
                 where: { id: uuid },
-            }
+            },
         );
         // Retrieve the updated transaction by its UUID
         const updatedTransaction: Transaction | null =
@@ -314,7 +322,7 @@ export default class TransactionService {
     }
 
     static async viewTransactionForYesterday(
-        partnerId: string
+        partnerId: string,
     ): Promise<Transaction[]> {
         const yesterdayDate = new Date();
         yesterdayDate.setDate(yesterdayDate.getDate() - 1);
@@ -332,7 +340,7 @@ export default class TransactionService {
 
     static async viewTransactionsForYesterdayByStatus(
         partnerId: string,
-        status: "COMPLETED" | "PENDING" | "FAILED"
+        status: "COMPLETED" | "PENDING" | "FAILED",
     ): Promise<Transaction[]> {
         const yesterdayDate = new Date();
         yesterdayDate.setDate(yesterdayDate.getDate() - 1);

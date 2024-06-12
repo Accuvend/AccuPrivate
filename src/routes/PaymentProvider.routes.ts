@@ -12,7 +12,7 @@ router
     .get("/", PaymentProviderController.getPaymentProviders)
     .post(
         "/create",
-        basicAuth,
+        basicAuth("access"),
         RBACMiddelware.validateRole([RoleEnum.SuperAdmin, RoleEnum.Admin]),
         AuthenticatedController(
             PaymentProviderController.createPaymentProvider,

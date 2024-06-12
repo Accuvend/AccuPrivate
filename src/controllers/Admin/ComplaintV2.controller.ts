@@ -80,9 +80,12 @@ export class ComplaintController {
             //title,
             description , 
             category , 
-            transactionId 
-         }: { title?: string; description: string , category: string, transactionId : string} = req.body;
+            transactionId
+            // upload
+         }: { title?: string; description: string , category: string, transactionId : string } /*upload: any}*/ = req.body;
         
+        const upload = req.file
+        // console.log(upload , 'file----')
         // checking the route calling the Endpoint
         let channel = ''
         const _route = req.url
@@ -136,6 +139,7 @@ export class ComplaintController {
                 status: "Open", // The status of the complaint, typically either 'Open' or another custom status.
                 email: entity.email, // The email address associated with the complaint (optional).
                 category : category, // The category of the complaint (optional)
+                uploads: upload, // The Upload
                 cf: {
                     // Additional custom fields related to the complaint (optional).
                     cf_transanction_id: transaction.id, // The transaction ID associated with the complaint.
@@ -163,8 +167,14 @@ export class ComplaintController {
             });
 
             return;
-        } catch (err) {
+        } catch (err: any) {
             // Handling errors
+            if(err.message === "Error occurred while uploading attachment to in Zoho."){
+                res.status(202).json({
+                    status: "success",
+                    message: "complaint successful error creating attachment"
+                })
+            }
             next(
                 new InternalServerError(
                     "Sorry an error occurred, couldn't create complaint"
@@ -273,7 +283,7 @@ export class ComplaintController {
         } = req.user.user;
         try {
             // Retrieving complaints associated with the partner
-            console.log(page, size , status)
+            // console.log(page, size , status)
             const complaint =
                 await ComplaintService.viewAllComplainsPaginatedFilteredPartner(
                     id,

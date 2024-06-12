@@ -7,6 +7,7 @@ import {
     PrimaryKey,
     CreatedAt,
     ForeignKey,
+    BelongsTo,
 } from "sequelize-typescript";
 import Role from "./Role.model";
 
@@ -47,6 +48,7 @@ export default class UserInvite extends Model<UserInvite | IUserInvite> {
     @Column({ type: DataType.DATE, allowNull: false })
     createdAt: Date;
 
+    @BelongsTo(() => Role)
     @ForeignKey(() => Role)
     role: Role;
 }

@@ -111,7 +111,7 @@ export default class UserInviteService {
      */
     static async updateAUserInvite(
         uuid: string,
-        userInvite: IUpdateUserInvite,
+        data: IUpdateUserInvite,
         transaction?: Transaction,
     ) {
         try {
@@ -124,8 +124,8 @@ export default class UserInviteService {
             }
 
             transaction
-                ? await userInvite.update(userInvite, { transaction })
-                : await userInvite.update(userInvite);
+                ? await userInvite.update(data, { transaction })
+                : await userInvite.update(data);
 
             const updatedUserInvite = transaction
                 ? await UserInvite.findOne({

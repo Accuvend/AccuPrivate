@@ -189,6 +189,9 @@ export default class AuthController {
         const existingInviteForUser =
             await UserInviteService.viewUserInviteByEmail(email);
 
+        console.log({
+            existingInviteForUser: existingInviteForUser?.dataValues,
+        });
         const role =
             existingInviteForUser &&
             existingInviteForUser.status === UserInviteStatus.PENDING

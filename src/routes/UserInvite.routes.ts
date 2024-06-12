@@ -10,7 +10,16 @@ export const router: Router = express.Router();
 router
     .use(
         basicAuth("access"),
-        RBACMiddelware.validateRole([RoleEnum.SuperAdmin]),
+        RBACMiddelware.validateRole([RoleEnum.SuperAdmin, RoleEnum.Admin]),
+    )
+    .post("/new", AuthenticatedController(UserInviteController.addUserInvite))
+    .post(
+        "/cancel",
+        AuthenticatedController(UserInviteController.cancelUserInvite),
+    )
+    .post(
+        "/resend",
+        AuthenticatedController(UserInviteController.resendUserInvite),
     )
     .get(
         "/info",

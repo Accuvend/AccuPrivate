@@ -3,11 +3,13 @@ import fs from "fs";
 import {
     ACCUVEND_ORDER_CONFIRMATION_BASE_URL,
     ACCUVEND_RECEIPT_BASE_URL,
+    ACCUVEND_USER_INVITE_URL,
     LOGO_URL,
 } from "../../Constants";
 import { IReceiptEmailTemplateProps } from "../../Interface";
 import Transaction from "../../../models/Transaction.model";
 import { randomUUID } from "crypto";
+import { string } from "zod";
 
 const containerTemplate = fs.readFileSync(__dirname + "/container.ejs", "utf8");
 
@@ -245,6 +247,24 @@ class EmailTemplate {
             await ejs.renderFile(__dirname + "/su_deactivation_request.ejs", {
                 email,
                 authorizationCode,
+            }),
+        );
+    };
+    userInvite = async ({
+        email,
+        roleId,
+        name,
+    }: {
+        name: string;
+        email: string;
+        roleId: string;
+    }) => {
+        return container(
+            await ejs.renderFile(__dirname + "/userinvite.ejs", {
+                email,
+                name,
+                roleId,
+                link: ACCUVEND_USER_INVITE_URL + `/${email}`,
             }),
         );
     };

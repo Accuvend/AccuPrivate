@@ -6,6 +6,7 @@ import UserInviteService from "../../services/UserInvite.service";
 import { UserInviteStatus } from "../../models/UserInvite.model";
 import { RoleEnum } from "../../models/Role.model";
 import EntityService from "../../services/Entity/Entity.service";
+import EmailService, { EmailTemplate } from "../../utils/Email";
 
 export default class UserInviteController {
     static async addUserInvite(req: AuthenticatedRequest, res: Response) {
@@ -31,6 +32,16 @@ export default class UserInviteController {
             roleId,
             status: UserInviteStatus.PENDING,
             createdAt: new Date(),
+        });
+
+        await EmailService.sendEmail({
+            to: userInvite.email,
+            subject: "User Invite",
+            html: await new EmailTemplate().userInvite({
+                email: userInvite.email,
+                name: userInvite.name ?? "",
+                roleId: userInvite.roleId,
+            }),
         });
 
         res.status(201).send({
@@ -115,6 +126,16 @@ export default class UserInviteController {
         if (existingUser) {
             throw new ForbiddenError("User already accepted invite");
         }
+
+        await EmailService.sendEmail({
+            to: userInvite.email,
+            subject: "User Invite",
+            html: await new EmailTemplate().userInvite({
+                email: userInvite.email,
+                roleId: userInvite.roleId,
+                name: userInvite.name ?? "",
+            }),
+        });
 
         // Send email to userInvite.email
         res.status(200).send({

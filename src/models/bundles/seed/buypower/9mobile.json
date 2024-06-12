@@ -1,0 +1,114 @@
+{
+    "status": "00",
+    "message": "Successful",
+    "bundles": [
+        {
+            "code": "92",
+            "title": "Etisalat D-MFIN-2-1.5GB for 30 days \t\r\n4GB (2GB+2GB Night)",
+            "price": "1000",
+            "validity": "30 days \t\r\n4GB (2GB+2GB Night)"
+        },
+        {
+            "code": "93",
+            "title": "Etisalat D-MFIN-2-2GB for 30 days 6.2GB (2.2GB+4GB Night)",
+            "price": "1200",
+            "validity": "30 days 6.2GB (2.2GB+4GB Night)"
+        },
+        {
+            "code": "94",
+            "title": "Etisalat D-MFIN-2-4.5GB for 30 days 9.5GB (5.5GB+4GB Night)",
+            "price": "2000",
+            "validity": "30 days 9.5GB (5.5GB+4GB Night)"
+        },
+        {
+            "code": "95",
+            "title": "Etisalat D-MFIN-2-40GB for 30 days",
+            "price": "10000",
+            "validity": "30 days"
+        },
+        {
+            "code": "96",
+            "title": "Etisalat D-MFIN-2-165GB for 1 days",
+            "price": "300",
+            "validity": "1 days"
+        },
+        {
+            "code": "97",
+            "title": "Etisalat D-MFIN-2-365GB for 30 days\t15GB (10GB+ 5GB Night)",
+            "price": "3000",
+            "validity": "30 days\t15GB (10GB+ 5GB Night)"
+        },
+        {
+            "code": "98",
+            "title": "Etisalat D-MFIN-2-11GB for 30 days 18.5GB (14GB+4.5GB Night)",
+            "price": "4000",
+            "validity": "30 days 18.5GB (14GB+4.5GB Night)"
+        },
+        {
+            "code": "99",
+            "title": "Etisalat D-MFIN-2-25MB for 1 day",
+            "price": "50",
+            "validity": "1 day"
+        },
+        {
+            "code": "100",
+            "title": "Etisalat D-MFIN-2-100MB for 1 day",
+            "price": "100",
+            "validity": "1 day"
+        },
+        {
+            "code": "101",
+            "title": "Etisalat D-MFIN-2-650MB for 1 day",
+            "price": "200",
+            "validity": "1 day"
+        },
+        {
+            "code": "102",
+            "title": "Etisalat D-MFIN-2-15GB for 30 days",
+            "price": "5000",
+            "validity": "30 days"
+        },
+        {
+            "code": "103",
+            "title": "Etisalat D-MFIN-2-100GB for 1 days",
+            "price": "150",
+            "validity": "1 days"
+        },
+        {
+            "code": "104",
+            "title": "Etisalat D-MFIN-2-7GB1W for 7 days 7GB (6GB+1GB Night)",
+            "price": "1500",
+            "validity": "7 days 7GB (6GB+1GB Night)"
+        },
+        {
+            "code": "105",
+            "title": "Etisalat D-MFIN-2-5M for 30 days",
+            "price": "500",
+            "validity": "30 days"
+        },
+        {
+            "code": "106",
+            "title": "Etisalat D-MFIN-2-75M30 for 30 days",
+            "price": "15000",
+            "validity": "30 days"
+        },
+        {
+            "code": "107",
+            "title": "Etisalat D-MFIN-2-75M for 30 days",
+            "price": "20000",
+            "validity": "30 days"
+        },
+        {
+            "code": "108",
+            "title": "Etisalat D-MFIN-2-2.5GB for 30 days \t11GB (7GB+ 4GB Night)",
+            "price": "2500",
+            "validity": "30 days \t11GB (7GB+ 4GB Night)"
+        },
+        {
+            "code": "109",
+            "title": "Etisalat D-MFIN-2-35GB for 30 days",
+            "price": "7000",
+            "validity": "30 days"
+        }
+    ]
+}

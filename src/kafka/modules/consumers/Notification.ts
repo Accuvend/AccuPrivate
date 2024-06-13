@@ -7,24 +7,16 @@ import TransactionService from "../../../services/Transaction.service";
 import TransactionEventService, {
     AirtimeTransactionEventService,
 } from "../../../services/TransactionEvent.service";
-import WebhookService from "../../../services/Webhook.service";
 import EmailService, { EmailTemplate } from "../../../utils/Email";
 import logger from "../../../utils/Logger";
 import NotificationUtil from "../../../utils/Notification";
 import { TOPICS } from "../../Constants";
 import ConsumerFactory from "../util/Consumer";
-import {
-    PublisherEventAndParameters,
-    Registry,
-    Topic,
-} from "../util/Interface";
+import { PublisherEventAndParameters, Registry } from "../util/Interface";
 import MessageProcessor from "../util/MessageProcessor";
 import { v4 as uuidv4 } from "uuid";
 import ProductService from "../../../services/Product.service";
 import { SmsService } from "../../../utils/Sms";
-import { VendorPublisher } from "../publishers/Vendor";
-import Event from "../../../models/Event.model";
-import PowerUnit from "../../../models/PowerUnit.model";
 
 class NotificationHandler extends Registry {
     private static async handleTokenToSendToUser(
@@ -88,7 +80,7 @@ class NotificationHandler extends Registry {
                 meterNumber: data.meter.meterNumber,
                 token: data.meter.token,
                 address: meter?.address ?? "",
-                name: user?.dataValues.name ?? "",
+                name: meter?.ownersName ?? "",
                 units: data.tokenUnits,
             }),
         });
@@ -107,7 +99,7 @@ class NotificationHandler extends Registry {
                     meta: {
                         transactionId: transaction.id,
                         error: error.response?.data,
-                    }
+                    },
                 });
             });
         await transactionEventService.addTokenSentToUserEmailEvent();
@@ -178,11 +170,11 @@ class NotificationHandler extends Registry {
 
         // If you've not notified the partner before, notify them
         if (!notifyPartnerEvent) {
-            logger.info('Notification sent to partner', {
+            logger.info("Notification sent to partner", {
                 meta: {
                     transactionId: transaction.id,
-                }
-            })
+                },
+            });
             await NotificationUtil.sendNotificationToUser(
                 partnerEntity.id,
                 notification,
@@ -388,4 +380,3 @@ export default class NotificationConsumer extends ConsumerFactory {
         super(messageProcessor);
     }
 }
-

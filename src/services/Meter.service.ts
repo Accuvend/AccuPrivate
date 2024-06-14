@@ -65,6 +65,22 @@ export default class MeterService {
         return meters;
     }
 
-    static async updateSingleMeter() { }
-}
+    static async updateMeterInPlace({
+        meter,
+        meterData,
+        transaction,
+    }: {
+        meter: Meter;
+        meterData: IUpdateMeter;
+        transaction: Transaction;
+    }) {
+        transaction
+            ? await meter.update(meterData, { transaction })
+            : await meter.update(meterData);
 
+        const updatedMeter = transaction
+            ? await Meter.findByPk(meter.id, { transaction })
+            : await Meter.findByPk(meter.id);
+        return updatedMeter;
+    }
+}

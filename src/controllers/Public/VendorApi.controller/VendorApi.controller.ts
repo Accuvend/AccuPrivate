@@ -762,6 +762,14 @@ export default class VendorController {
                             sequelizeTransaction,
                         ));
 
+                    const ownersNameInMeter =
+                        meter.ownersName && meter.ownersName != "";
+                    ownersNameInMeter &&
+                        (await MeterService.updateMeterInPlace({
+                            meter,
+                            meterData: { ownersName: response.name },
+                            transaction: sequelizeTransaction,
+                        }));
                     !userHasUsedMeterBefore &&
                         (await UserMeterService.create(
                             {

@@ -266,21 +266,26 @@ export class TokenHandlerUtil {
         }
 
         if (requeryCount === 2) {
-            const user = await transaction.$get('user')
+            const user = await transaction.$get("user");
             if (!user) {
                 throw new CustomError("User not found", {
                     transactionId: eventData.transactionId,
                 });
             }
-            logger.info('Sending email to user after 2 requery attempts', {
-                meta: { email:user.email, transactionId: transaction.id }
-            })
+            logger.info("Sending email to user after 2 requery attempts", {
+                meta: { email: user.email, transactionId: transaction.id },
+            });
 
             await EmailService.sendEmail({
                 to: user.email,
                 subject: `Order with reference ${transaction.reference} is being processed`,
-                html: await new  EmailTemplate().processing_order_confirmation({ transaction, meterNumber: meter.meterNumber, address: meter.address, name: meter.ownersName ?? ""})
-            })
+                html: await new EmailTemplate().processing_order_confirmation({
+                    transaction,
+                    meterNumber: meter.meterNumber,
+                    address: meter.address,
+                    name: meter.ownersName ?? "",
+                }),
+            });
         }
         eventService.addScheduleRequeryEvent({
             timeStamp: new Date().toString(),
@@ -504,7 +509,9 @@ export class TokenHandlerUtil {
 
         logger.info("Scheduled retry event", meta);
 
-        await TransactionService.updateSingleTransaction(transaction.id, { superagent: newVendor });
+        await TransactionService.updateSingleTransaction(transaction.id, {
+            superagent: newVendor,
+        });
         await VendorPublisher.publishEventToScheduleRetry({
             scheduledMessagePayload: {
                 meter: meter,
@@ -796,7 +803,7 @@ export class TokenHandlerUtil {
             }),
         );
 
-        console.log({ vendorProducts})
+        console.log({ vendorProducts });
         // Check other vendors, sort them according to their commission rates
         // If the current vendor is the vendor with the highest commission rate, then switch to the vendor with the next highest commission rate
         // If the next vendor has been used before, switch to the next vendor with the next highest commission rate
@@ -1153,7 +1160,15 @@ class TokenHandler extends Registry {
 
                     // Purchase token from vendor
                     // Keep record of the last time the transaction was requeued
-                    await TransactionService.updateSingleTransaction(transaction.id, { vendTimeStamps: [...(transaction.vendTimeStamps ?? []), new Date().toString()] })
+                    await TransactionService.updateSingleTransaction(
+                        transaction.id,
+                        {
+                            vendTimeStamps: [
+                                ...(transaction.vendTimeStamps ?? []),
+                                new Date(),
+                            ],
+                        },
+                    );
                     const tokenInfo = await TokenHandlerUtil.processVendRequest(
                         {
                             transaction:
@@ -1463,11 +1478,15 @@ class TokenHandler extends Registry {
                     const previousTimestamp = new Date(
                         transaction.transactionTimestamp,
                     ).getTime(); // This represents a timestamp for April 1, 2022
-                        const lastVendTime = transaction.vendTimeStamps?.slice(-1)[0];
+                    const lastVendTime =
+                        transaction.vendTimeStamps?.slice(-1)[0];
                     let differenceInHoursFromLastVend = 0;
                     if (lastVendTime) {
-                        const lastVendTimeStamp = new Date(lastVendTime).getTime();
-                        differenceInHoursFromLastVend = (now - lastVendTimeStamp) / (1000 * 60 * 60);
+                        const lastVendTimeStamp = new Date(
+                            lastVendTime,
+                        ).getTime();
+                        differenceInHoursFromLastVend =
+                            (now - lastVendTimeStamp) / (1000 * 60 * 60);
                     }
 
                     // Calculate the difference between the current timestamp and the previous timestamp in milliseconds
@@ -1478,7 +1497,9 @@ class TokenHandler extends Registry {
                         differenceInMilliseconds / (1000 * 60 * 60); // 1000 milliseconds * 60 seconds * 60 minutes
 
                     // Check if the difference is greater than two hours
-                    const flaggTransaction = differenceInHoursFromLastVend > 2 || differenceInHours > ((2/60) * 2);
+                    const flaggTransaction =
+                        differenceInHoursFromLastVend > 2 ||
+                        differenceInHours > 2;
                     //check if transaction is greater than 2hrs then stop
                     if (flaggTransaction) {
                         logger.info(

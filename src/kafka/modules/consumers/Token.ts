@@ -8,8 +8,6 @@ import TransactionEventService from "../../../services/TransactionEvent.service"
 import {
     DISCO_LOGO,
     LOGO_URL,
-    MAX_REQUERY_PER_VENDOR,
-    NODE_ENV,
 } from "../../../utils/Constants";
 import logger, { Logger } from "../../../utils/Logger";
 import { TOPICS } from "../../Constants";
@@ -26,36 +24,21 @@ import MessageProcessor from "../util/MessageProcessor";
 import { v4 as uuidv4 } from "uuid";
 import EventService from "../../../services/Event.service";
 import VendorService, {
-    ElectricityPurchaseResponse,
-    ElectricityRequeryResponse,
-    IRechargeVendorService,
-    SuccessResponseForBuyPowerRequery,
     Vendor,
 } from "../../../services/VendorApi.service";
 import {
-    generateRandomString,
-    generateRandomToken,
-    generateRandonNumbers,
     generateVendorReference,
 } from "../../../utils/Helper";
 import ProductService from "../../../services/Product.service";
 import { CustomError } from "../../../utils/Errors";
 import VendorProductService from "../../../services/VendorProduct.service";
 import VendorModelService from "../../../services/Vendor.service";
-import {
-    BaxiRequeryResultForPurchase,
-    BaxiSuccessfulPuchaseResponse,
-} from "../../../services/VendorApi.service/Baxi/Config";
 import { error, log } from "console";
-import test from "node:test";
-import WaitTimeService from "../../../services/Waittime.service";
 import ResponsePathService from "../../../services/ResponsePath.service";
 import ErrorCodeService from "../../../services/ErrorCodes.service";
-import ErrorCode from "../../../models/ErrorCodes.model";
 import newrelic from "newrelic";
 import { TokenUtil } from "../../../utils/Auth/Token";
 import { randomUUID } from "crypto";
-import { userInfo } from "os";
 import EmailService, { EmailTemplate } from "../../../utils/Email";
 
 interface EventMessage {
@@ -569,13 +552,32 @@ export class TokenHandlerUtil {
         });
     }
 
-    static async processVendRequest<T extends Vendor>(data: TokenPurchaseData) {
+    static async processVendRequest(data: TokenPurchaseData) {
         try {
+            let { transaction } = data;
             const user = await data.transaction.$get("user");
             if (!user)
                 throw new CustomError("User not found for transaction", {
                     transactionId: data.transaction.id,
                 });
+
+            const {
+                retryRecord,
+                accessToken,
+                newTransactionReference,
+                currentVendor,
+                switchVendor,
+            } = await this.createRetryEntryForTransaction({ transaction });
+
+            transaction = await TransactionService.updateSingleTransaction(
+                transaction.id,
+                {
+                    retryRecord,
+                    reference: newTransactionReference,
+                    superagent: currentVendor,
+                    irechargeAccessToken: accessToken,
+                },
+            );
 
             const _data = {
                 reference:
@@ -592,93 +594,45 @@ export class TokenHandlerUtil {
                 transactionId: data.transaction.id,
             };
 
-            if (
-                !_data.accessToken &&
-                data.transaction.superagent === "IRECHARGE"
-            ) {
-                logger.warn(
-                    "No access token found for irecharge meter validation",
-                    {
-                        transactionId: data.transaction.id,
-                    },
-                );
-
-                logger.info("Validating meter", {
-                    transactionId: data.transaction.id,
-                });
-                const meterValidationResult =
-                    await VendorService.irechargeValidateMeter(
-                        _data.disco,
-                        _data.meterNumber,
-                        data.transaction.vendorReferenceId,
-                        _data.transactionId,
-                    ).catch((error) => {
-                        throw new CustomError("Error validating meter", {
-                            transactionId: data.transaction.id,
-                        });
-                    });
-
-                if (!meterValidationResult)
-                    throw new CustomError("Error validating meter", {
-                        transactionId: data.transaction.id,
-                    });
-
-                _data.accessToken = meterValidationResult.access_token;
-                console.log({
-                    meterValidationResult,
-                    info: "New meter validation result",
-                });
-                await TransactionService.updateSingleTransaction(
-                    data.transaction.id,
-                    {
-                        irechargeAccessToken:
-                            meterValidationResult.access_token,
-                    },
-                );
-                logger.info(
-                    "Generated access token for irecharge meter validation",
-                    { transactionId: data.transaction.id },
-                );
-            }
-
             logger.info("Processing vend request", {
                 vendor: data.transaction.superagent,
                 transactionId: data.transaction.id,
                 preTransformedPayload: _data,
             });
-            switch (data.transaction.superagent) {
-                case "BAXI":
-                    return await VendorService.purchaseElectricity({
-                        data: _data,
-                        vendor: "BAXI",
-                    });
-                case "BUYPOWERNG":
-                    return await VendorService.purchaseElectricity({
-                        data: _data,
-                        vendor: "BUYPOWERNG",
-                    }).catch((e) => {
-                        logger.error(
-                            "An error occured while vending from " +
-                                data.transaction.superagent,
-                            {
-                                meta: {
-                                    transactionId: data.transaction.id,
-                                    error: error,
-                                },
-                            },
-                        );
-                        return e;
-                    });
-                case "IRECHARGE":
-                    return await VendorService.purchaseElectricity({
-                        data: _data,
-                        vendor: "IRECHARGE",
-                    });
-                default:
-                    throw new CustomError("Invalid superagent", {
-                        transactionId: data.transaction.id,
-                    });
-            }
+
+            let response: Awaited<
+                ReturnType<typeof VendorService.purchaseElectricity>
+            > = await VendorService.purchaseElectricity({
+                data: _data,
+                vendor: transaction.superagent,
+            }).catch((e) => {
+                logger.error(
+                    "An error occured while vending from " +
+                        data.transaction.superagent,
+                    {
+                        meta: {
+                            transactionId: data.transaction.id,
+                            error: error,
+                        },
+                    },
+                );
+                if (transaction.superagent === "BUYPOWERNG") {
+                    return e;
+                }
+
+                throw e;
+            });
+
+            return {
+                response,
+                retryEntryResult: {
+                    transaction,
+                    accessToken,
+                    newTransactionReference,
+                    currentVendor,
+                    switchVendor,
+                },
+            };
         } catch (error) {
             logger.error(
                 "An error occured while vending from " +
@@ -695,7 +649,7 @@ export class TokenHandlerUtil {
         }
     }
 
-    static async requeryTransactionFromVendor(transaction: Transaction) {
+    static async processRequeryRequest(transaction: Transaction) {
         try {
             switch (transaction.superagent) {
                 case "BAXI":
@@ -1593,7 +1547,7 @@ class TokenHandler extends Registry {
                     );
 
                     const requeryResult =
-                        await TokenHandlerUtil.requeryTransactionFromVendor(
+                        await TokenHandlerUtil.processRequeryRequest(
                             transaction,
                         ).catch((e) => e ?? {});
 

@@ -448,157 +448,57 @@ export class TokenHandlerUtil {
         meter: MeterInfo & { id: string };
         vendorRetryRecord: VendorRetryRecord;
     }) {
-        let waitTime = await getCurrentWaitTimeForSwitchEvent(
-            vendorRetryRecord.retryCount,
-        );
-
         logger.warn("Retrying transaction with new vendor", {
             meta: { transactionId: transaction.id },
         });
         const meta = {
             transactionId: transaction.id,
         };
+
         // Attempt purchase from new vendor
         if (!transaction.bankRefId)
             throw new CustomError("BankRefId not found", meta);
 
-        let retryRecord = transaction.retryRecord;
+        const {
+            retryRecord,
+            accessToken,
+            newTransactionReference,
+            currentVendor,
+            switchVendor,
+        } = await this.createRetryEntryForTransaction({ transaction });
 
-        retryRecord =
-            retryRecord.length === 0
-                ? [
-                      {
-                          vendor: transaction.superagent,
-                          retryCount: 1,
-                          reference: [transaction.reference],
-                          attempt: 1,
-                      },
-                  ]
-                : retryRecord;
+        const newVendorEntry = retryRecord[retryRecord.length - 1];
 
-        // Make sure to use the same vendor thrice before switching to another vendor
-        let currentVendor = retryRecord[retryRecord.length - 1];
-        console.log({ currentVendor, retryRecord });
-        let useCurrentVendor = false;
-        if (currentVendor.vendor === transaction.superagent) {
-            if (
-                currentVendor.retryCount < retry.retryCountBeforeSwitchingVendor
-            ) {
-                // Update the retry record in the transaction
-                // Get the last record where this vendor was used
-                const lastRecord = retryRecord[retryRecord.length - 1];
-                lastRecord.retryCount = lastRecord.retryCount + 1;
-
-                // Update the transaction
-                await TransactionService.updateSingleTransaction(
-                    transaction.id,
-                    { retryRecord },
-                );
-
-                useCurrentVendor = true;
-                logger.info("Using current vendor", meta);
-            }
-
-            // Check for the reference used in the last retry record
-            retryRecord[retryRecord.length - 1].reference.push(
-                currentVendor.vendor === "IRECHARGE"
-                    ? await generateVendorReference()
-                    : randomUUID(),
-            );
-        } else {
-            logger.warn("Switching to new vendor", meta);
-            // Add new record to the retry record
-        }
-
-        const newVendor = useCurrentVendor
-            ? currentVendor.vendor
-            : await TokenHandlerUtil.getNextBestVendorForVendRePurchase(
-                  transaction.productCodeId,
-                  transaction.superagent,
-                  transaction.previousVendors,
-                  parseFloat(transaction.amount),
+        const waitTime = switchVendor
+            ? await getCurrentWaitTimeForSwitchEvent(newVendorEntry.retryCount)
+            : await getCurrentWaitTimeForSwitchEvent(
+                  vendorRetryRecord.retryCount,
               );
-        if (
-            newVendor != currentVendor.vendor ||
-            currentVendor.retryCount > retry.retryCountBeforeSwitchingVendor
-        ) {
-            // Add new record to the retry record
-            currentVendor = {
-                vendor: newVendor,
-                retryCount: 1,
-                reference: [
-                    currentVendor.reference[currentVendor.reference.length - 1],
-                ],
-                attempt: 1,
-            };
-            retryRecord.push(currentVendor);
-            waitTime = await getCurrentWaitTimeForSwitchEvent(
-                currentVendor.retryCount,
-            );
-        }
 
         await transactionEventService.addPowerPurchaseRetryWithNewVendor({
             bankRefId: transaction.bankRefId,
             currentVendor: transaction.superagent,
-            newVendor,
+            newVendor: currentVendor,
         });
 
-        const user = await transaction.$get("user");
-        if (!user)
-            throw new CustomError("User not found for transaction", meta);
-
-        const partner = await transaction.$get("partner");
-        if (!partner)
-            throw new CustomError("Partner not found for transaction", meta);
-
-        retry.count = 0;
-
-        const newTransactionReference =
-            retryRecord[retryRecord.length - 1].reference[
-                retryRecord[retryRecord.length - 1].reference.length - 1
-            ];
-        let accesToken = transaction.irechargeAccessToken;
-
-        if (newVendor === "IRECHARGE") {
-            const irechargeVendor =
-                await VendorModelService.viewSingleVendorByName("IRECHARGE");
-            if (!irechargeVendor) {
-                throw new CustomError("Irecharge vendor not found");
-            }
-
-            const irechargeVendorProduct =
-                await VendorProductService.viewSingleVendorProductByVendorIdAndProductId(
-                    irechargeVendor.id,
-                    transaction.productCodeId,
-                );
-            if (!irechargeVendorProduct) {
-                throw new CustomError("Irecharge vendor product not found");
-            }
-
-            const meterValidationResult =
-                await VendorService.irechargeValidateMeter(
-                    irechargeVendorProduct.schemaData.code,
-                    meter.meterNumber,
-                    newTransactionReference,
-                    transaction.id,
-                ).then((res) => ({ ...res, ...res.customer }));
-            console.log({
-                meterValidationResult,
-                info: "New meter validation result",
-            });
-            accesToken = meterValidationResult.access_token;
-        }
+        const { user, partner } = await TransactionService.populateRelations({
+            transaction,
+            strict: true,
+            fields: ["user", "partner"],
+        });
 
         const eventService = new TransactionEventService(
             transaction,
             meter,
-            newVendor,
+            newVendorEntry.vendor,
             partner.email,
         );
 
         await TransactionService.updateSingleTransaction(transaction.id, {
             retryRecord,
             reference: newTransactionReference,
+            superagent: newVendorEntry.vendor,
+            irechargeAccessToken: accessToken,
         });
 
         if (manual) {
@@ -622,8 +522,8 @@ export class TokenHandlerUtil {
                     email: partner.email,
                 },
                 user: {
-                    name: user.name as string,
                     email: user.email,
+                    name: user.name as string,
                     address: user.address,
                     phoneNumber: user.phoneNumber,
                 },
@@ -637,20 +537,17 @@ export class TokenHandlerUtil {
         eventService.addScheduleRetryEvent({
             timeStamp: new Date().toString(),
             waitTime,
-            retryRecord: currentVendor,
+            retryRecord: newVendorEntry,
         });
 
         logger.info("Scheduled retry event", meta);
 
-        await TransactionService.updateSingleTransaction(transaction.id, {
-            superagent: newVendor,
-        });
         await VendorPublisher.publishEventToScheduleRetry({
             scheduledMessagePayload: {
                 meter: meter,
                 partner: partner,
                 transactionId: transaction.id,
-                superAgent: newVendor,
+                superAgent: newVendorEntry.vendor,
                 user: {
                     name: user.name as string,
                     email: user.email,
@@ -659,12 +556,12 @@ export class TokenHandlerUtil {
                 },
                 vendorRetryRecord: retryRecord[retryRecord.length - 1],
                 retryRecord,
-                newVendor,
+                newVendor: newVendorEntry.vendor,
                 newTransactionReference,
-                irechargeAccessToken: accesToken,
+                irechargeAccessToken: accessToken,
                 previousVendors: [
                     ...transaction.previousVendors,
-                    newVendor,
+                    newVendorEntry.vendor,
                 ] as Transaction["superagent"][],
             },
             timeStamp: new Date().toString(),

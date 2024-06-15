@@ -357,4 +357,35 @@ export default class TransactionService {
 
         return transactions;
     }
+
+    static async populateRelations<
+        T extends RelationFields,
+        U extends boolean,
+    >({
+        transaction,
+        fields,
+        strict,
+    }: {
+        transaction: Transaction;
+        strict: U;
+        fields: T[];
+    }) {
+        const records = {} as {
+            [K in T]: U extends true
+                ? NonNullable<RelationTypeMap[K]>
+                : RelationTypeMap[K] | null;
+        };
+
+        for (const field of fields) {
+            const populatedRecord = await transaction.$get(field);
+            if (!populatedRecord && strict) {
+                throw new CustomError(`${field} not found in transaction`, {
+                    transactionId: transaction.id,
+                });
+            }
+            records[field] = populatedRecord as any;
+        }
+
+        return records;
+    }
 }

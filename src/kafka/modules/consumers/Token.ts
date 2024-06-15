@@ -190,9 +190,6 @@ export class TokenHandlerUtil {
             JSON.stringify([...transaction.retryRecord]),
         );
 
-        // If this is the first retry attempt add a record for it
-        const initialRetryRecord = [...retryRecord];
-
         // Make sure to use the same vendor thrice before switching to another vendor
         const lastVendorRetryRecord = retryRecord[retryRecord.length - 1];
         const lastVendorRetryEntryReachedLimit =
@@ -548,28 +545,18 @@ export class TokenHandlerUtil {
             } = await this.createRetryEntryForTransaction({ transaction });
 
             const oldRetryRecord = transaction.retryRecord;
-            logger.info("Retry record", {
-                meta: {
-                    transactionId: transaction.id,
-                    retryRecord,
-                    oldRetryRecord: transaction.retryRecord,
-                },
-            });
-
             let updateData = {} as IUpdateTransaction;
             if (
                 oldRetryRecord[0].attempt === 0 &&
                 oldRetryRecord.length === 1
             ) {
+                // The  existing record in this case has not been used, no need to add  a new record
                 const updatedRetryRecord = [
                     {
                         ...oldRetryRecord[0],
                         attempt: 1,
                     },
                 ];
-                logger.info("Setting attempt count to 1", {
-                    meta: { transactionId: transaction.id },
-                });
                 updateData = { retryRecord: updatedRetryRecord };
             } else {
                 updateData = {

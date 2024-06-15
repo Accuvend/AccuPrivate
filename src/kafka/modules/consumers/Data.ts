@@ -425,7 +425,7 @@ export class DataHandlerUtil {
         }
     }
 
-    static async requeryTransactionFromVendor(transaction: Transaction) {
+    static async processRequeryRequest(transaction: Transaction) {
         switch (transaction.superagent) {
             case "BAXI":
                 return await VendorService.baxiRequeryTransaction({
@@ -1011,7 +1011,7 @@ class TokenHandler extends Registry {
          * When requerying a transaction, the response code is 201.
          */
         const requeryResult =
-            await DataHandlerUtil.requeryTransactionFromVendor(
+            await DataHandlerUtil.processRequeryRequest(
                 transaction,
             ).catch((e) => e);
         const validationResponse =
@@ -1215,13 +1215,13 @@ class TokenHandler extends Registry {
             currentTimeInSeconds - timeStampInSeconds;
         const timeDifference = delayInSeconds - timeInSecondsSinceInit;
 
-        console.log({
-            timeDifference,
-            timeStamp,
-            currentTime: new Date(),
-            delayInSeconds,
-            timeInSecondsSinceInit,
-        });
+        // console.log({
+        //     timeDifference,
+        //     timeStamp,
+        //     currentTime: new Date(),
+        //     delayInSeconds,
+        //     timeInSecondsSinceInit,
+        // });
 
         // Check if current time is greater than the timeStamp + delayInSeconds
         if (timeDifference <= 0) {

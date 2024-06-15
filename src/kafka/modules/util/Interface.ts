@@ -106,9 +106,6 @@ export interface PublisherEventAndParameters
         delayInSeconds: number;
         scheduledMessagePayload: PublisherEventAndParameters[TOPICS.POWER_PURCHASE_INITIATED_BY_CUSTOMER] & {
             retryRecord: Transaction["retryRecord"];
-            newVendor: Transaction["superagent"];
-            newTransactionReference: string;
-            irechargeAccessToken: string;
             previousVendors: Transaction["superagent"][];
         };
     };

@@ -568,8 +568,7 @@ export default class VendorController {
                             superagent: superagent,
                             paymentType: PaymentType.PAYMENT,
                             transactionTimestamp: new Date(),
-                            disco: disco,
-                            partnerId: partnerId,
+                            disco: disco, partnerId: partnerId,
                             reference: transactionReference,
                             paymentProviderId,
                             transactionType:
@@ -577,6 +576,7 @@ export default class VendorController {
                                     existingProductCodeForDisco.category
                                 ],
                             productCodeId: existingProductCodeForDisco.id,
+                            vendTimeStamps: [],
                             retryRecord: [],
                             previousVendors: [superagent],
                             // vendorReferenceId was created specifically for irecharge thier reference format is different from other vendors
@@ -588,6 +588,8 @@ export default class VendorController {
                             channel,
                         },
                     );
+
+                console.log({ transaction });
 
                 Logger.apiRequest.info("Validate meter requested", {
                     meta: { transactionId: transaction.id, ...req.body },
@@ -719,11 +721,11 @@ export default class VendorController {
 
                 const retryRecord = {
                     retryCount: 1,
-                    attempt: 1,
+                    attempt: 0,
                     reference: [
                         selectedVendor === "IRECHARGE"
                             ? transaction.vendorReferenceId
-                            : transaction.vendorReferenceId // Vendor reference id is only for irecharge,
+                            : transaction.vendorReferenceId, // Vendor reference id is only for irecharge,
                     ],
                     vendor: superagent,
                 } as ITransaction["retryRecord"][number];
@@ -735,9 +737,10 @@ export default class VendorController {
 
                 // // TODO: Publish event for disco up to kafka
                 const existingMeter =
-                    await MeterService.viewSingleMeterByMeterNumber(
+                    await MeterService.viewSingleMeterByMeterNumberAndVendType({
+                        vendType,
                         meterNumber,
-                    );
+                    });
                 const userHasUsedMeterBefore = existingMeter
                     ? await UserMeterService.findByUserAndMeterId({
                           userId: user.id,

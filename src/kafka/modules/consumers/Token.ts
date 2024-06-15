@@ -161,6 +161,139 @@ export class TokenHandlerUtil {
         });
     }
 
+    private static async generateNewAccessTokenForIrecharge({
+        transaction,
+        newReference,
+        meter,
+    }: {
+        newReference: string;
+        transaction: Transaction;
+        meter: Meter;
+    }) {
+        const irechargeVendor =
+            await VendorModelService.viewSingleVendorByName("IRECHARGE");
+        if (!irechargeVendor) {
+            throw new CustomError("Irecharge vendor not found");
+        }
+
+        const irechargeVendorProduct =
+            await VendorProductService.viewSingleVendorProductByVendorIdAndProductId(
+                irechargeVendor.id,
+                transaction.productCodeId,
+            );
+        if (!irechargeVendorProduct) {
+            throw new CustomError("Irecharge vendor product not found");
+        }
+
+        const meterValidationResult =
+            await VendorService.irechargeValidateMeter(
+                irechargeVendorProduct.schemaData.code,
+                meter.meterNumber,
+                newReference,
+                transaction.id,
+            ).then((res) => ({ ...res, ...res.customer }));
+
+        logger.info("Meter validation result", {
+            meta: { meterValidationResult, transactionId: transaction.id },
+        });
+
+        return meterValidationResult.access_token;
+    }
+
+    private static async createRetryEntryForTransaction({
+        transaction,
+    }: {
+        transaction: Transaction;
+    }) {
+        let retryRecord = transaction.retryRecord;
+
+        // If this is the first retry attempt add a record for it
+        retryRecord =
+            retryRecord.length === 0
+                ? [
+                      {
+                          vendor: transaction.superagent,
+                          retryCount: 1,
+                          reference: [transaction.reference],
+                          attempt: 1,
+                      },
+                  ]
+                : retryRecord;
+
+        // Make sure to use the same vendor thrice before switching to another vendor
+        const lastVendorRetryRecord = retryRecord[retryRecord.length - 1];
+        const lastVendorRetryEntryReachedLimit =
+            lastVendorRetryRecord.retryCount >=
+            retry.retryCountBeforeSwitchingVendor;
+        if (!lastVendorRetryEntryReachedLimit) {
+            // Update the retry count for the last vendor entry in the transaction
+            lastVendorRetryRecord.retryCount =
+                lastVendorRetryRecord.retryCount + 1;
+
+            logger.info("Using current vendor", {
+                meta: { transactionId: transaction.id },
+            });
+        } else {
+            logger.warn("switching to new vendor", {
+                meta: { transactionId: transaction.id },
+            });
+        }
+
+        const newTransactionReference =
+            lastVendorRetryRecord.vendor === "IRECHARGE"
+                ? await generateVendorReference()
+                : randomUUID();
+
+        // Add the new reference to be used for new retry
+        lastVendorRetryRecord.reference.push(newTransactionReference);
+
+        const currentVendor = lastVendorRetryEntryReachedLimit
+            ? await this.getNextBestVendorForVendRePurchase(
+                  transaction.productCodeId,
+                  transaction.superagent,
+                  transaction.previousVendors,
+                  parseFloat(transaction.amount),
+              )
+            : lastVendorRetryRecord.vendor;
+
+        if (
+            currentVendor != lastVendorRetryRecord.vendor ||
+            lastVendorRetryEntryReachedLimit
+            // lastVendorRetryRecord.retryCount > retry.retryCountBeforeSwitchingVendor
+        ) {
+            // Add new vendor retry entry to the retry record
+            const newVendorRetryRecord = {
+                vendor: currentVendor,
+                retryCount: 1,
+                reference: [
+                    lastVendorRetryRecord.reference[
+                        lastVendorRetryRecord.reference.length - 1
+                    ],
+                    // Reuses the last reference used  since it was with a different vendor
+                ],
+                attempt: 1,
+            };
+            retryRecord.push(newVendorRetryRecord);
+        }
+
+        let accessToken = transaction.irechargeAccessToken;
+        if (currentVendor === "IRECHARGE") {
+            accessToken = await this.generateNewAccessTokenForIrecharge({
+                transaction,
+                newReference: newTransactionReference,
+                meter: transaction.meter,
+            });
+        }
+
+        return {
+            retryRecord,
+            accessToken,
+            newTransactionReference,
+            currentVendor,
+            switchVendor: lastVendorRetryEntryReachedLimit,
+        };
+    }
+
     static async triggerEventToRequeryTransactionTokenFromVendor({
         eventService,
         eventData,

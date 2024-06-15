@@ -20,27 +20,27 @@ class BaxiApiBaseConfig {
     protected static agentId = BAXI_AGENT_ID;
 }
 
-export interface BaxiSuccessfulPuchaseResponse {
-    status: string;
-    message: string;
-    code: number;
-    data: {
-        statusCode: string;
-        transactionStatus: string;
-        transactionReference: number;
-        transactionMessage: string;
-        baxiReference: number;
-        provider_message: string;
-        extraData: {
-            balance: string;
-            exchangeReference: string;
-            responseMessage: string;
-            status: string;
-            statusCode: string;
-            responseCode: string;
-        };
-    };
-}
+// export interface BaxiSuccessfulPuchaseResponse {
+//     status: string;
+//     message: string;
+//     code: number;
+//     data: {
+//         statusCode: string;
+//         transactionStatus: string;
+//         transactionReference: number;
+//         transactionMessage: string;
+//         baxiReference: number;
+//         provider_message: string;
+//         extraData: {
+//             balance: string;
+//             exchangeReference: string;
+//             responseMessage: string;
+//             status: string;
+//             statusCode: string;
+//             responseCode: string;
+//         };
+//     };
+// }
 
 export interface BaxiSuccessfulPuchaseResponse {
     Prepaid: {
@@ -55,31 +55,31 @@ export interface BaxiSuccessfulPuchaseResponse {
             baxiReference: number;
             provider_message: string;
             rawOutput: {
-                bsstTokenValue: string,
-                fixedTariff: 'Fixed',
-                bsstTokenAmount: number,
-                tokenTechnologyCode: '02',
-                standardTokenUnits: 16.4,
-                tariffIndex: '52',
-                bsstTokenUnits: 63.67,
-                bsstTokenTax: 0,
-                keyRevisionNumber: '1',
-                terminalId: '1',
-                standardTokenValue: string,
-                bsstTokenDescription: 'FBE',
-                debtTariff: 'Debt Recovery',
-                responseCode: 'elec000',
-                algorithmCode: '05',
-                debtDescription: '1122',
-                standardTokenTax: 132.63,
-                fixedAmount: 144.74,
-                utilityAddress: '59 WaterFront, Durban. 5899.',
-                utilityName: 'Eskom Online',
-                debtAmount: 223.68,
-                retailerMessage: 'Hello Operator Message.',
-                standardTokenDescription: 'Normal Sale',
-                clientId: string,
-            },
+                bsstTokenValue: string;
+                fixedTariff: "Fixed";
+                bsstTokenAmount: number;
+                tokenTechnologyCode: "02";
+                standardTokenUnits: 16.4;
+                tariffIndex: "52";
+                bsstTokenUnits: 63.67;
+                bsstTokenTax: 0;
+                keyRevisionNumber: "1";
+                terminalId: "1";
+                standardTokenValue: string;
+                bsstTokenDescription: "FBE";
+                debtTariff: "Debt Recovery";
+                responseCode: "elec000";
+                algorithmCode: "05";
+                debtDescription: "1122";
+                standardTokenTax: 132.63;
+                fixedAmount: 144.74;
+                utilityAddress: "59 WaterFront, Durban. 5899.";
+                utilityName: "Eskom Online";
+                debtAmount: 223.68;
+                retailerMessage: "Hello Operator Message.";
+                standardTokenDescription: "Normal Sale";
+                clientId: string;
+            };
             extraData: {
                 balance: string;
                 exchangeReference: string;

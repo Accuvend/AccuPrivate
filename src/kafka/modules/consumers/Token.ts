@@ -5,10 +5,7 @@ import Transaction from "../../../models/Transaction.model";
 import PowerUnitService from "../../../services/PowerUnit.service";
 import TransactionService from "../../../services/Transaction.service";
 import TransactionEventService from "../../../services/TransactionEvent.service";
-import {
-    DISCO_LOGO,
-    LOGO_URL,
-} from "../../../utils/Constants";
+import { DISCO_LOGO, LOGO_URL } from "../../../utils/Constants";
 import logger, { Logger } from "../../../utils/Logger";
 import { TOPICS } from "../../Constants";
 import { VendorPublisher } from "../publishers/Vendor";
@@ -23,12 +20,8 @@ import {
 import MessageProcessor from "../util/MessageProcessor";
 import { v4 as uuidv4 } from "uuid";
 import EventService from "../../../services/Event.service";
-import VendorService, {
-    Vendor,
-} from "../../../services/VendorApi.service";
-import {
-    generateVendorReference,
-} from "../../../utils/Helper";
+import VendorService, { Vendor } from "../../../services/VendorApi.service";
+import { generateVendorReference } from "../../../utils/Helper";
 import ProductService from "../../../services/Product.service";
 import { CustomError } from "../../../utils/Errors";
 import VendorProductService from "../../../services/VendorProduct.service";
@@ -40,6 +33,7 @@ import newrelic from "newrelic";
 import { TokenUtil } from "../../../utils/Auth/Token";
 import { randomUUID } from "crypto";
 import EmailService, { EmailTemplate } from "../../../utils/Email";
+import { Error } from "sequelize";
 
 interface EventMessage {
     meter: {
@@ -222,14 +216,6 @@ export class TokenHandlerUtil {
             });
         }
 
-        const newTransactionReference =
-            lastVendorRetryRecord.vendor === "IRECHARGE"
-                ? await generateVendorReference()
-                : randomUUID();
-
-        // Add the new reference to be used for new retry
-        lastVendorRetryRecord.reference.push(newTransactionReference);
-
         const currentVendor = lastVendorRetryEntryReachedLimit
             ? await this.getNextBestVendorForVendRePurchase(
                   transaction.productCodeId,
@@ -238,6 +224,11 @@ export class TokenHandlerUtil {
                   parseFloat(transaction.amount),
               )
             : lastVendorRetryRecord.vendor;
+
+        const newTransactionReference =
+            currentVendor === "IRECHARGE"
+                ? await generateVendorReference()
+                : randomUUID();
 
         if (
             currentVendor != lastVendorRetryRecord.vendor ||
@@ -248,15 +239,13 @@ export class TokenHandlerUtil {
             const newVendorRetryRecord = {
                 vendor: currentVendor,
                 retryCount: 1,
-                reference: [
-                    lastVendorRetryRecord.reference[
-                        lastVendorRetryRecord.reference.length - 1
-                    ],
-                    // Reuses the last reference used  since it was with a different vendor
-                ],
+                reference: [newTransactionReference],
                 attempt: 1,
             };
             retryRecord.push(newVendorRetryRecord);
+        } else {
+            // Add the new reference to be used for new retry
+            lastVendorRetryRecord.reference.push(newTransactionReference);
         }
 
         let accessToken = transaction.irechargeAccessToken;
@@ -579,6 +568,17 @@ export class TokenHandlerUtil {
                 },
             );
 
+            console.log({
+                retryRecord,
+                currentVendor,
+                updatedTransactionVendor: transaction.superagent,
+                retryEntry: {
+                    accessToken,
+                    newTransactionReference,
+                    currentVendor,
+                    switchVendor,
+                },
+            });
             const _data = {
                 reference:
                     data.transaction.superagent === "IRECHARGE"
@@ -605,24 +605,7 @@ export class TokenHandlerUtil {
             > = await VendorService.purchaseElectricity({
                 data: _data,
                 vendor: transaction.superagent,
-            }).catch((e) => {
-                logger.error(
-                    "An error occured while vending from " +
-                        data.transaction.superagent,
-                    {
-                        meta: {
-                            transactionId: data.transaction.id,
-                            error: error,
-                        },
-                    },
-                );
-                if (transaction.superagent === "BUYPOWERNG") {
-                    return e;
-                }
-
-                throw e;
             });
-
             return {
                 response,
                 retryEntryResult: {
@@ -854,7 +837,7 @@ export class ResponseValidationUtil {
         disco: string;
         transactionId: string;
         vendType: "PREPAID" | "POSTPAID";
-        httpCode: string | number;
+        httpCode?: string | number;
         requestType: "VENDREQUEST" | "REQUERY";
         vendor: Transaction["superagent"] | string;
         responseObject: Record<string, any>;
@@ -1153,8 +1136,8 @@ class TokenHandler extends Registry {
                             ],
                         },
                     );
-                    const tokenInfo = await TokenHandlerUtil.processVendRequest(
-                        {
+                    const { response: tokenInfo } =
+                        await TokenHandlerUtil.processVendRequest({
                             transaction:
                                 transaction as TokenPurchaseData["transaction"],
                             meterNumber: meter.meterNumber,
@@ -1162,8 +1145,9 @@ class TokenHandler extends Registry {
                             vendType: meter.vendType,
                             phone: user.phoneNumber,
                             accessToken: transaction.irechargeAccessToken,
-                        },
-                    ).catch((e) => e);
+                        }).catch((e) => ({
+                            response: e as AxiosError | Error,
+                        }));
 
                     console.log({
                         point: "power purchase initiated",
@@ -1192,9 +1176,15 @@ class TokenHandler extends Registry {
                         },
                         transactionId: transaction.id,
                         error: {
-                            code: (tokenInfo instanceof AxiosError
-                                ? tokenInfo.response?.data?.responseCode
-                                : undefined) as number | 0,
+                            code:
+                                tokenInfo instanceof AxiosError
+                                    ? ((
+                                          tokenInfo.response?.data as Record<
+                                              string,
+                                              any
+                                          >
+                                      )?.responseCode as number)
+                                    : 0,
                             cause: TransactionErrorCause.UNKNOWN,
                         },
                     };
@@ -1206,18 +1196,23 @@ class TokenHandler extends Registry {
                         partner.email,
                     );
 
+                    const superAgent = updatedTransaction.superagent;
                     const response =
                         await ResponseValidationUtil.validateTransactionCondition(
                             {
                                 requestType: "VENDREQUEST",
-                                vendor: vendor.name,
+                                vendor: superAgent,
                                 httpCode:
+                                    tokenInfo instanceof Error ||
                                     tokenInfo instanceof AxiosError
-                                        ? tokenInfo.response?.status
-                                        : tokenInfo?.httpStatusCode,
+                                        ? (tokenInfo as AxiosError).response
+                                              ?.status
+                                        : tokenInfo.httpStatusCode,
                                 responseObject:
+                                    tokenInfo instanceof Error ||
                                     tokenInfo instanceof AxiosError
-                                        ? tokenInfo.response?.data
+                                        ? ((tokenInfo as AxiosError).response
+                                              ?.data as Record<string, any>)
                                         : tokenInfo,
                                 vendType: meter.vendType,
                                 disco: disco,
@@ -1245,7 +1240,7 @@ class TokenHandler extends Registry {
                                     },
                                     eventService: transactionEventService,
                                     retryCount: 1,
-                                    superAgent: data.superAgent,
+                                    superAgent: updatedTransaction.superagent,
                                     requeryCount: 1,
                                     tokenInResponse: null,
                                     transactionTimedOutFromBuypower: false,
@@ -1324,8 +1319,7 @@ class TokenHandler extends Registry {
                                       discoLogo,
                                       amount: transaction.amount,
                                       meterId: data.meter.id,
-                                      superagent:
-                                          data.superAgent as ITransaction["superagent"],
+                                      superagent: updatedTransaction.superagent,
                                       tokenFromVend: token,
                                       tokenNumber: 0,
                                       tokenUnits: response.tokenUnits,
@@ -1386,7 +1380,7 @@ class TokenHandler extends Registry {
                                     },
                                     eventService: transactionEventService,
                                     retryCount: 1,
-                                    superAgent: data.superAgent,
+                                    superAgent: updatedTransaction.superagent,
                                     tokenInResponse: null,
                                     transactionTimedOutFromBuypower: false,
                                     requeryCount: 1,
@@ -1408,7 +1402,7 @@ class TokenHandler extends Registry {
                                     requeryCount: 1,
                                     eventService: transactionEventService,
                                     retryCount: 1,
-                                    superAgent: data.superAgent,
+                                    superAgent: updatedTransaction.superagent,
                                     tokenInResponse: null,
                                     transactionTimedOutFromBuypower: false,
                                     vendorRetryRecord: data.vendorRetryRecord,
@@ -1788,13 +1782,13 @@ class TokenHandler extends Registry {
                     currentTimeInSeconds - timeStampInSeconds;
                 const timeDifference = delayInSeconds - timeInSecondsSinceInit;
 
-                console.log({
-                    timeDifference,
-                    timeStamp,
-                    currentTime: new Date(),
-                    delayInSeconds,
-                    timeInSecondsSinceInit,
-                });
+                // console.log({
+                //     timeDifference,
+                //     timeStamp,
+                //     currentTime: new Date(),
+                //     delayInSeconds,
+                //     timeInSecondsSinceInit,
+                // });
 
                 if (timeDifference <= 0) {
                     const existingTransaction =
@@ -1878,13 +1872,13 @@ class TokenHandler extends Registry {
                     currentTimeInSeconds - timeStampInSeconds;
                 const timeDifference = delayInSeconds - timeInSecondsSinceInit;
 
-                console.log({
-                    timeDifference,
-                    timeStamp,
-                    currentTime: new Date(),
-                    delayInSeconds,
-                    timeInSecondsSinceInit,
-                });
+                // console.log({
+                //     timeDifference,
+                //     timeStamp,
+                //     currentTime: new Date(),
+                //     delayInSeconds,
+                //     timeInSecondsSinceInit,
+                //});
 
                 // Check if current time is greater than the timeStamp + delayInSeconds
                 if (timeDifference <= 0) {

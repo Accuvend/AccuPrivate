@@ -38,7 +38,7 @@ export default class UserInviteController {
             to: userInvite.email,
             subject: "User Invite",
             html: await new EmailTemplate().userInvite({
-                email: userInvite?.email ?? "",
+                email: userInvite?.email || "",
                 name: userInvite?.name ?? "",
                 roleId: userInvite?.roleId ?? "",
             }),

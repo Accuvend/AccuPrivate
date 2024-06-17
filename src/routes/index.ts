@@ -56,7 +56,7 @@ router
     .use("/response_path", responsePathRoute)
     .use("/error_code", errorCodeRoute)
     .use("/complaint/v2", complaintV2Route)
-    .use("/payment_provider", paymentProviderRoute);
+    .use("/payment_provider", paymentProviderRoute)
     .use("/userinvite", userInviteRoute);
 
 export default router;

@@ -24,7 +24,9 @@ import bundleRoute from "./Bundle.routes";
 import responsePathRoute from "./ResponsePath.routes";
 import errorCodeRoute from "./ErrorCode.routes";
 import complaintV2Route from "./compalintV2.routes";
+import paymentProviderRoute from "./PaymentProvider.routes";
 import userInviteRoute from "./UserInvite.routes";
+
 
 const router = Router();
 
@@ -54,6 +56,7 @@ router
     .use("/response_path", responsePathRoute)
     .use("/error_code", errorCodeRoute)
     .use("/complaint/v2", complaintV2Route)
+    .use("/payment_provider", paymentProviderRoute);
     .use("/userinvite", userInviteRoute);
 
 export default router;

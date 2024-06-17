@@ -1,0 +1,324 @@
+{
+    "status": "00",
+    "message": "Successful",
+    "bundles": [
+        {
+            "code": "1",
+            "title": "MTN D-MFIN-5-Combo-97 for Xtradata 20000 Monthly Bundle",
+            "price": "20000",
+            "validity": "Xtradata 20000 Monthly Bundle"
+        },
+        {
+            "code": "2",
+            "title": "MTN D-MFIN-5-Combo-96 for Xtradata 15000 Monthly Bundle",
+            "price": "15000",
+            "validity": "Xtradata 15000 Monthly Bundle"
+        },
+        {
+            "code": "3",
+            "title": "MTN D-MFIN-5-Combo-95 for Xtradata 10000 Monthly Bundle",
+            "price": "10000",
+            "validity": "Xtradata 10000 Monthly Bundle"
+        },
+        {
+            "code": "4",
+            "title": "MTN D-MFIN-5-Combo-94 for Xtradata 5000 Monthly Bundle",
+            "price": "5000",
+            "validity": "Xtradata 5000 Monthly Bundle"
+        },
+        {
+            "code": "5",
+            "title": "MTN D-MFIN-5-Combo-93 for Xtradata 2000 Monthly Bundle",
+            "price": "2000",
+            "validity": "Xtradata 2000 Monthly Bundle"
+        },
+        {
+            "code": "6",
+            "title": "MTN D-MFIN-5-Combo-92 for Xtradata 1000 Monthly Bundle",
+            "price": "1000",
+            "validity": "Xtradata 1000 Monthly Bundle"
+        },
+        {
+            "code": "7",
+            "title": "MTN D-MFIN-5-Combo-91 for Xtradata 500 Weekly Bundle",
+            "price": "500",
+            "validity": "Xtradata 500 Weekly Bundle"
+        },
+        {
+            "code": "8",
+            "title": "MTN D-MFIN-5-Combo-89 for Xtratalk 20000 Monthly Bundle",
+            "price": "20000",
+            "validity": "Xtratalk 20000 Monthly Bundle"
+        },
+        {
+            "code": "9",
+            "title": "MTN D-MFIN-5-Combo-88 for Xtratalk 15000 Monthly Bundle",
+            "price": "15000",
+            "validity": "Xtratalk 15000 Monthly Bundle"
+        },
+        {
+            "code": "10",
+            "title": "MTN D-MFIN-5-Combo-87 for Xtratalk 10000 Monthly Bundle",
+            "price": "10000",
+            "validity": "Xtratalk 10000 Monthly Bundle"
+        },
+        {
+            "code": "11",
+            "title": "MTN D-MFIN-5-Combo-86 for Xtratalk 5000 Monthly Bundle",
+            "price": "5000",
+            "validity": "Xtratalk 5000 Monthly Bundle"
+        },
+        {
+            "code": "12",
+            "title": "MTN D-MFIN-5-Combo-85 for Xtratalk 2000 Monthly Bundle",
+            "price": "2000",
+            "validity": "Xtratalk 2000 Monthly Bundle"
+        },
+        {
+            "code": "13",
+            "title": "MTN D-MFIN-5-Combo-84 for Xtratalk 1000 Monthly Bundle",
+            "price": "1000",
+            "validity": "Xtratalk 1000 Monthly Bundle"
+        },
+        {
+            "code": "14",
+            "title": "MTN D-MFIN-5-Combo-83 for Xtratalk 500 Weekly Bundle",
+            "price": "500",
+            "validity": "Xtratalk 500 Weekly Bundle"
+        },
+        {
+            "code": "15",
+            "title": "MTN D-MFIN-5-Combo-73 for Xtratalk 300 Weekly Bundle\r\nXtratalk 300 Weekly Bundle",
+            "price": "300",
+            "validity": "Xtratalk 300 Weekly Bundle\r\nXtratalk 300 Weekly Bundle"
+        },
+        {
+            "code": "16",
+            "title": "MTN D-MFIN-5-Combo-1588 for Xtradata 300 Weekly Bundle",
+            "price": "300",
+            "validity": "Xtradata 300 Weekly Bundle"
+        },
+        {
+            "code": "17",
+            "title": "MTN D-MFIN-5-Combo-1587 for Xtratalk 200 3days Bundle\r\nXtratalk 200 3days Bundle",
+            "price": "200",
+            "validity": "Xtratalk 200 3days Bundle\r\nXtratalk 200 3days Bundle"
+        },
+        {
+            "code": "18",
+            "title": "MTN D-MFIN-5-7GB-A for 7GB Weekly Bundle",
+            "price": "2000",
+            "validity": "7GB Weekly Bundle"
+        },
+        {
+            "code": "19",
+            "title": "MTN D-MFIN-5-774 for 1TB SME 3-Months Plan",
+            "price": "350000",
+            "validity": "1TB SME 3-Months Plan"
+        },
+        {
+            "code": "20",
+            "title": "MTN D-MFIN-5-773 for 165GB SME 2-Months Plan",
+            "price": "50000",
+            "validity": "165GB SME 2-Months Plan"
+        },
+        {
+            "code": "21",
+            "title": "MTN D-MFIN-5-755 for 400GB Yearly Plan",
+            "price": "120000",
+            "validity": "400GB Yearly Plan"
+        },
+        {
+            "code": "22",
+            "title": "MTN D-MFIN-5-746 for 120GB Monthly Plan + 80mins.",
+            "price": "22000",
+            "validity": "120GB Monthly Plan + 80mins."
+        },
+        {
+            "code": "23",
+            "title": "MTN D-MFIN-5-745 for 10GB+2GB YouTube Night+300MB YouTube Music + 20mins.",
+            "price": "3500",
+            "validity": "10GB+2GB YouTube Night+300MB YouTube Music + 20mins."
+        },
+        {
+            "code": "24",
+            "title": "MTN D-MFIN-5-744 for 8GB+2GB YouTube Night+200MB YouTube Music + 15mins.",
+            "price": "3000",
+            "validity": "8GB+2GB YouTube Night+200MB YouTube Music + 15mins."
+        },
+        {
+            "code": "25",
+            "title": "MTN D-MFIN-5-743 for 5GB Weekly Plan",
+            "price": "1500",
+            "validity": "5GB Weekly Plan"
+        },
+        {
+            "code": "26",
+            "title": "MTN D-MFIN-5-742 for 1GB Weekly Plan + FREE 1GB for YouTube and 100MB for YouTube Music + 5mins.",
+            "price": "600",
+            "validity": "1GB Weekly Plan + FREE 1GB for YouTube and 100MB for YouTube Music + 5mins."
+        },
+        {
+            "code": "27",
+            "title": "MTN D-MFIN-5-600 for 2.5GB 2-Day Plan",
+            "price": "600",
+            "validity": "2.5GB 2-Day Plan"
+        },
+        {
+            "code": "28",
+            "title": "MTN D-MFIN-5-3GB-A for 3GB 2-Days Bundle",
+            "price": "800",
+            "validity": "3GB 2-Days Bundle"
+        },
+        {
+            "code": "29",
+            "title": "MTN D-MFIN-5-360GB for 360GB SME 3-Months Plan",
+            "price": "100000",
+            "validity": "360GB SME 3-Months Plan"
+        },
+        {
+            "code": "30",
+            "title": "MTN D-MFIN-5-307 for DataPlan 100MB Daily",
+            "price": "100",
+            "validity": "DataPlan 100MB Daily"
+        },
+        {
+            "code": "31",
+            "title": "MTN D-MFIN-5-278 for 75GB Monthly Plan + 40mins.",
+            "price": "16000",
+            "validity": "75GB Monthly Plan + 40mins."
+        },
+        {
+            "code": "32",
+            "title": "MTN D-MFIN-5-276 for 1GB Daily Plan + 3mins.",
+            "price": "350",
+            "validity": "1GB Daily Plan + 3mins."
+        },
+        {
+            "code": "33",
+            "title": "MTN D-MFIN-5-212 for 25GB+2GB YouTube Night + 25mins.",
+            "price": "6500",
+            "validity": "25GB+2GB YouTube Night + 25mins."
+        },
+        {
+            "code": "34",
+            "title": "MTN D-MFIN-5-211 for 3GB+2GB YouTube Night+200MB YouTube Music + 5mins.",
+            "price": "1600",
+            "validity": "3GB+2GB YouTube Night+200MB YouTube Music + 5mins."
+        },
+        {
+            "code": "35",
+            "title": "MTN D-MFIN-5-210 for 160GB 2-Month Plan",
+            "price": "30000",
+            "validity": "160GB 2-Month Plan"
+        },
+        {
+            "code": "36",
+            "title": "MTN D-MFIN-5-204 for 1-Year Plan",
+            "price": "450000",
+            "validity": "1-Year Plan"
+        },
+        {
+            "code": "37",
+            "title": "MTN D-MFIN-5-203 for 2.5TB Yearly Plan",
+            "price": "250000",
+            "validity": "2.5TB Yearly Plan"
+        },
+        {
+            "code": "38",
+            "title": "MTN D-MFIN-5-202 for 1 year Plan",
+            "price": "100000",
+            "validity": "1 year Plan"
+        },
+        {
+            "code": "39",
+            "title": "MTN D-MFIN-5-201 for 600GB 3-Month Plan",
+            "price": "75000",
+            "validity": "600GB 3-Month Plan"
+        },
+        {
+            "code": "40",
+            "title": "MTN D-MFIN-5-200 for 400GB 3-Month Plan",
+            "price": "50000",
+            "validity": "400GB 3-Month Plan"
+        },
+        {
+            "code": "41",
+            "title": "MTN D-MFIN-5-199 for 100GB 2-Month Plan",
+            "price": "20000",
+            "validity": "100GB 2-Month Plan"
+        },
+        {
+            "code": "42",
+            "title": "MTN D-MFIN-5-198 for 40GB Monthly Plan + 40mins.",
+            "price": "11000",
+            "validity": "40GB Monthly Plan + 40mins."
+        },
+        {
+            "code": "43",
+            "title": "MTN D-MFIN-5-197 for 20GB+2GB YouTube Night+300MB YouTube Music + 25mins.",
+            "price": "5500",
+            "validity": "20GB+2GB YouTube Night+300MB YouTube Music + 25mins."
+        },
+        {
+            "code": "44",
+            "title": "MTN D-MFIN-5-196 for 12GB+2GB YouTube Night + 25mins.",
+            "price": "4000",
+            "validity": "12GB+2GB YouTube Night + 25mins."
+        },
+        {
+            "code": "45",
+            "title": "MTN D-MFIN-5-195 for 4GB+2GB YouTube Night+200MB YouTube Music + 10mins.",
+            "price": "2000",
+            "validity": "4GB+2GB YouTube Night+200MB YouTube Music + 10mins."
+        },
+        {
+            "code": "46",
+            "title": "MTN D-MFIN-5-192 for Data Plan 200MB 3-Day Plan",
+            "price": "200",
+            "validity": "Data Plan 200MB 3-Day Plan"
+        },
+        {
+            "code": "47",
+            "title": "MTN D-MFIN-5-15AD for 1.2GB Monthly Plan + FREE 2GB for YouTube and 200MB for YouTube Music + 5mins.",
+            "price": "1000",
+            "validity": "1.2GB Monthly Plan + FREE 2GB for YouTube and 200MB for YouTube Music + 5mins."
+        },
+        {
+            "code": "48",
+            "title": "MTN D-MFIN-5-1596 for 27GB Monthly Plan + 25mins.",
+            "price": "6500",
+            "validity": "27GB Monthly Plan + 25mins."
+        },
+        {
+            "code": "49",
+            "title": "MTN D-MFIN-5-1595 for 22GB Monthly Plan + 25mins.",
+            "price": "5500",
+            "validity": "22GB Monthly Plan + 25mins."
+        },
+        {
+            "code": "50",
+            "title": "MTN D-MFIN-5-1594 for 13GB Monthly Plan + 25mins.",
+            "price": "4000",
+            "validity": "13GB Monthly Plan + 25mins."
+        },
+        {
+            "code": "51",
+            "title": "MTN D-MFIN-5-1593 for 11GB Monthly Plan + 20mins.",
+            "price": "3500",
+            "validity": "11GB Monthly Plan + 20mins."
+        },
+        {
+            "code": "52",
+            "title": "MTN D-MFIN-5-153 for 1.5GB+2.4GB YouTube Night+3hr-200MB-YouTube Weekly + 5mins.",
+            "price": "1200",
+            "validity": "1.5GB+2.4GB YouTube Night+3hr-200MB-YouTube Weekly + 5mins."
+        },
+        {
+            "code": "53",
+            "title": "MTN D-MFIN-5-13500 for 35GB SME Monthly Plan",
+            "price": "13500",
+            "validity": "35GB SME Monthly Plan"
+        }
+    ]
+}

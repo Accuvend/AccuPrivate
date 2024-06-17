@@ -66,6 +66,7 @@ import UserMeter from "../../../models/UserMeter.model";
 import { Database } from "../../../models";
 import sequelize from "sequelize";
 import { throws } from "assert";
+import PaymentProviderService from "../../../services/PaymentProvider.service";
 
 enum MessageType {
     INFORMATION = "INFORMATION",
@@ -84,6 +85,7 @@ interface valideMeterRequestBody {
     email: string;
     channel: ITransaction["channel"];
     amount: number;
+    paymentProviderId: string;
 }
 
 interface vendTokenRequestBody {
@@ -487,6 +489,7 @@ export default class VendorController {
                     vendType,
                     channel,
                     amount,
+                    paymentProviderId
                 }: valideMeterRequestBody = req.body;
                 let { disco } = req.body;
                 const partnerId = (req as any).key;
@@ -510,6 +513,16 @@ export default class VendorController {
                 if (!existingProductCodeForDisco) {
                     throw new NotFoundError(
                         "Product code not found for disco",
+                        errorMeta,
+                    );
+                }
+
+                const existingPaymentProvider = await PaymentProviderService.viewSinglePaymentProvider(
+                    paymentProviderId
+                );
+                if (!existingPaymentProvider) {
+                    throw new NotFoundError(
+                        "Payment provider not found",
                         errorMeta,
                     );
                 }
@@ -557,6 +570,7 @@ export default class VendorController {
                             disco: disco,
                             partnerId: partnerId,
                             reference: transactionId,
+                            paymentProviderId, 
                             transactionType:
                                 transactionTypes[
                                     existingProductCodeForDisco.category
@@ -1251,6 +1265,13 @@ export default class VendorController {
         if (!transaction) {
             throw new NotFoundError("Transaction not found");
         }
+
+        if (transaction.transactionType != TransactionType.ELECTRICITY) {
+            throw new BadRequestError(
+                "Transaction is not an electricity transaction",
+            );
+        }
+
         const logMeta = { transactionId: transaction.id };
         const user = await transaction.$get("user");
         const meter = await transaction.$get("meter");
@@ -1262,64 +1283,23 @@ export default class VendorController {
         }
 
         logger.info("Requery initiated from customer", logMeta);
-        // Check if disco is up
-        const vendor = await VendorModelService.viewSingleVendorByName(
-            transaction.superagent,
-        );
-        if (!vendor) throw new InternalServerError("Vendor not found");
-
-        const product =
-            await ProductService.viewSingleProductByMasterProductCode(
-                transaction.disco,
-            );
-        if (!product) throw new InternalServerError("Product not found");
-
-        const vendorProduct =
-            await VendorProductService.viewSingleVendorProductByVendorIdAndProductId(
-                vendor.id,
-                product.id,
-            );
-        if (!vendorProduct)
-            throw new InternalServerError("Vendor product not found");
-
-        logger.info("Intiating transaction requery", logMeta);
-        const discoCode = vendorProduct.schemaData.code;
-        const requeryResult =
-            await TokenHandlerUtil.requeryTransactionFromVendor(
-                transaction,
-            ).catch((e) => e ?? {});
-
-        logger.info("Requeried transaction successfully", logMeta);
-        console.log({ requeryResult: requeryResult });
-        const response =
-            await ResponseValidationUtil.validateTransactionCondition({
-                requestType: "REQUERY",
-                vendor: vendor.name,
-                // transactionType: transaction.transactionType,
-                httpCode:
-                    requeryResult instanceof AxiosError
-                        ? requeryResult.status
-                        : requeryResult.httpStatusCode,
-                responseObject:
-                    requeryResult instanceof AxiosError
-                        ? requeryResult.response?.data
-                        : requeryResult,
-                vendType: meter.vendType,
-                disco: discoCode,
-                transactionId: transaction.id,
-                isError: requeryResult instanceof AxiosError,
-            });
-
-        logger.info("Response validation completed", {
-            ...logMeta,
-            validationResponse: response,
-        });
-        if (response.action != 1) {
-            throw new BadRequestError("Transaction requery unsuccessfull");
+        const powerUnit = await transaction.$get("powerUnit");
+        if (!powerUnit) {
+            throw new InternalServerError("Power unit not found");
         }
 
         const tokenInResponse =
-            response.vendType === "PREPAID" ? response.token : undefined;
+            meter.vendType === "PREPAID" ? powerUnit.token : undefined;
+        if (!tokenInResponse && meter.vendType === "PREPAID") {
+            res.status(400).send({
+                message: "Transaction is still in progress",
+                data: {
+                    transaction,
+                },
+            });
+            return;
+        }
+
         await VendorPublisher.publishEventForTokenReceivedFromRequery({
             transactionId: transaction!.id,
             user: {
@@ -1338,7 +1318,7 @@ export default class VendorController {
                 vendType: meter.vendType,
                 token: tokenInResponse ?? "",
             },
-            tokenUnits: response.tokenUnits,
+            tokenUnits: powerUnit.tokenUnits,
         });
 
         res.status(200).send({
@@ -1357,6 +1337,7 @@ export default class VendorController {
                     vendType: meter.vendType,
                     name: meter.userId,
                 },
+                token: tokenInResponse,
             },
         });
     }
@@ -1539,11 +1520,11 @@ export default class VendorController {
         const discoCode = vendorProduct.schemaData.code;
         const requeryResult =
             await TokenHandlerUtil.requeryTransactionFromVendor(
-                transaction,
+                { ...transaction, superagent: vendor.name as ITransaction['superagent'] } as Transaction,  
             ).catch((e) => e ?? {});
 
         logger.info("Requeried transaction successfully", logMeta);
-        console.log({ requeryResult: requeryResult });
+        console.log({ requeryResult: requeryResult.response?.data });
         const response =
             await ResponseValidationUtil.validateTransactionCondition({
                 requestType: "REQUERY",
@@ -1590,6 +1571,9 @@ export default class VendorController {
             lastSuperAgentUsed,
             partner.email,
         );
+        await TransactionService.updateSingleTransaction(transaction.id, {
+            status: Status.INPROGRESS,
+        });
         switch (response.action) {
             case -1:
                 logger.error(
@@ -1605,9 +1589,9 @@ export default class VendorController {
                                 cause: TransactionErrorCause.UNEXPECTED_ERROR,
                             },
                         },
+                        requeryCount: 1,
                         eventService: transactionEventService,
                         retryCount: 1,
-                        requeryCount: 1,
                         superAgent: lastSuperAgentUsed,
                         tokenInResponse: null,
                         transactionTimedOutFromBuypower: false,
@@ -1729,9 +1713,9 @@ export default class VendorController {
                                 cause: TransactionErrorCause.UNEXPECTED_ERROR,
                             },
                         },
-                        requeryCount: 1,
                         eventService: transactionEventService,
                         retryCount: 1,
+                        requeryCount: 1,
                         superAgent: lastSuperAgentUsed,
                         tokenInResponse: null,
                         transactionTimedOutFromBuypower: false,
@@ -1743,16 +1727,16 @@ export default class VendorController {
                 await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
                     {
                         eventData: {
-                            meter: meter,
+                            meter: meter!,
                             transactionId: transactionId,
                             error: {
                                 code: 202,
                                 cause: TransactionErrorCause.NO_TOKEN_IN_RESPONSE,
                             },
                         },
-                        requeryCount: 1,
                         eventService: transactionEventService,
                         retryCount: 1,
+                        requeryCount: 1,
                         superAgent: lastSuperAgentUsed,
                         tokenInResponse: null,
                         transactionTimedOutFromBuypower: false,

@@ -5,6 +5,62 @@ import { PublisherEventAndParameters } from "../util/Interface";
 import ProducerFactory from "../util/Producer";
 
 export class VendorPublisher extends ProducerFactory {
+    static async publishEventToScheduleAirtimeRequery(
+        data: PublisherEventAndParameters[TOPICS.SCHEDULE_REQUERY_FOR_AIRTIME_TRANSACTION],
+    ) {
+        return ProducerFactory.sendMessage({
+            topic: TOPICS.SCHEDULE_REQUERY_FOR_AIRTIME_TRANSACTION,
+            message: {
+                log: data.log,
+                scheduledMessagePayload: data.scheduledMessagePayload,
+                timeStamp: data.timeStamp,
+                delayInSeconds: data.delayInSeconds,
+            },
+        });
+    }
+
+    static async publishEventToScheduleAirtimeRetry(
+        data: PublisherEventAndParameters[TOPICS.SCHEDULE_RETRY_FOR_AIRTIME_TRANSACTION],
+    ) {
+        return ProducerFactory.sendMessage({
+            topic: TOPICS.SCHEDULE_RETRY_FOR_AIRTIME_TRANSACTION,
+            message: {
+                log: data.log,
+                scheduledMessagePayload: data.scheduledMessagePayload,
+                timeStamp: data.timeStamp,
+                delayInSeconds: data.delayInSeconds,
+            },
+        });
+    }
+
+    static async publishEventToScheduleDataRequery(
+        data: PublisherEventAndParameters[TOPICS.SCHEDULE_REQUERY_FOR_DATA_TRANSACTION],
+    ) {
+        return ProducerFactory.sendMessage({
+            topic: TOPICS.SCHEDULE_REQUERY_FOR_DATA_TRANSACTION,
+            message: {
+                log: data.log,
+                scheduledMessagePayload: data.scheduledMessagePayload,
+                timeStamp: data.timeStamp,
+                delayInSeconds: data.delayInSeconds,
+            },
+        });
+    }
+
+    static async publishEventToScheduleDataRetry(
+        data: PublisherEventAndParameters[TOPICS.SCHEDULE_RETRY_FOR_DATA_TRANSACTION],
+    ) {
+        return ProducerFactory.sendMessage({
+            topic: TOPICS.SCHEDULE_RETRY_FOR_DATA_TRANSACTION,
+            message: {
+                log: data.log,
+                scheduledMessagePayload: data.scheduledMessagePayload,
+                timeStamp: data.timeStamp,
+                delayInSeconds: data.delayInSeconds,
+            },
+        });
+    }
+
     static async publishEventToScheduleRequery(
         data: PublisherEventAndParameters[TOPICS.SCHEDULE_REQUERY_FOR_TRANSACTION],
     ) {
@@ -44,6 +100,25 @@ export class VendorPublisher extends ProducerFactory {
                     meterNumber: data.meter.meterNumber,
                     disco: data.meter.disco,
                     vendType: data.meter.vendType,
+                },
+                transactionId: data.transactionId,
+                superAgent: data.superAgent,
+            },
+        });
+    }
+
+    static async publishEvnetForVendAirtimeRequestedFromVendor(
+        data: PublisherEventAndParameters[TOPICS.VEND_AIRTIME_REQUESTED_FROM_VENDOR],
+    ) {
+        return ProducerFactory.sendMessage({
+            topic: TOPICS.VEND_AIRTIME_REQUESTED_FROM_VENDOR,
+            message: {
+                log: data.log,
+                meter: {
+                    meterNumber: data.meter.meterNumber,
+                    disco: data.meter.disco,
+                    vendType: data.meter.vendType,
+                    id: data.meter.id,
                 },
                 transactionId: data.transactionId,
                 superAgent: data.superAgent,
@@ -299,6 +374,45 @@ export class VendorPublisher extends ProducerFactory {
         });
     }
 
+    static async publishEventForGetDataRequestedFromVendorRequery(
+        data: PublisherEventAndParameters[TOPICS.GET_DATA_FROM_VENDOR_REQUERY],
+    ) {
+        return ProducerFactory.sendMessage({
+            topic: TOPICS.GET_DATA_FROM_VENDOR_REQUERY,
+            message: {
+                log: data.log,
+                error: data.error,
+                transactionId: data.transactionId,
+                timeStamp: data.timeStamp,
+                retryCount: data.retryCount,
+                bundle: data.bundle,
+                superAgent: data.superAgent,
+                waitTime: data.waitTime,
+                vendorRetryRecord: data.vendorRetryRecord,
+                phone: data.phone,
+            },
+        });
+    }
+
+    static async publishEventForGetAirtimeRequestedFromVendorRequery(
+        data: PublisherEventAndParameters[TOPICS.GET_AIRTIME_FROM_VENDOR_REQUERY],
+    ) {
+        return ProducerFactory.sendMessage({
+            topic: TOPICS.GET_AIRTIME_FROM_VENDOR_REQUERY,
+            message: {
+                log: data.log,
+                error: data.error,
+                transactionId: data.transactionId,
+                timeStamp: data.timeStamp,
+                retryCount: data.retryCount,
+                superAgent: data.superAgent,
+                waitTime: data.waitTime,
+                vendorRetryRecord: data.vendorRetryRecord,
+                phone: data.phone,
+            },
+        });
+    }
+
     static async publishEventForGetTransactionTokenFromVendorInitiated(
         data: PublisherEventAndParameters[TOPICS.GET_TRANSACTION_TOKEN_FROM_VENDOR_INITIATED],
     ) {
@@ -361,7 +475,7 @@ export class VendorPublisher extends ProducerFactory {
                     vendType: data.meter.vendType,
                     id: data.meter.id,
                     token: data.meter.token,
-                },
+            },
                 user: {
                     name: data.user.name,
                     email: data.user.email,
@@ -426,6 +540,7 @@ export class VendorPublisher extends ProducerFactory {
                 partner: data.partner,
                 user: data.user,
                 transactionId: data.transactionId,
+                vendorRetryRecord: data.vendorRetryRecord,
                 superAgent: data.superAgent,
             },
         });
@@ -476,10 +591,10 @@ export class VendorPublisher extends ProducerFactory {
     }
 
     static async publishEventForGetAirtimeFromVendorRetry(
-        data: PublisherEventAndParameters[TOPICS.GET_AIRTIME_FROM_VENDOR_RETRY],
+        data: PublisherEventAndParameters[TOPICS.GET_AIRTIME_FROM_VENDOR_REQUERY],
     ) {
         return ProducerFactory.sendMessage({
-            topic: TOPICS.GET_AIRTIME_FROM_VENDOR_RETRY,
+            topic: TOPICS.GET_AIRTIME_FROM_VENDOR_REQUERY,
             message: {
                 log: data.log,
                 phone: data.phone,
@@ -488,6 +603,7 @@ export class VendorPublisher extends ProducerFactory {
                 timeStamp: data.timeStamp,
                 retryCount: data.retryCount,
                 superAgent: data.superAgent,
+                vendorRetryRecord: data.vendorRetryRecord,
                 waitTime: data.waitTime,
             },
         });
@@ -505,6 +621,7 @@ export class VendorPublisher extends ProducerFactory {
                 superAgent: data.superAgent,
                 newVendor: data.newVendor,
                 partner: data.partner,
+                vendorRetryRecord: data.vendorRetryRecord,
                 user: data.user,
             },
         });
@@ -519,6 +636,7 @@ export class VendorPublisher extends ProducerFactory {
             topic: TOPICS.DATA_PURCHASE_INITIATED_BY_CUSTOMER,
             message: {
                 log: data.log,
+                bundle: data.bundle,
                 phone: data.phone,
                 partner: data.partner,
                 user: data.user,
@@ -539,6 +657,7 @@ export class VendorPublisher extends ProducerFactory {
                 phone: data.phone,
                 transactionId: data.transactionId,
                 partner: data.partner,
+                bundle: data.bundle,
                 user: data.user,
             },
         });
@@ -582,6 +701,7 @@ export class VendorPublisher extends ProducerFactory {
                 log: data.log,
                 phone: data.phone,
                 error: data.error,
+                bundle: data.bundle,
                 transactionId: data.transactionId,
                 timeStamp: data.timeStamp,
                 retryCount: data.retryCount,
@@ -600,6 +720,8 @@ export class VendorPublisher extends ProducerFactory {
             message: {
                 log: data.log,
                 phone: data.phone,
+                vendorRetryRecord: data.vendorRetryRecord,
+                bundle: data.bundle,
                 transactionId: data.transactionId,
                 superAgent: data.superAgent,
                 newVendor: data.newVendor,

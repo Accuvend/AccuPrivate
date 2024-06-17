@@ -1,6 +1,7 @@
 import { ConsumerSubscribeTopics, EachMessagePayload } from "kafkajs";
 import { TOPICS } from "../../Constants";
 import Transaction from "../../../models/Transaction.model";
+import { IBundle } from "../../../models/Bundle.model";
 export type Topic = TOPICS;
 
 export interface CustomMessageFormat {
@@ -54,6 +55,45 @@ export interface VendorRetryRecord {
 
 export interface PublisherEventAndParameters
     extends Record<TOPICS, { log?: 1 | 0 } & any> {
+    [TOPICS.SCHEDULE_REQUERY_FOR_AIRTIME_TRANSACTION]: {
+        log?: 1 | 0;
+        timeStamp: string;
+        delayInSeconds: number;
+        scheduledMessagePayload: PublisherEventAndParameters[TOPICS.GET_AIRTIME_FROM_VENDOR_REQUERY];
+    };
+    [TOPICS.SCHEDULE_RETRY_FOR_AIRTIME_TRANSACTION]: {
+        log?: 1 | 0;
+        timeStamp: string;
+        delayInSeconds: number;
+        scheduledMessagePayload: PublisherEventAndParameters[TOPICS.AIRTIME_PURCHASE_INITIATED_BY_CUSTOMER] & {
+            retryRecord: Transaction["retryRecord"];
+            newVendor: Transaction["superagent"];
+            newTransactionReference: string;
+            irechargeAccessToken: string;
+            previousVendors: Transaction["superagent"][];
+        };
+    };
+    [TOPICS.SCHEDULE_REQUERY_FOR_DATA_TRANSACTION]: {
+        log?: 1 | 0;
+        timeStamp: string;
+        delayInSeconds: number;
+        scheduledMessagePayload: PublisherEventAndParameters[TOPICS.GET_DATA_FROM_VENDOR_REQUERY];
+    };
+    [TOPICS.SCHEDULE_RETRY_FOR_DATA_TRANSACTION]: {
+        log?: 1 | 0;
+        timeStamp: string;
+        delayInSeconds: number;
+        scheduledMessagePayload: PublisherEventAndParameters[TOPICS.DATA_PURCHASE_INITIATED_BY_CUSTOMER] & {
+            retryRecord: Transaction["retryRecord"];
+            retryCount: number;
+            bundle: IBundle;
+            vendorRetryRecord: VendorRetryRecord;
+            newVendor: Transaction["superagent"];
+            newTransactionReference: string;
+            irechargeAccessToken: string;
+            previousVendors: Transaction["superagent"][];
+        };
+    };
     [TOPICS.SCHEDULE_REQUERY_FOR_TRANSACTION]: {
         log?: 1 | 0;
         timeStamp: string;
@@ -147,6 +187,7 @@ export interface PublisherEventAndParameters
         timeStamp: Date;
         superAgent: Transaction["superagent"];
     };
+
     [TOPICS.PARTNER_TRANSACTION_COMPLETE]: {
         log?: 1 | 0;
         meter: MeterInfo & { id: string };
@@ -197,6 +238,9 @@ export interface PublisherEventAndParameters
             phoneNumber: string;
             amount: number;
         };
+        vendorRetryRecord: {
+            retryCount: number;
+        };
         user: User;
         partner: Partner;
         transactionId: string;
@@ -222,14 +266,6 @@ export interface PublisherEventAndParameters
         superAgent: Transaction["superagent"];
         newVendor: Transaction["superagent"];
     };
-    [TOPICS.AIRTIME_PURCHASE_INITIATED_BY_CUSTOMER]: {
-        log?: 1 | 0;
-        phone: { phoneNumber: string; amount: number };
-        user: User;
-        partner: Partner;
-        transactionId: string;
-        superAgent: Transaction["superagent"];
-    };
     [TOPICS.AIRTIME_RECEIVED_FROM_VENDOR]: {
         log?: 1 | 0;
         phone: { phoneNumber: string; amount: number };
@@ -237,7 +273,7 @@ export interface PublisherEventAndParameters
         partner: Partner;
         transactionId: string;
     };
-    [TOPICS.GET_AIRTIME_FROM_VENDOR_RETRY]: {
+    [TOPICS.GET_AIRTIME_FROM_VENDOR_REQUERY]: {
         log?: 1 | 0;
         phone: {
             phoneNumber: string;
@@ -248,6 +284,7 @@ export interface PublisherEventAndParameters
         error: { code: number; cause: TransactionErrorCause };
         retryCount: number;
         superAgent: Transaction["superagent"];
+        vendorRetryRecord: VendorRetryRecord;
         waitTime: number;
     };
     [TOPICS.AIRTIME_PURCHASE_RETRY_FROM_NEW_VENDOR]: {
@@ -255,6 +292,9 @@ export interface PublisherEventAndParameters
         phone: {
             phoneNumber: string;
             amount: number;
+        };
+        vendorRetryRecord: {
+            retryCount: number;
         };
         user: User;
         partner: Partner;
@@ -270,6 +310,7 @@ export interface PublisherEventAndParameters
             phoneNumber: string;
             amount: number;
         };
+        bundle: IBundle;
         user: User;
         partner: Partner;
         transactionId: string;
@@ -296,19 +337,11 @@ export interface PublisherEventAndParameters
         superAgent: Transaction["superagent"];
         newVendor: Transaction["superagent"];
     };
-    [TOPICS.DATA_PURCHASE_INITIATED_BY_CUSTOMER]: {
-        log?: 1 | 0;
-        phone: { phoneNumber: string; amount: number };
-        user: User;
-        partner: Partner;
-        transactionId: string;
-        superAgent: Transaction["superagent"];
-        vendorRetryRecord: VendorRetryRecord;
-    };
     [TOPICS.DATA_RECEIVED_FROM_VENDOR]: {
         log?: 1 | 0;
         phone: { phoneNumber: string; amount: number };
         user: User;
+        bundle: IBundle;
         partner: Partner;
         transactionId: string;
     };
@@ -319,6 +352,7 @@ export interface PublisherEventAndParameters
             amount: number;
         };
         transactionId: string;
+        bundle: IBundle;
         timeStamp: Date;
         error: { code: number; cause: TransactionErrorCause };
         retryCount: number;
@@ -332,6 +366,8 @@ export interface PublisherEventAndParameters
             phoneNumber: string;
             amount: number;
         };
+        bundle: IBundle;
+        vendorRetryRecord: VendorRetryRecord;
         user: User;
         partner: Partner;
         transactionId: string;

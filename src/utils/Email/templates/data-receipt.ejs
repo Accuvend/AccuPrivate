@@ -49,6 +49,14 @@
                         
                         <div
                             style="width: 100%; display: flex; flex-direction: row; padding: 10px 0; border-bottom: 1px solid grey;">
+                            <p style="font-size: 15px; font-weight: 300; margin-right: auto; color: grey">Phone number</p>
+                            <p style="font-size: 15px; font-weight: 500; text-align: right; font-style: bold;">
+                                <%=bundleName %>
+                            </p>
+                        </div>
+
+                        <div
+                            style="width: 100%; display: flex; flex-direction: row; padding: 10px 0; border-bottom: 1px solid grey;">
                             <p style="font-size: 15px; font-weight: 300; margin-right: auto; color: grey">Date</p>
                             <p style="font-size: 15px; font-weight: 500; text-align: right; font-style: bold;"><%= transaction.transactionTimestamp.toString().split(` (`)[0] %> </p>
                         </div>

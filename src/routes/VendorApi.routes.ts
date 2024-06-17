@@ -21,20 +21,10 @@ router
         AuthenticatedController(VendorController.confirmPayment),
     )
 
-    .post(
-        "/validate/airtime/phone",
-        validateApiKey,
-        AirtimeVendController.validateAirtimeRequest,
-    )
     .get("/airtime", validateApiKey, AirtimeVendController.requestAirtime)
-    .get("/seed", AirtimeVendController.seedDataToDb)
-    .get("/seed/data", AirtimeVendController.seedDataBundlesToDb)
-
-    .post(
-        "/validate/data/phone",
-        validateApiKey,
-        DataVendController.validateDataRequest,
-    )
+    // .get("/seed", AirtimeVendController.seedDataToDb)
+    // .get("/seed/data", AirtimeVendController.seedDataBundlesToDb)
+    //
     .get("/data", validateApiKey, DataVendController.requestData)
     .post(
         "/validate/meter/mock",
@@ -71,4 +61,3 @@ router
     );
 
 export default router;
-

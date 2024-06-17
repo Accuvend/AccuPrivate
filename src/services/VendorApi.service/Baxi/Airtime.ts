@@ -1,34 +1,78 @@
-import { generateRandomString } from '../../../utils/Helper';
-import BaxiApiBaseConfig, { BaxiSuccessfulPuchaseResponse } from './Config';
+import { generateRandomString } from "../../../utils/Helper";
+import logger from "../../../utils/Logger";
+import BaxiApiBaseConfig, { BaxiSuccessfulPuchaseResponse } from "./Config";
 
-export type BaxiAirtimeServiceType = 'MTN' | 'GLO' | 'AIRTEL' | '9MOBILE'
+export type BaxiAirtimeServiceType = "MTN" | "GLO" | "AIRTEL" | "9MOBILE";
 
 export interface PurchaseInfo {
-    serviceType: BaxiAirtimeServiceType, phoneNumber: string, amount: number
+    serviceType: BaxiAirtimeServiceType;
+    phoneNumber: string;
+    reference: string;
+    amount: number;
 }
 
 export default class BaxiAirtimeApi extends BaxiApiBaseConfig {
     static async getRechargeProviders() {
-        const response = await this.baxiApi.get('/airtime/providers')
+        const response = await this.baxiApi.get("/airtime/providers");
 
-        return response.data
+        return response.data;
     }
 
-    static async purchase(purchaseData: PurchaseInfo) {
-        const {
-            serviceType, phoneNumber, amount
-        } = purchaseData
+    static async purchase(
+        purchaseData: PurchaseInfo & { transactionId: string },
+    ) {
+        const { serviceType, phoneNumber, reference, amount } = purchaseData;
 
-        const response = await this.baxiApi.post<BaxiSuccessfulPuchaseResponse>('/airtime/request', {
-            agentReference: generateRandomString(20),
+        const logMeta = {
+            description: {
+                url: this.baxiApi.defaults.baseURL + "/airtime/request",
+                method: "POST",
+            },
+            data: purchaseData,
+            transactionId: purchaseData.transactionId,
+        };
+
+        const requestPayload = {
+            agentReference: reference,
             agentId: this.agentId,
-            plan: 'prepaid',
+            plan: "prepaid",
             service_type: serviceType.toLowerCase(),
             phone: phoneNumber,
-            amount
-        })
+            amount,
+        };
 
-        return response.data
+        try {
+            logger.info("Vending request with BAXI", {
+                meta: { postData: requestPayload, ...logMeta },
+            });
+
+            const response =
+                await this.baxiApi.post<BaxiSuccessfulPuchaseResponse>(
+                    "/airtime/request",
+                    requestPayload,
+                );
+            logger.info("Vend response from BAXI", {
+                meta: {
+                    requestData: requestPayload,
+                    responseData: response.data,
+                },
+            });
+
+            return {
+                ...response.data,
+                source: "BAXI" as const,
+                httpStatusCode: response.status,
+            };
+        } catch (error: any) {
+            if (error.response) {
+                logger.error("Vend response from BAXI", {
+                    meta: {
+                        requestData: requestPayload,
+                        responseData: error.response.data,
+                    },
+                });
+            }
+            throw error;
+        }
     }
 }
-

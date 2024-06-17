@@ -9,6 +9,7 @@ import {
 import { IReceiptEmailTemplateProps } from "../../Interface";
 import Transaction from "../../../models/Transaction.model";
 import { randomUUID } from "crypto";
+import { IBundle } from "../../../models/Bundle.model";
 import { string } from "zod";
 
 const containerTemplate = fs.readFileSync(__dirname + "/container.ejs", "utf8");
@@ -141,6 +142,24 @@ class EmailTemplate {
             }),
         );
     };
+    dataBundleReceipt = async ({
+        transaction,
+        phoneNumber,
+        bundle,
+    }: {
+        transaction: Transaction;
+        phoneNumber: string;
+        bundle: IBundle;
+    }) => {
+        return container(
+            await ejs.renderFile(__dirname + "/airtime-receipt.ejs", {
+                transaction,
+                phoneNumber,
+                bundleName: bundle.bundleName,
+            }),
+        );
+    };
+
     emailVerification = async ({
         partnerEmail,
         otpCode,

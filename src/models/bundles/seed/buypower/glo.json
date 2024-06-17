@@ -1,0 +1,336 @@
+{
+    "status": "00",
+    "message": "Successful",
+    "bundles": [
+        {
+            "code": "110",
+            "title": "Glo D-MFIN-6-DATA400 for Day Plan 1 days",
+            "price": "50",
+            "validity": "Day Plan 1 days"
+        },
+        {
+            "code": "111",
+            "title": "Glo D-MFIN-6-DATA401 for Day Plan 1 days",
+            "price": "100",
+            "validity": "Day Plan 1 days"
+        },
+        {
+            "code": "112",
+            "title": "Glo D-MFIN-6-DATA402 for Day Plan 2 days",
+            "price": "200",
+            "validity": "Day Plan 2 days"
+        },
+        {
+            "code": "113",
+            "title": "Glo D-MFIN-6-DATA403 for Weekly Plan 14 days",
+            "price": "500",
+            "validity": "Weekly Plan 14 days"
+        },
+        {
+            "code": "114",
+            "title": "Glo D-MFIN-6-DATA404 for Monthly Plan 30 days",
+            "price": "1000",
+            "validity": "Monthly Plan 30 days"
+        },
+        {
+            "code": "115",
+            "title": "Glo D-MFIN-6-DATA433 for Monthly Plan 30 days",
+            "price": "1500",
+            "validity": "Monthly Plan 30 days"
+        },
+        {
+            "code": "116",
+            "title": "Glo D-MFIN-6-DATA405 for Monthly Plan 30 days",
+            "price": "2000",
+            "validity": "Monthly Plan 30 days"
+        },
+        {
+            "code": "117",
+            "title": "Glo D-MFIN-6-DATA406 for Monthly Plan 30 days",
+            "price": "2500",
+            "validity": "Monthly Plan 30 days"
+        },
+        {
+            "code": "118",
+            "title": "Glo D-MFIN-6-DATA407 for Monthly Plan 30 days",
+            "price": "3000",
+            "validity": "Monthly Plan 30 days"
+        },
+        {
+            "code": "119",
+            "title": "Glo D-MFIN-6-DATA408 for Monthly Plan 30 days",
+            "price": "4000",
+            "validity": "Monthly Plan 30 days"
+        },
+        {
+            "code": "120",
+            "title": "Glo D-MFIN-6-DATA409 for Monthly Plan 30 days",
+            "price": "5000",
+            "validity": "Monthly Plan 30 days"
+        },
+        {
+            "code": "121",
+            "title": "Glo D-MFIN-6-DATA410 for Monthly Plan 30 days",
+            "price": "8000",
+            "validity": "Monthly Plan 30 days"
+        },
+        {
+            "code": "122",
+            "title": "Glo D-MFIN-6-DATA430 for Monthly Plan 30 days",
+            "price": "10000",
+            "validity": "Monthly Plan 30 days"
+        },
+        {
+            "code": "123",
+            "title": "Glo D-MFIN-6-DATA411 for Monthly Plan 30 days",
+            "price": "15000",
+            "validity": "Monthly Plan 30 days"
+        },
+        {
+            "code": "124",
+            "title": "Glo D-MFIN-6-DATA412 for Monthly Plan 30 days",
+            "price": "18000",
+            "validity": "Monthly Plan 30 days"
+        },
+        {
+            "code": "125",
+            "title": "Glo D-MFIN-6-DATA432 for Monthly Plan 30 days",
+            "price": "20000",
+            "validity": "Monthly Plan 30 days"
+        },
+        {
+            "code": "126",
+            "title": "Glo D-MFIN-6-DATA15 for Night Plan 1 days",
+            "price": "25",
+            "validity": "Night Plan 1 days"
+        },
+        {
+            "code": "127",
+            "title": "Glo D-MFIN-6-DATA30 for Night Plan 1 days",
+            "price": "50",
+            "validity": "Night Plan 1 days"
+        },
+        {
+            "code": "128",
+            "title": "Glo D-MFIN-6-DATA31 for Night Plan 5 days",
+            "price": "100",
+            "validity": "Night Plan 5 days"
+        },
+        {
+            "code": "129",
+            "title": "Glo D-MFIN-6-DATA35 for Special Plan 1 days",
+            "price": "300",
+            "validity": "Special Plan 1 days"
+        },
+        {
+            "code": "130",
+            "title": "Glo D-MFIN-6-DATA36 for Special Plan 2 days",
+            "price": "500",
+            "validity": "Special Plan 2 days"
+        },
+        {
+            "code": "131",
+            "title": "Glo D-MFIN-6-DATA24 for Special Plan 7 days",
+            "price": "1500",
+            "validity": "Special Plan 7 days"
+        },
+        {
+            "code": "132",
+            "title": "Glo D-MFIN-6-DATA14 for Weekend Plan 2 (Sat & Sun) days",
+            "price": "500",
+            "validity": "Weekend Plan 2 (Sat & Sun) days"
+        },
+        {
+            "code": "133",
+            "title": "Glo D-MFIN-6-DATA37 for Weekend Plan 1 (Sun) days",
+            "price": "200",
+            "validity": "Weekend Plan 1 (Sun) days"
+        },
+        {
+            "code": "134",
+            "title": "Glo D-MFIN-6-DATA434 for Mega Plan 30 days",
+            "price": "30000",
+            "validity": "Mega Plan 30 days"
+        },
+        {
+            "code": "135",
+            "title": "Glo D-MFIN-6-DATA435 for Mega Plan 30 days",
+            "price": "36000",
+            "validity": "Mega Plan 30 days"
+        },
+        {
+            "code": "136",
+            "title": "Glo D-MFIN-6-DATA436 for Mega Plan 90 days",
+            "price": "50000",
+            "validity": "Mega Plan 90 days"
+        },
+        {
+            "code": "137",
+            "title": "Glo D-MFIN-6-DATA437 for Mega Plan 120 days",
+            "price": "60000",
+            "validity": "Mega Plan 120 days"
+        },
+        {
+            "code": "138",
+            "title": "Glo D-MFIN-6-DATA438 for Mega Plan 120 days",
+            "price": "75000",
+            "validity": "Mega Plan 120 days"
+        },
+        {
+            "code": "139",
+            "title": "Glo D-MFIN-6-DATA439 for Mega Plan 365 days",
+            "price": "100000",
+            "validity": "Mega Plan 365 days"
+        },
+        {
+            "code": "140",
+            "title": "Glo D-MFIN-6-DATA780 for Glo TV 3 days",
+            "price": "150",
+            "validity": "Glo TV 3 days"
+        },
+        {
+            "code": "141",
+            "title": "Glo D-MFIN-6-DATA781 for Glo TV 7 days",
+            "price": "450",
+            "validity": "Glo TV 7 days"
+        },
+        {
+            "code": "142",
+            "title": "Glo D-MFIN-6-DATA782 for Glo TV 30 days",
+            "price": "1400",
+            "validity": "Glo TV 30 days"
+        },
+        {
+            "code": "143",
+            "title": "Glo D-MFIN-6-DATA783 for Glo TV 7 days",
+            "price": "900",
+            "validity": "Glo TV 7 days"
+        },
+        {
+            "code": "144",
+            "title": "Glo D-MFIN-6-DATA784 for Glo TV 30 days",
+            "price": "3200",
+            "validity": "Glo TV 30 days"
+        },
+        {
+            "code": "145",
+            "title": "Glo D-MFIN-6-DATA850 for Social Plan 1 days",
+            "price": "25",
+            "validity": "Social Plan 1 days"
+        },
+        {
+            "code": "146",
+            "title": "Glo D-MFIN-6-DATA851 for Social Plan 7 days",
+            "price": "50",
+            "validity": "Social Plan 7 days"
+        },
+        {
+            "code": "147",
+            "title": "Glo D-MFIN-6-DATA852 for Social Plan 30 days",
+            "price": "100",
+            "validity": "Social Plan 30 days"
+        },
+        {
+            "code": "148",
+            "title": "Glo D-MFIN-6-DATA853 for Social Plan 1 days",
+            "price": "25",
+            "validity": "Social Plan 1 days"
+        },
+        {
+            "code": "149",
+            "title": "Glo D-MFIN-6-DATA854 for Social Plan 7 days",
+            "price": "50",
+            "validity": "Social Plan 7 days"
+        },
+        {
+            "code": "150",
+            "title": "Glo D-MFIN-6-DATA855 for Social Plan 30 days",
+            "price": "100",
+            "validity": "Social Plan 30 days"
+        },
+        {
+            "code": "151",
+            "title": "Glo D-MFIN-6-DATA856 for Social Plan 1 days",
+            "price": "25",
+            "validity": "Social Plan 1 days"
+        },
+        {
+            "code": "152",
+            "title": "Glo D-MFIN-6-DATA857 for Social Plan 7 days",
+            "price": "50",
+            "validity": "Social Plan 7 days"
+        },
+        {
+            "code": "153",
+            "title": "Glo D-MFIN-6-DATA858 for Social Plan 30 days",
+            "price": "100",
+            "validity": "Social Plan 30 days"
+        },
+        {
+            "code": "154",
+            "title": "Glo D-MFIN-6-DATA859 for Social Plan 1 days",
+            "price": "25",
+            "validity": "Social Plan 1 days"
+        },
+        {
+            "code": "155",
+            "title": "Glo D-MFIN-6-DATA860 for Social Plan 7 days",
+            "price": "50",
+            "validity": "Social Plan 7 days"
+        },
+        {
+            "code": "156",
+            "title": "Glo D-MFIN-6-DATA861 for Social Plan 30 days",
+            "price": "100",
+            "validity": "Social Plan 30 days"
+        },
+        {
+            "code": "157",
+            "title": "Glo D-MFIN-6-DATA869 for Social Plan 7 days",
+            "price": "50",
+            "validity": "Social Plan 7 days"
+        },
+        {
+            "code": "158",
+            "title": "Glo D-MFIN-6-DATA871 for Social Plan 1 days",
+            "price": "50",
+            "validity": "Social Plan 1 days"
+        },
+        {
+            "code": "159",
+            "title": "Glo D-MFIN-6-DATA872 for Social Plan 7 days",
+            "price": "100",
+            "validity": "Social Plan 7 days"
+        },
+        {
+            "code": "160",
+            "title": "Glo D-MFIN-6-DATA873 for Social Plan 30 days",
+            "price": "250",
+            "validity": "Social Plan 30 days"
+        },
+        {
+            "code": "161",
+            "title": "Glo D-MFIN-6-DATA874 for Social Plan 1 days",
+            "price": "50",
+            "validity": "Social Plan 1 days"
+        },
+        {
+            "code": "162",
+            "title": "Glo D-MFIN-6-DATA875 for Social Plan 1 days",
+            "price": "130",
+            "validity": "Social Plan 1 days"
+        },
+        {
+            "code": "163",
+            "title": "Glo D-MFIN-6-DATA876 for Social Plan 1 days",
+            "price": "50",
+            "validity": "Social Plan 1 days"
+        },
+        {
+            "code": "164",
+            "title": "Glo D-MFIN-6-DATA877 for Social Plan 7 days",
+            "price": "200",
+            "validity": "Social Plan 7 days"
+        }
+    ]
+}

@@ -504,6 +504,7 @@ export class TokenHandlerUtil {
 
         logger.info("Scheduled retry event", meta);
 
+        await TransactionService.updateSingleTransaction(transaction.id, { superagent: newVendor });
         await VendorPublisher.publishEventToScheduleRetry({
             scheduledMessagePayload: {
                 meter: meter,
@@ -795,6 +796,7 @@ export class TokenHandlerUtil {
             }),
         );
 
+        console.log({ vendorProducts})
         // Check other vendors, sort them according to their commission rates
         // If the current vendor is the vendor with the highest commission rate, then switch to the vendor with the next highest commission rate
         // If the next vendor has been used before, switch to the next vendor with the next highest commission rate
@@ -1150,6 +1152,8 @@ class TokenHandler extends Registry {
                     logger.info("Processing token request", logMeta);
 
                     // Purchase token from vendor
+                    // Keep record of the last time the transaction was requeued
+                    await TransactionService.updateSingleTransaction(transaction.id, { vendTimeStamps: [...(transaction.vendTimeStamps ?? []), new Date().toString()] })
                     const tokenInfo = await TokenHandlerUtil.processVendRequest(
                         {
                             transaction:
@@ -1459,6 +1463,12 @@ class TokenHandler extends Registry {
                     const previousTimestamp = new Date(
                         transaction.transactionTimestamp,
                     ).getTime(); // This represents a timestamp for April 1, 2022
+                        const lastVendTime = transaction.vendTimeStamps?.slice(-1)[0];
+                    let differenceInHoursFromLastVend = 0;
+                    if (lastVendTime) {
+                        const lastVendTimeStamp = new Date(lastVendTime).getTime();
+                        differenceInHoursFromLastVend = (now - lastVendTimeStamp) / (1000 * 60 * 60);
+                    }
 
                     // Calculate the difference between the current timestamp and the previous timestamp in milliseconds
                     const differenceInMilliseconds = now - previousTimestamp;
@@ -1468,10 +1478,9 @@ class TokenHandler extends Registry {
                         differenceInMilliseconds / (1000 * 60 * 60); // 1000 milliseconds * 60 seconds * 60 minutes
 
                     // Check if the difference is greater than two hours
-                    // if (differenceInHours > 2) {
-
+                    const flaggTransaction = differenceInHoursFromLastVend > 2 || differenceInHours > ((2/60) * 2);
                     //check if transaction is greater than 2hrs then stop
-                    if (differenceInHours > 2) {
+                    if (flaggTransaction) {
                         logger.info(
                             `Flagged transaction with id ${transaction.id} after hitting requery limit`,
                             {

@@ -1,15 +1,19 @@
 import { NODE_ENV } from "../../../utils/Constants";
 import { generateRandonNumbers } from "../../../utils/Helper";
+import logger from "../../../utils/Logger";
 import { IRechargeBaseConfig, IRechargeApi } from "./Config";
 
 export class IRechargeDataApi extends IRechargeBaseConfig {
-    static async purchase(data: IRechargeApi.DataPurchaseParams) {
+    static async purchase(
+        data: IRechargeApi.DataPurchaseParams & { transactionId: string },
+    ) {
         const { email, amount, phoneNumber, serviceType } = data;
 
         const reference =
-            NODE_ENV === "development"
-                ? generateRandonNumbers(12)
-                : data.reference;
+            // NODE_ENV === "development"
+            //     ? generateRandonNumbers(12)
+            //     :
+            data.reference;
 
         const network = {
             mtn: "MTN",
@@ -38,22 +42,58 @@ export class IRechargeDataApi extends IRechargeBaseConfig {
             vtu_network:
                 network[serviceType.toLowerCase() as keyof typeof network],
             vtu_amount: parseFloat(amount.toString()),
-            vtu_data: parseInt(data.dataCode),
+            vtu_data: data.dataCode,
             vtu_number: phoneNumber,
             email: email,
             reference_id: reference,
             response_format: "json",
             hash,
         };
-        const response = await this.API.get<
-            | IRechargeApi.DataSuccessfulVendResponse
-            | IRechargeApi.RequeryResponse
-        >("/vend_data.php", { params });
+        console.log({ params });
 
-        console.log({ params, response: response.data });
-        return (response.data) as
-            | IRechargeApi.DataSuccessfulVendResponse
-            | IRechargeApi.RequeryResponse;
+        const logMeta = {
+            description: {
+                url: this.API.defaults.baseURL + "/vend_data.php",
+                method: "GET",
+            },
+            data: params,
+            transactionId: data.transactionId,
+        };
+
+        try {
+            logger.info("Vending request with IRECHARGE", {
+                meta: { postData: params, ...logMeta },
+            });
+            const response = await this.API.get<
+                | IRechargeApi.DataSuccessfulVendResponse
+                | IRechargeApi.RequeryResponse
+            >("/vend_data.php", { params });
+
+            logger.info("Vend response from IRECHARGE", {
+                meta: {
+                    requestData: params,
+                    responseData: response.data,
+                    ...logMeta,
+                },
+            });
+            console.log({ params, response: response.data });
+
+            return {
+                ...response.data,
+                source: "IRECHARGE" as const,
+                httpStatusCode: response.status,
+            };
+        } catch (error: any) {
+            if (error.response) {
+                logger.error("Vend response from IRECHARGE", {
+                    meta: {
+                        requestData: params,
+                        responseData: error.response.data,
+                    },
+                });
+            }
+
+            throw error;
+        }
     }
 }
-

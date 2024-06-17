@@ -35,7 +35,7 @@ export default class UserInviteController {
         });
 
         await EmailService.sendEmail({
-            to: userInvite.email,
+            to: userInvite?.email || "",
             subject: "User Invite",
             html: await new EmailTemplate().userInvite({
                 email: userInvite?.email || "",

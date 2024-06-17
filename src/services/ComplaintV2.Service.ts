@@ -20,13 +20,13 @@ export interface IComplaint {
         cf_customer_email?: string; // The email address of the customer associated with the complaint.
         cf_customer_phone?: string; // The phone of the customer associated with the complaint.
         cf_customer_name?: string; // The name of the customer associated with the complaint.
-        cf_product_code?: string // The Product Code Attached to the transaction
-        cf_ticket_status?: string // The Ticket Status 
-        cf_complain_channel?: string | 'PARTNER PORTAL' | 'PARTNER API' //The Channel which the complaint is coming from
+        cf_product_code?: string; // The Product Code Attached to the transaction
+        cf_ticket_status?: string; // The Ticket Status
+        cf_complain_channel?: string | "PARTNER PORTAL" | "PARTNER API"; //The Channel which the complaint is coming from
     };
-    category ?: string // The category of the complaint (optional)
+    category?: string; // The category of the complaint (optional)
     email?: string; // The email address associated with the complaint (optional).
-    uploads?: string; // Any file uploads or attachments related to the complaint (optional).
+    uploads?: any | string; // Any file uploads or attachments related to the complaint (optional).
 }
 
 /**
@@ -85,14 +85,42 @@ export default class ComplaintService {
     static async createComplain(complaint: IComplaint) {
         try {
             //Get Zoho Setting Information
-            const zohoSetting: ZohoIntegrationSettings | null = await ZohoIntegrationSettings.findOne();
+            const zohoSetting: ZohoIntegrationSettings | null =
+                await ZohoIntegrationSettings.findOne();
+
+            // Complaint without Upload
+            const complaintWithUpload = { ...complaint};
+            if (complaintWithUpload.uploads) delete complaintWithUpload.uploads;
 
             // Making a request to the Zoho API to create a new complaint
             const data = await ZohoIntegrationService.zohoEndpoint(
                 "/api/v1/tickets",
                 "POST",
-                { ...complaint, departmentId: zohoSetting?.departmentId}
+                {
+                    ...complaintWithUpload,
+                    departmentId: zohoSetting?.departmentId,
+                }
             );
+
+
+            if (complaint.uploads && data.id) {
+                const uploadData = await ZohoIntegrationService.zohoEndpoint(
+                    `/api/v1/tickets/${data.id}/attachments`,
+                    "POST",
+                    {
+                        file: complaint.uploads,
+                    },
+                    "multipart/form-data"
+                );
+                // Handling errors if Zoho returns an error code
+                if (uploadData?.errorCode) {
+                    throw new Error(
+                        "Error occurred while uploading attachment to in Zoho."
+                    );
+                }
+                console.log(uploadData);
+            }
+            //
             // Handling errors if Zoho returns an error code
             if (data?.errorCode)
                 throw new Error(
@@ -132,19 +160,20 @@ export default class ComplaintService {
             if (!entity) throw new Error("Entity is required");
 
             // Constructing URL for Zoho API call with query parameters
-            const url = `/api/v1/tickets/search?contactId=${entity.zohoContactId}&` +//&fields=cf_ticket_status,cf_transanction_id,cf_customer_email,cf_customer_name,cf_customer_phone,cf_complain_channel&` +
+            const url =
+                `/api/v1/tickets/search?contactId=${entity.zohoContactId}&` + //&fields=cf_ticket_status,cf_transanction_id,cf_customer_email,cf_customer_name,cf_customer_phone,cf_complain_channel&` +
                 // `/api/v1/contacts/${entity.zohoContactId}/tickets?fields=cf_ticket_status,cf_transanction_id,cf_customer_email,cf_customer_name,cf_customer_phone,cf_complain_channel&` +
                 // (limit || offset || status ? "?" : "") +
                 (limit ? "limit=" + limit + "&" : "") +
                 (offset || offset === 0 ? "from=" + offset + "&" : "") +
                 (status ? "status=" + status : "");
 
-            console.log(url)
+            // console.log(url)
 
             // Making a request to the Zoho API to retrieve complaints associated with the partner
             const data = await ZohoIntegrationService.zohoEndpoint(url);
 
-            if(data.errorCode) throw Error(data.message);
+            if (data.errorCode) throw Error(data.message);
 
             return data; // Returning the response data containing the complaints
         } catch (error: any) {

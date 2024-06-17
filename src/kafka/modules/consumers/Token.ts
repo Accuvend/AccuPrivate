@@ -1960,3 +1960,4 @@ export default class TokenConsumer extends ConsumerFactory {
         super(messageProcessor);
     }
 }
+

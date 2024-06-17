@@ -14,6 +14,7 @@ import { PartnerProfileService } from "../../services/Entity/Profiles";
 import Entity from "../../models/Entity/Entity.model";
 import Transaction from "../../models/Transaction.model";
 import TransactionService from "../../services/Transaction.service";
+import { PartnerProfile } from "../../models/Entity/Profiles";
 require("newrelic");
 
 
@@ -80,9 +81,12 @@ export class ComplaintController {
             //title,
             description , 
             category , 
-            transactionId 
-         }: { title?: string; description: string , category: string, transactionId : string} = req.body;
+            transactionId
+            // upload
+         }: { title?: string; description: string , category: string, transactionId : string } /*upload: any}*/ = req.body;
         
+        const upload = req.file
+        // console.log(upload , 'file----')
         // checking the route calling the Endpoint
         let channel = ''
         const _route = req.url
@@ -92,10 +96,12 @@ export class ComplaintController {
         else if (_route === '/create') channel = 'PARTNER PORTAL'
         else channel = 'OTHERS'
         
-        // Extracting the entity ID from the authenticated user data
-        const {
-            entity: { id },
-        } = req.user.user;
+        // Extracting the entity ID from the authenticated user data for basic Auth
+        const id =  req?.user?.user?.entity?.id || null;
+
+        // Extracting the entity ID from the authenticated user data for Api Key 
+        const partnerId  = (req as any).key;
+        
 
         const transaction: Transaction | null = await TransactionService.viewSingleTransaction(transactionId)
         try {
@@ -122,10 +128,18 @@ export class ComplaintController {
             }
 
             // Fetching entity details
-            const entity: Entity | null = await EntityService.viewSingleEntity(
-                id
-            );
+            let entity : Entity | null | undefined
+            if(id){
+                entity = await EntityService.viewSingleEntity(
+                    id
+                );
+            }else if(partnerId){
+                let partner: PartnerProfile | null = await PartnerProfileService.viewSinglePartner(partnerId)
+                entity = partner?.entity
+            }
+
             if (!entity) throw new Error("Entity doesn't exist ");
+            
 
             // Creating complaint schema based on request data
             const complaintSchema: ICreateComplaint = {
@@ -136,6 +150,7 @@ export class ComplaintController {
                 status: "Open", // The status of the complaint, typically either 'Open' or another custom status.
                 email: entity.email, // The email address associated with the complaint (optional).
                 category : category, // The category of the complaint (optional)
+                uploads: upload, // The Upload
                 cf: {
                     // Additional custom fields related to the complaint (optional).
                     cf_transanction_id: transaction.id, // The transaction ID associated with the complaint.
@@ -163,8 +178,14 @@ export class ComplaintController {
             });
 
             return;
-        } catch (err) {
+        } catch (err: any) {
             // Handling errors
+            if(err.message === "Error occurred while uploading attachment to in Zoho."){
+                res.status(202).json({
+                    status: "success",
+                    message: "complaint successful error creating attachment"
+                })
+            }
             next(
                 new InternalServerError(
                     "Sorry an error occurred, couldn't create complaint"
@@ -273,7 +294,7 @@ export class ComplaintController {
         } = req.user.user;
         try {
             // Retrieving complaints associated with the partner
-            console.log(page, size , status)
+            // console.log(page, size , status)
             const complaint =
                 await ComplaintService.viewAllComplainsPaginatedFilteredPartner(
                     id,

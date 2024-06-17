@@ -53,8 +53,9 @@ export default class EntityService {
         return entity
     }
 
-    static async updateEntity(entity: Entity, dataToUpdate: IUpdateEntity): Promise<Entity> {
-        await entity.update(dataToUpdate)
+    static async updateEntity(entity: Entity, dataToUpdate: IUpdateEntity , transaction ?: Transaction): Promise<Entity> {
+        if(transaction) await entity.update(dataToUpdate, {transaction})
+        else await entity.update(dataToUpdate)
 
         const updatedEntity = await Entity.findOne({ where: { id: entity.id } })
         if (!updatedEntity) {

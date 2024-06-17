@@ -11,27 +11,31 @@ import { Transaction as SequelizeTransaction, UUIDV4 } from "sequelize";
 export default class UserService {
     static async addUserIfNotExists(
         user: IUser,
-        _transaction: SequelizeTransaction | null = null
+        _transaction: SequelizeTransaction | null = null,
     ): Promise<User> {
         // const transactionWasIncludedInQuery = !!_transaction
         // const transaction = _transaction ?? await Database.transaction()
         // Check if a user with the same email exists
-        const existingUser: User | null = await User.findOne({ where: { email: user.email, phoneNumber: user.phoneNumber } })
+        const existingUser: User | null = await User.findOne({
+            where: { email: user.email, phoneNumber: user.phoneNumber },
+        });
         if (existingUser) {
-            console.log({ existingUser })
-            return existingUser
+            console.log({ existingUser });
+            return existingUser;
         }
 
-        const newUser: User = User.build(user)
+        const newUser: User = User.build(user);
         try {
-            await newUser.save()
-            const exitingEntity = await EntityService.viewSingleEntityByEmail(user.email)
+            await newUser.save();
+            const exitingEntity = await EntityService.viewSingleEntityByEmail(
+                user.email,
+            );
             if (exitingEntity) {
-                return newUser
+                return newUser;
             }
 
             const entity = await EntityService.addEntity({
-                email: user.email,
+                email: user.email.toLowerCase(),
                 userId: newUser.id,
                 id: randomUUID(),
                 role: RoleEnum.EndUser,
@@ -42,13 +46,13 @@ export default class UserService {
                 },
                 requireOTPOnLogin: true,
                 phoneNumber: user.phoneNumber,
-            })
+            });
 
             await PasswordService.addPassword({
                 id: randomUUID(),
                 entityId: entity.id,
-                password: randomUUID()
-            })
+                password: randomUUID(),
+            });
 
             return newUser;
         } catch (er) {
@@ -70,7 +74,9 @@ export default class UserService {
     }
 
     static async viewSingleUserWithEmail(email: string): Promise<User | null> {
-        const user: User | null = await User.findOne({ where: { email } });
+        const user: User | null = await User.findOne({
+            where: { email: email.toLowerCase() },
+        });
         return user;
     }
 
@@ -84,5 +90,5 @@ export default class UserService {
         return user;
     }
 
-    static async updateSingleUser() { }
+    static async updateSingleUser() {}
 }

@@ -14,7 +14,8 @@ import TransactionEventService from "../../services/TransactionEvent.service";
 import { VendorPublisher } from "../../kafka/modules/publishers/Vendor";
 import { Op } from "sequelize";
 import { TeamMemberProfileService } from "../../services/Entity/Profiles";
-import Event, { Status } from "../../models/Event.model";
+import Event from "../../models/Event.model";
+import { Status } from "../../models/Transaction.model";
 import PowerUnit from "../../models/PowerUnit.model";
 import Partner from "../../models/Entity/Profiles/PartnerProfile.model";
 import User from "../../models/User.model";
@@ -333,9 +334,13 @@ export default class TransactionController {
         }
 
         // Retrieves the ID of the authenticated user's partner profile
-        const {
-            profile: { id },
-        } = req.user.user;
+        const partnerBasicAuthId  = req?.user?.user?.profile?.id;
+
+        const partnerApiKeyId = (req as any).key;
+
+        let id = ''
+        if(partnerApiKeyId) id = partnerApiKeyId
+        if(partnerBasicAuthId ) id = partnerBasicAuthId
 
         // Retrieves the partner profile based on the ID
         const partner = await PartnerService.viewSinglePartner(id);

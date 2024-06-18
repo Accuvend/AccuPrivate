@@ -1,16 +1,15 @@
 import { Axios, AxiosError, AxiosResponse } from "axios";
-import { ITransaction, Status } from "../../../models/Transaction.model";
+import {
+    ITransaction,
+    IUpdateTransaction,
+    Status,
+} from "../../../models/Transaction.model";
 import Meter from "../../../models/Meter.model";
 import Transaction from "../../../models/Transaction.model";
 import PowerUnitService from "../../../services/PowerUnit.service";
 import TransactionService from "../../../services/Transaction.service";
 import TransactionEventService from "../../../services/TransactionEvent.service";
-import {
-    DISCO_LOGO,
-    LOGO_URL,
-    MAX_REQUERY_PER_VENDOR,
-    NODE_ENV,
-} from "../../../utils/Constants";
+import { DISCO_LOGO, LOGO_URL } from "../../../utils/Constants";
 import logger, { Logger } from "../../../utils/Logger";
 import { TOPICS } from "../../Constants";
 import { VendorPublisher } from "../publishers/Vendor";
@@ -25,38 +24,20 @@ import {
 import MessageProcessor from "../util/MessageProcessor";
 import { v4 as uuidv4 } from "uuid";
 import EventService from "../../../services/Event.service";
-import VendorService, {
-    ElectricityPurchaseResponse,
-    ElectricityRequeryResponse,
-    IRechargeVendorService,
-    SuccessResponseForBuyPowerRequery,
-    Vendor,
-} from "../../../services/VendorApi.service";
-import {
-    generateRandomString,
-    generateRandomToken,
-    generateRandonNumbers,
-    generateVendorReference,
-} from "../../../utils/Helper";
+import VendorService, { Vendor } from "../../../services/VendorApi.service";
+import { generateVendorReference } from "../../../utils/Helper";
 import ProductService from "../../../services/Product.service";
 import { CustomError } from "../../../utils/Errors";
 import VendorProductService from "../../../services/VendorProduct.service";
 import VendorModelService from "../../../services/Vendor.service";
-import {
-    BaxiRequeryResultForPurchase,
-    BaxiSuccessfulPuchaseResponse,
-} from "../../../services/VendorApi.service/Baxi/Config";
 import { error, log } from "console";
-import test from "node:test";
-import WaitTimeService from "../../../services/Waittime.service";
 import ResponsePathService from "../../../services/ResponsePath.service";
 import ErrorCodeService from "../../../services/ErrorCodes.service";
-import ErrorCode from "../../../models/ErrorCodes.model";
 import newrelic from "newrelic";
 import { TokenUtil } from "../../../utils/Auth/Token";
 import { randomUUID } from "crypto";
-import { userInfo } from "os";
 import EmailService, { EmailTemplate } from "../../../utils/Email";
+import { Error } from "sequelize";
 
 interface EventMessage {
     meter: {
@@ -159,6 +140,131 @@ export class TokenHandlerUtil {
         return await TransactionService.updateSingleTransaction(transactionId, {
             status: Status.FLAGGED,
         });
+    }
+
+    private static async generateNewAccessTokenForIrecharge({
+        transaction,
+        newReference,
+        meter,
+    }: {
+        newReference: string;
+        transaction: Transaction;
+        meter: Meter;
+    }) {
+        const irechargeVendor =
+            await VendorModelService.viewSingleVendorByName("IRECHARGE");
+        if (!irechargeVendor) {
+            throw new CustomError("Irecharge vendor not found");
+        }
+
+        const irechargeVendorProduct =
+            await VendorProductService.viewSingleVendorProductByVendorIdAndProductId(
+                irechargeVendor.id,
+                transaction.productCodeId,
+            );
+        if (!irechargeVendorProduct) {
+            throw new CustomError("Irecharge vendor product not found");
+        }
+
+        const meterValidationResult =
+            await VendorService.irechargeValidateMeter(
+                irechargeVendorProduct.schemaData.code,
+                meter.meterNumber,
+                newReference,
+                transaction.id,
+            ).then((res) => ({ ...res, ...res.customer }));
+
+        logger.info("Meter validation result", {
+            meta: { meterValidationResult, transactionId: transaction.id },
+        });
+
+        return meterValidationResult.access_token;
+    }
+
+    private static async createRetryEntryForTransaction({
+        transaction,
+    }: {
+        transaction: Transaction;
+    }) {
+        let retryRecord: Transaction["retryRecord"] = JSON.parse(
+            JSON.stringify([...transaction.retryRecord]),
+        );
+
+        // Make sure to use the same vendor thrice before switching to another vendor
+        const lastVendorRetryRecord = retryRecord[retryRecord.length - 1];
+        const lastVendorRetryEntryReachedLimit =
+            lastVendorRetryRecord.retryCount >=
+            retry.retryCountBeforeSwitchingVendor;
+        if (!lastVendorRetryEntryReachedLimit) {
+            // Update the retry count for the last vendor entry in the transaction
+            lastVendorRetryRecord.retryCount =
+                lastVendorRetryRecord.retryCount + 1;
+
+            logger.info("Using current vendor", {
+                meta: { transactionId: transaction.id },
+            });
+        } else {
+            logger.warn("switching to new vendor", {
+                meta: { transactionId: transaction.id },
+            });
+        }
+
+        const previousVendors = [] as Transaction["superagent"][];
+        for (const record of retryRecord) {
+            for (const _ of record.reference) {
+                previousVendors.push(record.vendor);
+            }
+        }
+
+        const currentVendor = lastVendorRetryEntryReachedLimit
+            ? await this.getNextBestVendorForVendRePurchase(
+                  transaction.productCodeId,
+                  transaction.superagent,
+                  previousVendors,
+                  parseFloat(transaction.amount),
+              )
+            : lastVendorRetryRecord.vendor;
+
+        const newTransactionReference =
+            currentVendor === "IRECHARGE"
+                ? await generateVendorReference()
+                : randomUUID();
+
+        if (
+            currentVendor != lastVendorRetryRecord.vendor ||
+            lastVendorRetryEntryReachedLimit
+            // lastVendorRetryRecord.retryCount > retry.retryCountBeforeSwitchingVendor
+        ) {
+            // Add new vendor retry entry to the retry record
+            const newVendorRetryRecord = {
+                vendor: currentVendor,
+                retryCount: 1,
+                reference: [newTransactionReference],
+                attempt: 1,
+            };
+            retryRecord.push(newVendorRetryRecord);
+        } else {
+            // Add the new reference to be used for new retry
+            lastVendorRetryRecord.reference.push(newTransactionReference);
+        }
+
+        let accessToken = transaction.irechargeAccessToken;
+        if (currentVendor === "IRECHARGE") {
+            accessToken = await this.generateNewAccessTokenForIrecharge({
+                transaction,
+                newReference: newTransactionReference,
+                meter: transaction.meter,
+            });
+        }
+
+        // const isFirstRetry = initialRetryRecord[0].reference.length === 2;
+        return {
+            retryRecord,
+            accessToken,
+            newTransactionReference,
+            currentVendor,
+            switchVendor: lastVendorRetryEntryReachedLimit,
+        };
     }
 
     static async triggerEventToRequeryTransactionTokenFromVendor({
@@ -266,21 +372,26 @@ export class TokenHandlerUtil {
         }
 
         if (requeryCount === 2) {
-            const user = await transaction.$get('user')
+            const user = await transaction.$get("user");
             if (!user) {
                 throw new CustomError("User not found", {
                     transactionId: eventData.transactionId,
                 });
             }
-            logger.info('Sending email to user after 2 requery attempts', {
-                meta: { email:user.email, transactionId: transaction.id }
-            })
+            logger.info("Sending email to user after 2 requery attempts", {
+                meta: { email: user.email, transactionId: transaction.id },
+            });
 
             await EmailService.sendEmail({
                 to: user.email,
                 subject: `Order with reference ${transaction.reference} is being processed`,
-                html: await new  EmailTemplate().processing_order_confirmation({ transaction, meterNumber: meter.meterNumber, address: meter.address, name: meter.ownersName ?? ""})
-            })
+                html: await new EmailTemplate().processing_order_confirmation({
+                    transaction,
+                    meterNumber: meter.meterNumber,
+                    address: meter.address,
+                    name: meter.ownersName ?? "",
+                }),
+            });
         }
         eventService.addScheduleRequeryEvent({
             timeStamp: new Date().toString(),
@@ -310,94 +421,29 @@ export class TokenHandlerUtil {
         meter: MeterInfo & { id: string };
         vendorRetryRecord: VendorRetryRecord;
     }) {
-        let waitTime = await getCurrentWaitTimeForSwitchEvent(
-            vendorRetryRecord.retryCount,
-        );
-
         logger.warn("Retrying transaction with new vendor", {
             meta: { transactionId: transaction.id },
         });
         const meta = {
             transactionId: transaction.id,
         };
+
         // Attempt purchase from new vendor
         if (!transaction.bankRefId)
             throw new CustomError("BankRefId not found", meta);
 
-        let retryRecord = transaction.retryRecord;
+        const retryRecord = transaction.retryRecord;
+        const { retryRecord: newRetryRecord, switchVendor } =
+            await this.createRetryEntryForTransaction({ transaction });
 
-        retryRecord =
-            retryRecord.length === 0
-                ? [
-                      {
-                          vendor: transaction.superagent,
-                          retryCount: 1,
-                          reference: [transaction.reference],
-                          attempt: 1,
-                      },
-                  ]
-                : retryRecord;
+        const newVendorEntry = newRetryRecord[newRetryRecord.length - 1];
+        const newVendor = newVendorEntry.vendor;
 
-        // Make sure to use the same vendor thrice before switching to another vendor
-        let currentVendor = retryRecord[retryRecord.length - 1];
-        console.log({ currentVendor, retryRecord });
-        let useCurrentVendor = false;
-        if (currentVendor.vendor === transaction.superagent) {
-            if (
-                currentVendor.retryCount < retry.retryCountBeforeSwitchingVendor
-            ) {
-                // Update the retry record in the transaction
-                // Get the last record where this vendor was used
-                const lastRecord = retryRecord[retryRecord.length - 1];
-                lastRecord.retryCount = lastRecord.retryCount + 1;
-
-                // Update the transaction
-                await TransactionService.updateSingleTransaction(
-                    transaction.id,
-                    { retryRecord },
-                );
-
-                useCurrentVendor = true;
-                logger.info("Using current vendor", meta);
-            }
-
-            // Check for the reference used in the last retry record
-            retryRecord[retryRecord.length - 1].reference.push(
-                currentVendor.vendor === "IRECHARGE"
-                    ? await generateVendorReference()
-                    : randomUUID(),
-            );
-        } else {
-            logger.warn("Switching to new vendor", meta);
-            // Add new record to the retry record
-        }
-
-        const newVendor = useCurrentVendor
-            ? currentVendor.vendor
-            : await TokenHandlerUtil.getNextBestVendorForVendRePurchase(
-                  transaction.productCodeId,
-                  transaction.superagent,
-                  transaction.previousVendors,
-                  parseFloat(transaction.amount),
+        const waitTime = switchVendor
+            ? await getCurrentWaitTimeForSwitchEvent(newVendorEntry.retryCount)
+            : await getCurrentWaitTimeForSwitchEvent(
+                  vendorRetryRecord.retryCount,
               );
-        if (
-            newVendor != currentVendor.vendor ||
-            currentVendor.retryCount > retry.retryCountBeforeSwitchingVendor
-        ) {
-            // Add new record to the retry record
-            currentVendor = {
-                vendor: newVendor,
-                retryCount: 1,
-                reference: [
-                    currentVendor.reference[currentVendor.reference.length - 1],
-                ],
-                attempt: 1,
-            };
-            retryRecord.push(currentVendor);
-            waitTime = await getCurrentWaitTimeForSwitchEvent(
-                currentVendor.retryCount,
-            );
-        }
 
         await transactionEventService.addPowerPurchaseRetryWithNewVendor({
             bankRefId: transaction.bankRefId,
@@ -405,63 +451,18 @@ export class TokenHandlerUtil {
             newVendor,
         });
 
-        const user = await transaction.$get("user");
-        if (!user)
-            throw new CustomError("User not found for transaction", meta);
-
-        const partner = await transaction.$get("partner");
-        if (!partner)
-            throw new CustomError("Partner not found for transaction", meta);
-
-        retry.count = 0;
-
-        const newTransactionReference =
-            retryRecord[retryRecord.length - 1].reference[
-                retryRecord[retryRecord.length - 1].reference.length - 1
-            ];
-        let accesToken = transaction.irechargeAccessToken;
-
-        if (newVendor === "IRECHARGE") {
-            const irechargeVendor =
-                await VendorModelService.viewSingleVendorByName("IRECHARGE");
-            if (!irechargeVendor) {
-                throw new CustomError("Irecharge vendor not found");
-            }
-
-            const irechargeVendorProduct =
-                await VendorProductService.viewSingleVendorProductByVendorIdAndProductId(
-                    irechargeVendor.id,
-                    transaction.productCodeId,
-                );
-            if (!irechargeVendorProduct) {
-                throw new CustomError("Irecharge vendor product not found");
-            }
-
-            const meterValidationResult =
-                await VendorService.irechargeValidateMeter(
-                    irechargeVendorProduct.schemaData.code,
-                    meter.meterNumber,
-                    newTransactionReference,
-                    transaction.id,
-                ).then((res) => ({ ...res, ...res.customer }));
-            console.log({
-                meterValidationResult,
-                info: "New meter validation result",
-            });
-            accesToken = meterValidationResult.access_token;
-        }
+        const { user, partner } = await TransactionService.populateRelations({
+            transaction,
+            strict: true,
+            fields: ["user", "partner"],
+        });
 
         const eventService = new TransactionEventService(
             transaction,
             meter,
-            newVendor,
+            newVendorEntry.vendor,
             partner.email,
         );
-
-        await TransactionService.updateSingleTransaction(transaction.id, {
-            retryRecord,
-            reference: newTransactionReference,
-        });
 
         if (manual) {
             await transactionEventService.addGetTransactionTokenRequestedFromVendorRetryEvent(
@@ -484,8 +485,8 @@ export class TokenHandlerUtil {
                     email: partner.email,
                 },
                 user: {
-                    name: user.name as string,
                     email: user.email,
+                    name: user.name as string,
                     address: user.address,
                     phoneNumber: user.phoneNumber,
                 },
@@ -499,18 +500,17 @@ export class TokenHandlerUtil {
         eventService.addScheduleRetryEvent({
             timeStamp: new Date().toString(),
             waitTime,
-            retryRecord: currentVendor,
+            retryRecord: newVendorEntry,
         });
 
         logger.info("Scheduled retry event", meta);
 
-        await TransactionService.updateSingleTransaction(transaction.id, { superagent: newVendor });
         await VendorPublisher.publishEventToScheduleRetry({
             scheduledMessagePayload: {
                 meter: meter,
                 partner: partner,
                 transactionId: transaction.id,
-                superAgent: newVendor,
+                superAgent: newVendorEntry.vendor,
                 user: {
                     name: user.name as string,
                     email: user.email,
@@ -519,32 +519,78 @@ export class TokenHandlerUtil {
                 },
                 vendorRetryRecord: retryRecord[retryRecord.length - 1],
                 retryRecord,
-                newVendor,
-                newTransactionReference,
-                irechargeAccessToken: accesToken,
-                previousVendors: [
-                    ...transaction.previousVendors,
-                    newVendor,
-                ] as Transaction["superagent"][],
+                previousVendors:
+                    transaction.previousVendors as Transaction["superagent"][],
             },
             timeStamp: new Date().toString(),
             delayInSeconds: waitTime,
         });
     }
 
-    static async processVendRequest<T extends Vendor>(data: TokenPurchaseData) {
+    static async processVendRequest(data: TokenPurchaseData) {
         try {
+            let { transaction } = data;
             const user = await data.transaction.$get("user");
             if (!user)
                 throw new CustomError("User not found for transaction", {
                     transactionId: data.transaction.id,
                 });
 
+            const {
+                retryRecord,
+                accessToken,
+                newTransactionReference,
+                currentVendor,
+                switchVendor,
+            } = await this.createRetryEntryForTransaction({ transaction });
+
+            const oldRetryRecord = transaction.retryRecord;
+            let updateData = {} as IUpdateTransaction;
+            if (
+                oldRetryRecord[0].attempt === 0 &&
+                oldRetryRecord.length === 1
+            ) {
+                // The  existing record in this case has not been used, no need to add  a new record
+                const updatedRetryRecord = [
+                    {
+                        ...oldRetryRecord[0],
+                        attempt: 1,
+                    },
+                ];
+                updateData = { retryRecord: updatedRetryRecord };
+            } else {
+                updateData = {
+                    retryRecord,
+                    reference: newTransactionReference,
+                    superagent: currentVendor,
+                    irechargeAccessToken: accessToken,
+                };
+            }
+
+            transaction = await TransactionService.updateSingleTransaction(
+                transaction.id,
+                {
+                    ...updateData,
+                    previousVendors: [
+                        ...transaction.previousVendors,
+                        retryRecord[retryRecord.length - 1].vendor,
+                    ],
+                },
+            );
+
+            console.log({
+                retryRecord,
+                currentVendor,
+                updatedTransactionVendor: transaction.superagent,
+                retryEntry: {
+                    accessToken,
+                    newTransactionReference,
+                    currentVendor,
+                    switchVendor,
+                },
+            });
             const _data = {
-                reference:
-                    data.transaction.superagent === "IRECHARGE"
-                        ? data.transaction.vendorReferenceId
-                        : data.transaction.reference,
+                reference: transaction.reference,
                 meterNumber: data.meterNumber,
                 disco: data.disco,
                 vendType: data.vendType,
@@ -555,93 +601,35 @@ export class TokenHandlerUtil {
                 transactionId: data.transaction.id,
             };
 
-            if (
-                !_data.accessToken &&
-                data.transaction.superagent === "IRECHARGE"
-            ) {
-                logger.warn(
-                    "No access token found for irecharge meter validation",
-                    {
-                        transactionId: data.transaction.id,
-                    },
-                );
-
-                logger.info("Validating meter", {
-                    transactionId: data.transaction.id,
-                });
-                const meterValidationResult =
-                    await VendorService.irechargeValidateMeter(
-                        _data.disco,
-                        _data.meterNumber,
-                        data.transaction.vendorReferenceId,
-                        _data.transactionId,
-                    ).catch((error) => {
-                        throw new CustomError("Error validating meter", {
-                            transactionId: data.transaction.id,
-                        });
-                    });
-
-                if (!meterValidationResult)
-                    throw new CustomError("Error validating meter", {
-                        transactionId: data.transaction.id,
-                    });
-
-                _data.accessToken = meterValidationResult.access_token;
-                console.log({
-                    meterValidationResult,
-                    info: "New meter validation result",
-                });
-                await TransactionService.updateSingleTransaction(
-                    data.transaction.id,
-                    {
-                        irechargeAccessToken:
-                            meterValidationResult.access_token,
-                    },
-                );
-                logger.info(
-                    "Generated access token for irecharge meter validation",
-                    { transactionId: data.transaction.id },
-                );
-            }
-
             logger.info("Processing vend request", {
                 vendor: data.transaction.superagent,
                 transactionId: data.transaction.id,
                 preTransformedPayload: _data,
             });
-            switch (data.transaction.superagent) {
-                case "BAXI":
-                    return await VendorService.purchaseElectricity({
-                        data: _data,
-                        vendor: "BAXI",
-                    });
-                case "BUYPOWERNG":
-                    return await VendorService.purchaseElectricity({
-                        data: _data,
-                        vendor: "BUYPOWERNG",
-                    }).catch((e) => {
-                        logger.error(
-                            "An error occured while vending from " +
-                                data.transaction.superagent,
-                            {
-                                meta: {
-                                    transactionId: data.transaction.id,
-                                    error: error,
-                                },
-                            },
-                        );
-                        return e;
-                    });
-                case "IRECHARGE":
-                    return await VendorService.purchaseElectricity({
-                        data: _data,
-                        vendor: "IRECHARGE",
-                    });
-                default:
-                    throw new CustomError("Invalid superagent", {
-                        transactionId: data.transaction.id,
-                    });
-            }
+
+            const timeStamps = transaction.vendTimeStamps ?? [];
+            console.log({ timeStamps, transaction });
+            timeStamps.push(new Date().toString());
+            await TransactionService.updateSingleTransaction(transaction.id, {
+                vendTimeStamps: timeStamps,
+            });
+            let response: Awaited<
+                ReturnType<typeof VendorService.purchaseElectricity>
+            > = await VendorService.purchaseElectricity({
+                data: _data,
+                vendor: transaction.superagent,
+            });
+
+            return {
+                response,
+                retryEntryResult: {
+                    transaction,
+                    accessToken,
+                    newTransactionReference,
+                    currentVendor,
+                    switchVendor,
+                },
+            };
         } catch (error) {
             logger.error(
                 "An error occured while vending from " +
@@ -658,7 +646,7 @@ export class TokenHandlerUtil {
         }
     }
 
-    static async requeryTransactionFromVendor(transaction: Transaction) {
+    static async processRequeryRequest(transaction: Transaction) {
         try {
             switch (transaction.superagent) {
                 case "BAXI":
@@ -796,7 +784,7 @@ export class TokenHandlerUtil {
             }),
         );
 
-        console.log({ vendorProducts})
+        console.log({ vendorProducts });
         // Check other vendors, sort them according to their commission rates
         // If the current vendor is the vendor with the highest commission rate, then switch to the vendor with the next highest commission rate
         // If the next vendor has been used before, switch to the next vendor with the next highest commission rate
@@ -863,7 +851,7 @@ export class ResponseValidationUtil {
         disco: string;
         transactionId: string;
         vendType: "PREPAID" | "POSTPAID";
-        httpCode: string | number;
+        httpCode?: string | number;
         requestType: "VENDREQUEST" | "REQUERY";
         vendor: Transaction["superagent"] | string;
         responseObject: Record<string, any>;
@@ -1147,15 +1135,17 @@ class TokenHandler extends Registry {
 
                     const disco = vendorProduct.schemaData.code;
                     const logMeta = {
-                        meta: { transactionId: data.transactionId },
+                        meta: {
+                            transactionId: data.transactionId,
+                            reference: transaction.reference,
+                        },
                     };
                     logger.info("Processing token request", logMeta);
 
                     // Purchase token from vendor
                     // Keep record of the last time the transaction was requeued
-                    await TransactionService.updateSingleTransaction(transaction.id, { vendTimeStamps: [...(transaction.vendTimeStamps ?? []), new Date().toString()] })
-                    const tokenInfo = await TokenHandlerUtil.processVendRequest(
-                        {
+                    const { response: tokenInfo } =
+                        await TokenHandlerUtil.processVendRequest({
                             transaction:
                                 transaction as TokenPurchaseData["transaction"],
                             meterNumber: meter.meterNumber,
@@ -1163,8 +1153,9 @@ class TokenHandler extends Registry {
                             vendType: meter.vendType,
                             phone: user.phoneNumber,
                             accessToken: transaction.irechargeAccessToken,
-                        },
-                    ).catch((e) => e);
+                        }).catch((e) => ({
+                            response: e as AxiosError | Error,
+                        }));
 
                     console.log({
                         point: "power purchase initiated",
@@ -1193,9 +1184,15 @@ class TokenHandler extends Registry {
                         },
                         transactionId: transaction.id,
                         error: {
-                            code: (tokenInfo instanceof AxiosError
-                                ? tokenInfo.response?.data?.responseCode
-                                : undefined) as number | 0,
+                            code:
+                                tokenInfo instanceof AxiosError
+                                    ? ((
+                                          tokenInfo.response?.data as Record<
+                                              string,
+                                              any
+                                          >
+                                      )?.responseCode as number)
+                                    : 0,
                             cause: TransactionErrorCause.UNKNOWN,
                         },
                     };
@@ -1207,18 +1204,23 @@ class TokenHandler extends Registry {
                         partner.email,
                     );
 
+                    const superAgent = updatedTransaction.superagent;
                     const response =
                         await ResponseValidationUtil.validateTransactionCondition(
                             {
                                 requestType: "VENDREQUEST",
-                                vendor: vendor.name,
+                                vendor: superAgent,
                                 httpCode:
+                                    tokenInfo instanceof Error ||
                                     tokenInfo instanceof AxiosError
-                                        ? tokenInfo.response?.status
-                                        : tokenInfo?.httpStatusCode,
+                                        ? (tokenInfo as AxiosError).response
+                                              ?.status
+                                        : tokenInfo.httpStatusCode,
                                 responseObject:
+                                    tokenInfo instanceof Error ||
                                     tokenInfo instanceof AxiosError
-                                        ? tokenInfo.response?.data
+                                        ? ((tokenInfo as AxiosError).response
+                                              ?.data as Record<string, any>)
                                         : tokenInfo,
                                 vendType: meter.vendType,
                                 disco: disco,
@@ -1246,7 +1248,7 @@ class TokenHandler extends Registry {
                                     },
                                     eventService: transactionEventService,
                                     retryCount: 1,
-                                    superAgent: data.superAgent,
+                                    superAgent: updatedTransaction.superagent,
                                     requeryCount: 1,
                                     tokenInResponse: null,
                                     transactionTimedOutFromBuypower: false,
@@ -1325,8 +1327,7 @@ class TokenHandler extends Registry {
                                       discoLogo,
                                       amount: transaction.amount,
                                       meterId: data.meter.id,
-                                      superagent:
-                                          data.superAgent as ITransaction["superagent"],
+                                      superagent: updatedTransaction.superagent,
                                       tokenFromVend: token,
                                       tokenNumber: 0,
                                       tokenUnits: response.tokenUnits,
@@ -1387,7 +1388,7 @@ class TokenHandler extends Registry {
                                     },
                                     eventService: transactionEventService,
                                     retryCount: 1,
-                                    superAgent: data.superAgent,
+                                    superAgent: updatedTransaction.superagent,
                                     tokenInResponse: null,
                                     transactionTimedOutFromBuypower: false,
                                     requeryCount: 1,
@@ -1409,7 +1410,7 @@ class TokenHandler extends Registry {
                                     requeryCount: 1,
                                     eventService: transactionEventService,
                                     retryCount: 1,
-                                    superAgent: data.superAgent,
+                                    superAgent: updatedTransaction.superagent,
                                     tokenInResponse: null,
                                     transactionTimedOutFromBuypower: false,
                                     vendorRetryRecord: data.vendorRetryRecord,
@@ -1463,11 +1464,15 @@ class TokenHandler extends Registry {
                     const previousTimestamp = new Date(
                         transaction.transactionTimestamp,
                     ).getTime(); // This represents a timestamp for April 1, 2022
-                        const lastVendTime = transaction.vendTimeStamps?.slice(-1)[0];
+                    const lastVendTime =
+                        transaction.vendTimeStamps?.slice(-1)[0];
                     let differenceInHoursFromLastVend = 0;
                     if (lastVendTime) {
-                        const lastVendTimeStamp = new Date(lastVendTime).getTime();
-                        differenceInHoursFromLastVend = (now - lastVendTimeStamp) / (1000 * 60 * 60);
+                        const lastVendTimeStamp = new Date(
+                            lastVendTime,
+                        ).getTime();
+                        differenceInHoursFromLastVend =
+                            (now - lastVendTimeStamp) / (1000 * 60 * 60);
                     }
 
                     // Calculate the difference between the current timestamp and the previous timestamp in milliseconds
@@ -1478,7 +1483,9 @@ class TokenHandler extends Registry {
                         differenceInMilliseconds / (1000 * 60 * 60); // 1000 milliseconds * 60 seconds * 60 minutes
 
                     // Check if the difference is greater than two hours
-                    const flaggTransaction = differenceInHoursFromLastVend > 2 || differenceInHours > ((2/60) * 2);
+                    const flaggTransaction =
+                        differenceInHoursFromLastVend > 2 ||
+                        differenceInHours > 2;
                     //check if transaction is greater than 2hrs then stop
                     if (flaggTransaction) {
                         logger.info(
@@ -1542,7 +1549,7 @@ class TokenHandler extends Registry {
                     );
 
                     const requeryResult =
-                        await TokenHandlerUtil.requeryTransactionFromVendor(
+                        await TokenHandlerUtil.processRequeryRequest(
                             transaction,
                         ).catch((e) => e ?? {});
 
@@ -1783,13 +1790,13 @@ class TokenHandler extends Registry {
                     currentTimeInSeconds - timeStampInSeconds;
                 const timeDifference = delayInSeconds - timeInSecondsSinceInit;
 
-                console.log({
-                    timeDifference,
-                    timeStamp,
-                    currentTime: new Date(),
-                    delayInSeconds,
-                    timeInSecondsSinceInit,
-                });
+                // console.log({
+                //     timeDifference,
+                //     timeStamp,
+                //     currentTime: new Date(),
+                //     delayInSeconds,
+                //     timeInSecondsSinceInit,
+                // });
 
                 if (timeDifference <= 0) {
                     const existingTransaction =
@@ -1873,14 +1880,6 @@ class TokenHandler extends Registry {
                     currentTimeInSeconds - timeStampInSeconds;
                 const timeDifference = delayInSeconds - timeInSecondsSinceInit;
 
-                console.log({
-                    timeDifference,
-                    timeStamp,
-                    currentTime: new Date(),
-                    delayInSeconds,
-                    timeInSecondsSinceInit,
-                });
-
                 // Check if current time is greater than the timeStamp + delayInSeconds
                 if (timeDifference <= 0) {
                     const existingTransaction =
@@ -1898,28 +1897,8 @@ class TokenHandler extends Registry {
                         data.scheduledMessagePayload.superAgent,
                     );
 
-                    await TransactionService.updateSingleTransaction(
-                        data.scheduledMessagePayload.transactionId,
-                        {
-                            superagent: data.scheduledMessagePayload.newVendor,
-                            retryRecord:
-                                data.scheduledMessagePayload.retryRecord,
-                            vendorReferenceId:
-                                data.scheduledMessagePayload
-                                    .newTransactionReference,
-                            reference:
-                                data.scheduledMessagePayload
-                                    .newTransactionReference,
-                            irechargeAccessToken:
-                                data.scheduledMessagePayload
-                                    .irechargeAccessToken,
-                            previousVendors:
-                                data.scheduledMessagePayload.previousVendors,
-                        },
-                    );
-
                     await transactionEventService.addPowerPurchaseInitiatedEvent(
-                        data.scheduledMessagePayload.newTransactionReference,
+                        existingTransaction.bankRefId!,
                         existingTransaction.amount,
                     );
                     return await VendorPublisher.publishEventForInitiatedPowerPurchase(

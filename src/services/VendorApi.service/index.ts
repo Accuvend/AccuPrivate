@@ -312,7 +312,12 @@ export class IRechargeVendorService {
         phone: string;
         email: string;
         amount: number;
-    }) {
+    }): Promise<
+        {
+            source: "IRECHARGE";
+            httpStatusCode: number;
+        } & IRechargeSuccessfulVendResponse
+    > {
         // amount = NODE_ENV === "development" ? 900 : amount; // IRecharge has a minimum amount of 500 naira and the wallet balance is limited
         meterNumber = NODE_ENV === "development" ? "1234567890" : meterNumber;
 
@@ -388,7 +393,7 @@ export class IRechargeVendorService {
 
         const responseData = {
             ...response.data,
-            source: "IRECHARGE",
+            source: "IRECHARGE" as const,
             httpStatusCode: response.status,
         };
         return responseData;
@@ -458,7 +463,12 @@ export class VendorAirtimeService {}
 // Define the VendorService class for handling provider-related operations
 export default class VendorService {
     // Static method for obtaining a Baxi vending token
-    static async baxiVendToken(body: IVendToken) {
+    static async baxiVendToken(body: IVendToken): Promise<
+        BaxiSuccessfulPuchaseResponse["Prepaid" | "Postpaid"] & {
+            source: "BAXI";
+            httpStatusCode: number;
+        }
+    > {
         const { reference, meterNumber, disco, amount, phone } = body;
         return newrelic.startBackgroundTransaction(
             "Baxi:VendTokenEndPoint",
@@ -752,9 +762,12 @@ export default class VendorService {
     }
 
     // Static method for vending a token with BuyPower
-    static async buyPowerVendToken(
-        body: IVendToken,
-    ): Promise<PurchaseResponse | TimedOutResponse> {
+    static async buyPowerVendToken(body: IVendToken): Promise<
+        {
+            source: "BUYPOWERNG";
+            httpStatusCode: number;
+        } & (PurchaseResponse | TimedOutResponse)
+    > {
         // Define data to be sent in the POST request
         return await newrelic.startBackgroundTransaction(
             "buypower:VendTokenEndPoint",
@@ -1069,7 +1082,7 @@ export default class VendorService {
 
     static async irechargeVendToken(
         body: IVendToken & { email: string; accessToken: string },
-    ): Promise<IRechargeSuccessfulVendResponse> {
+    ): Promise<IRechargeSuccessfulVendResponse & { httpStatusCode: number }> {
         const {
             reference,
             meterNumber,
@@ -1233,22 +1246,23 @@ export default class VendorService {
             transactionId: string;
         };
         vendor: T;
-    }): Promise<ElectricityPurchaseResponse[T]> {
-        let response: ElectricityPurchaseResponse[T];
+    }): Promise<Awaited<ElectricityPurchaseResponse[T]>> {
+        let response: Awaited<ElectricityPurchaseResponse[T]>;
 
         try {
+            vendor;
             if (vendor === "BUYPOWERNG") {
-                response = (await this.buyPowerVendToken(
-                    data,
-                )) as ElectricityPurchaseResponse[T];
+                response = (await this.buyPowerVendToken(data)) as Awaited<
+                    ElectricityPurchaseResponse[T]
+                >;
             } else if (vendor === "IRECHARGE") {
-                response = (await this.irechargeVendToken(
-                    data,
-                )) as ElectricityPurchaseResponse[T];
+                response = (await this.irechargeVendToken(data)) as Awaited<
+                    ElectricityPurchaseResponse[T]
+                >;
             } else if (vendor === "BAXI") {
-                response = (await this.baxiVendToken(
-                    data,
-                )) as ElectricityPurchaseResponse[T];
+                response = (await this.baxiVendToken(data)) as Awaited<
+                    ElectricityPurchaseResponse[T]
+                >;
             } else {
                 throw new Error("UNAVAILABLE_VENDOR");
             }
@@ -1286,9 +1300,9 @@ export interface DataPurchaseResponse {
 }
 
 export interface ElectricityPurchaseResponse {
-    BUYPOWERNG: PurchaseResponse | TimedOutResponse;
-    IRECHARGE: IRechargeSuccessfulVendResponse;
-    BAXI: Awaited<ReturnType<typeof VendorService.baxiVendToken>>;
+    BUYPOWERNG: ReturnType<typeof VendorService.buyPowerVendToken>;
+    IRECHARGE: ReturnType<typeof IRechargeVendorService.vend>;
+    BAXI: ReturnType<typeof VendorService.baxiVendToken>;
 }
 
 export interface ElectricityRequeryResponse {

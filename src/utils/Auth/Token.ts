@@ -29,18 +29,6 @@ class TokenUtil {
     }
 
     static async saveTokenToCache({ key, token, expiry }: SaveTokenToCache) {
-        console.log({ key, expiry, token})
-        console.log({ key, expiry, token})
-        console.log({ key, expiry, token})
-        console.log({ key, expiry, token})
-        console.log({ key, expiry, token})
-        console.log({ key, expiry, token})
-        console.log({ key, expiry, token})
-        console.log({ key, expiry, token})
-        console.log({ key, expiry, token})
-        console.log({ key, expiry, token})
-        console.log({ key, expiry, token})
-
         const response = expiry
             ? await redisClient.setex(key, expiry, token)
             : await redisClient.set(key, token);
@@ -213,4 +201,3 @@ class AuthUtil {
 }
 
 export { AuthUtil, TokenUtil };
-

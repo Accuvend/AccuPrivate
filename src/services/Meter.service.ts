@@ -1,5 +1,5 @@
 import { Transaction } from "sequelize";
-import Meter from "../models/Meter.model";
+import Meter, { IUpdateMeter } from "../models/Meter.model";
 import { IMeter, ICreateMeter } from "../models/Meter.model";
 import logger from "../utils/Logger";
 export default class MeterService {
@@ -21,6 +21,19 @@ export default class MeterService {
 
     static async viewSingleMeter(uuid: string): Promise<Meter | null> {
         const meter: Meter | null = await Meter.findByPk(uuid);
+        return meter;
+    }
+
+    static async viewSingleMeterByMeterNumberAndVendType({
+        meterNumber,
+        vendType,
+    }: {
+        meterNumber: string;
+        vendType: string;
+    }): Promise<Meter | null> {
+        const meter: Meter | null = await Meter.findOne({
+            where: { meterNumber, vendType },
+        });
         return meter;
     }
 
@@ -51,8 +64,8 @@ export default class MeterService {
         meterNumber,
         disco,
     }: {
-        meterNumber: string,
-        disco: string,
+        meterNumber: string;
+        disco: string;
     }): Promise<Meter | null> {
         const meter: Meter | null = await Meter.findOne({
             where: { meterNumber, disco },
@@ -65,6 +78,22 @@ export default class MeterService {
         return meters;
     }
 
-    static async updateSingleMeter() { }
-}
+    static async updateMeterInPlace({
+        meter,
+        meterData,
+        transaction,
+    }: {
+        meter: Meter;
+        meterData: IUpdateMeter;
+        transaction: Transaction;
+    }) {
+        transaction
+            ? await meter.update(meterData, { transaction })
+            : await meter.update(meterData);
 
+        const updatedMeter = transaction
+            ? await Meter.findByPk(meter.id, { transaction })
+            : await Meter.findByPk(meter.id);
+        return updatedMeter;
+    }
+}

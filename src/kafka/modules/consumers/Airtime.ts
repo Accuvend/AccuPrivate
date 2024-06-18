@@ -444,7 +444,7 @@ export class AirtimeHandlerUtil {
         }
     }
 
-    static async requeryTransactionFromVendor(transaction: Transaction) {
+    static async processRequeryRequest(transaction: Transaction) {
         try {
             switch (transaction.superagent) {
                 case "BAXI":
@@ -884,7 +884,7 @@ class AirtimeHandler extends Registry {
             );
 
             const requeryResult =
-                await AirtimeHandlerUtil.requeryTransactionFromVendor(
+                await AirtimeHandlerUtil.processRequeryRequest(
                     transaction,
                 ).catch((e) => e ?? {});
             const validationResponse =

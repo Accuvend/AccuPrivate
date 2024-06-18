@@ -418,7 +418,7 @@ export class VendorControllerValdator {
             });
         }
 
-        return returnedResponse;
+        return { returnedResponse, selectedVendor };
     }
 }
 
@@ -489,7 +489,7 @@ export default class VendorController {
                     vendType,
                     channel,
                     amount,
-                    paymentProviderId
+                    paymentProviderId,
                 }: valideMeterRequestBody = req.body;
                 let { disco } = req.body;
                 const partnerId = (req as any).key;
@@ -517,9 +517,10 @@ export default class VendorController {
                     );
                 }
 
-                const existingPaymentProvider = await PaymentProviderService.viewSinglePaymentProvider(
-                    paymentProviderId
-                );
+                const existingPaymentProvider =
+                    await PaymentProviderService.viewSinglePaymentProvider(
+                        paymentProviderId,
+                    );
                 if (!existingPaymentProvider) {
                     throw new NotFoundError(
                         "Payment provider not found",
@@ -567,17 +568,18 @@ export default class VendorController {
                             superagent: superagent,
                             paymentType: PaymentType.PAYMENT,
                             transactionTimestamp: new Date(),
-                            disco: disco,
-                            partnerId: partnerId,
-                            reference: transactionId,
-                            paymentProviderId, 
+                            disco: disco, partnerId: partnerId,
+                            reference: transactionReference,
+                            paymentProviderId,
                             transactionType:
                                 transactionTypes[
                                     existingProductCodeForDisco.category
                                 ],
                             productCodeId: existingProductCodeForDisco.id,
+                            vendTimeStamps: [],
                             retryRecord: [],
                             previousVendors: [superagent],
+                            // vendorReferenceId was created specifically for irecharge thier reference format is different from other vendors
                             vendorReferenceId: await generateVendorReference(),
                             productType:
                                 transactionTypes[
@@ -586,6 +588,8 @@ export default class VendorController {
                             channel,
                         },
                     );
+
+                console.log({ transaction });
 
                 Logger.apiRequest.info("Validate meter requested", {
                     meta: { transactionId: transaction.id, ...req.body },
@@ -631,12 +635,13 @@ export default class VendorController {
                     vendorProduct.schemaData as VendorProductSchemaData.BUYPOWERNG
                 ).code;
                 // We Check for Meter User *
-                const response = await VendorControllerValdator.validateMeter({
-                    meterNumber,
-                    disco: vendorDiscoCode,
-                    vendType,
-                    transaction,
-                });
+                const { returnedResponse: response, selectedVendor } =
+                    await VendorControllerValdator.validateMeter({
+                        meterNumber,
+                        disco: vendorDiscoCode,
+                        vendType,
+                        transaction,
+                    });
                 const userInfo = {
                     name: "",
                     email: email,
@@ -716,20 +721,26 @@ export default class VendorController {
 
                 const retryRecord = {
                     retryCount: 1,
-                    attempt: 1,
-                    reference: [transactionReference],
+                    attempt: 0,
+                    reference: [
+                        selectedVendor === "IRECHARGE"
+                            ? transaction.vendorReferenceId
+                            : transaction.vendorReferenceId, // Vendor reference id is only for irecharge,
+                    ],
                     vendor: superagent,
                 } as ITransaction["retryRecord"][number];
 
                 await transaction.update({
                     retryRecord: [retryRecord],
+                    reference: retryRecord.reference[0], // Incase irecharge is the selectedVendor change the reference to the vendor reference id
                 });
 
                 // // TODO: Publish event for disco up to kafka
                 const existingMeter =
-                    await MeterService.viewSingleMeterByMeterNumber(
+                    await MeterService.viewSingleMeterByMeterNumberAndVendType({
+                        vendType,
                         meterNumber,
-                    );
+                    });
                 const userHasUsedMeterBefore = existingMeter
                     ? await UserMeterService.findByUserAndMeterId({
                           userId: user.id,
@@ -762,6 +773,14 @@ export default class VendorController {
                             sequelizeTransaction,
                         ));
 
+                    const ownersNameInMeter =
+                        meter.ownersName && meter.ownersName != "";
+                    ownersNameInMeter &&
+                        (await MeterService.updateMeterInPlace({
+                            meter,
+                            meterData: { ownersName: response.name },
+                            transaction: sequelizeTransaction,
+                        }));
                     !userHasUsedMeterBefore &&
                         (await UserMeterService.create(
                             {
@@ -1388,10 +1407,9 @@ export default class VendorController {
                 admin: req.user.user,
             },
         });
-        const requeryResult =
-            await TokenHandlerUtil.requeryTransactionFromVendor(
-                transaction,
-            ).catch((e) => e ?? {});
+        const requeryResult = await TokenHandlerUtil.processRequeryRequest(
+            transaction,
+        ).catch((e) => e ?? {});
 
         logger.info("Requeried transaction successfully", logMeta);
         console.log({ requeryResult: requeryResult });
@@ -1518,10 +1536,10 @@ export default class VendorController {
 
         logger.info("Intiating transaction requery in manual retry", logMeta);
         const discoCode = vendorProduct.schemaData.code;
-        const requeryResult =
-            await TokenHandlerUtil.requeryTransactionFromVendor(
-                { ...transaction, superagent: vendor.name as ITransaction['superagent'] } as Transaction,  
-            ).catch((e) => e ?? {});
+        const requeryResult = await TokenHandlerUtil.processRequeryRequest({
+            ...transaction,
+            superagent: vendor.name as ITransaction["superagent"],
+        } as Transaction).catch((e) => e ?? {});
 
         logger.info("Requeried transaction successfully", logMeta);
         console.log({ requeryResult: requeryResult.response?.data });

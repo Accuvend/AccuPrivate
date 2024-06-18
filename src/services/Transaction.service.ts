@@ -11,9 +11,22 @@ import Partner from "../models/Entity/Profiles/PartnerProfile.model";
 import User from "../models/User.model";
 import Meter from "../models/Meter.model";
 import { Op, literal } from "sequelize";
-import { Sequelize } from "sequelize-typescript";
+import { $GetType, Sequelize } from "sequelize-typescript";
 import Bundle from "../models/Bundle.model";
 import PaymentProvider from "../models/PaymentProvider.model";
+import { CustomError } from "../utils/Errors";
+
+type RelationTypeMap = {
+    user: User;
+    partner: Partner;
+    events: Event[];
+    powerUnit: PowerUnit;
+    meter: Meter;
+    bundle: Bundle;
+    paymentProvider: PaymentProvider;
+};
+
+type RelationFields = keyof RelationTypeMap;
 
 // Define the TransactionService class for handling transaction-related operations
 export default class TransactionService {
@@ -280,7 +293,15 @@ export default class TransactionService {
                     "paymentProviderId",
                     //...attributesMap
                 ],
-                include: [PowerUnit, Event, Partner, User, Meter, Bundle, PaymentProvider],
+                include: [
+                    PowerUnit,
+                    Event,
+                    Partner,
+                    User,
+                    Meter,
+                    Bundle,
+                    PaymentProvider,
+                ],
             },
         );
         return transaction;
@@ -309,7 +330,7 @@ export default class TransactionService {
     static async updateSingleTransaction(
         uuid: string,
         updateTransaction: IUpdateTransaction,
-    ): Promise<Transaction | null> {
+    ): Promise<Transaction> {
         // Update the transaction in the database
         const updateResult: [number] = await Transaction.update(
             updateTransaction,
@@ -320,6 +341,12 @@ export default class TransactionService {
         // Retrieve the updated transaction by its UUID
         const updatedTransaction: Transaction | null =
             await Transaction.findByPk(uuid);
+
+        if (!updateResult[0] || !updatedTransaction) {
+            throw new CustomError("Transaction not found", {
+                meta: { transactionId: uuid },
+            });
+        }
         return updatedTransaction;
     }
 
@@ -358,5 +385,36 @@ export default class TransactionService {
         });
 
         return transactions;
+    }
+
+    static async populateRelations<
+        T extends RelationFields,
+        U extends boolean,
+    >({
+        transaction,
+        fields,
+        strict,
+    }: {
+        transaction: Transaction;
+        strict: U;
+        fields: T[];
+    }) {
+        const records = {} as {
+            [K in T]: U extends true
+                ? NonNullable<RelationTypeMap[K]>
+                : RelationTypeMap[K] | null;
+        };
+
+        for (const field of fields) {
+            const populatedRecord = await transaction.$get(field);
+            if (!populatedRecord && strict) {
+                throw new CustomError(`${field} not found in transaction`, {
+                    transactionId: transaction.id,
+                });
+            }
+            records[field] = populatedRecord as any;
+        }
+
+        return records;
     }
 }

@@ -28,7 +28,7 @@ jobs:
     # needs: [push-build]
     environment: Test_Digital_Ocean
     runs-on: ubuntu-latest
-    if : github.ref == 'refs/heads/build'
+    if : github.ref == 'refs/heads/do_build_test'
     steps:
     - name: chechkout
       uses: actions/checkout@v2

@@ -85,7 +85,7 @@ interface valideMeterRequestBody {
     email: string;
     channel: ITransaction["channel"];
     amount: number;
-    paymentProviderId: string;
+    paymentProvider: string;
 }
 
 interface vendTokenRequestBody {

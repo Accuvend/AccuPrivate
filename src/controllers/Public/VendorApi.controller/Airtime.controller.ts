@@ -435,10 +435,10 @@ export class AirtimeVendController {
                 const _validity = days
                     ? days[1]
                     : months
-                        ? months[1]
-                        : years
-                            ? years[1]
-                            : 0;
+                      ? months[1]
+                      : years
+                        ? years[1]
+                        : 0;
                 const validity = `${_validity} ${days ? "days" : months ? "months" : years ? "years" : "days"}`;
 
                 const bundleData = {
@@ -566,7 +566,7 @@ export class AirtimeVendController {
                     productCodeId: existingProductCodeForDisco.id,
                     previousVendors: [superAgent],
                     retryRecord: [],
-                    channel: channel as ITransaction['channel'],
+                    channel: channel as ITransaction["channel"],
                 },
             );
 
@@ -621,13 +621,9 @@ export class AirtimeVendController {
             throw error;
         }
 
+        const { bankRefId, bankComment } = req.query as Record<string, string>;
 
-        const { bankRefId, bankComment } = req.query as Record<
-            string,
-            string
-        >;
-
-        const transactionId = transaction.id
+        const transactionId = transaction.id;
         const user = await transaction.$get("user");
         if (!user) {
             throw new InternalServerError(
@@ -716,7 +712,7 @@ export class AirtimeVendController {
                 retryCount: 1,
             },
             partner: partnerEntity,
-            user
+            user,
             // user: user,
         });
 

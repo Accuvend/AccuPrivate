@@ -26,6 +26,7 @@ jobs:
   generate-env-file:
     name: generate-env-file
     # needs: [push-build]
+    environment: Test_Digital_Ocean
     runs-on: ubuntu-latest
     if : github.ref == 'refs/heads/build'
     steps:
@@ -196,15 +197,15 @@ jobs:
         echo "ACCUVEND_RECEIPT_BASE_URL=$ACCUVEND_RECEIPT_BASE_URL" >> .env
         
         cat .env
-  #   - name: push to state to s3
-  #     run: |
-  #       cp ./.env test.env
-  #       aws s3 cp ./test.env s3://accuvend-bucket-configuration/ 
-  #   - name: Save env file
-  #     uses: actions/cache@v2
-  #     with:
-  #       path: ./.env
-  #       key: env-file
+    - name: push to state to s3
+      run: |
+        cp ./.env do-test.env
+        aws s3 cp ./do-test.env s3://accuvend-bucket-configuration/ 
+    - name: Save env file
+      uses: actions/cache@v2
+      with:
+        path: ./.env
+        key: env-file
 
   #  # Scans the backend for an vulenrabilities
   # scan-backend: 

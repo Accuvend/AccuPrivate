@@ -274,9 +274,10 @@ jobs:
           fi
           echo "-----"
           unzip dist.zip -d ./dist_1
+          cat ./dist_1/dist/.env
           ls -R dist_1
           rm -rf dist_1
-          cat dist_1/.env
+          
           
       - name: cache dist.zip
         uses: actions/cache@v2

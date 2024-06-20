@@ -157,7 +157,7 @@ export class ComplaintController {
                     cf_complain_type: category , // The type of complaint.
                     cf_customer_email: transaction.user.email, // The email address of the customer associated with the complaint.
                     cf_customer_phone: transaction.user.phoneNumber, // The phone of the customer associated with the complaint.
-                    cf_customer_name: transaction.user.name, // The name of the customer associated with the complaint.
+                    cf_customer_name: transaction.user.name && "", // The name of the customer associated with the complaint.
                     cf_product_code: transaction.disco, // The Product Code Attached to the transaction
                     cf_complain_channel: channel //The Channel which the complaint is coming from
                 }

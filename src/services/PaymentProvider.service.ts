@@ -5,6 +5,7 @@ import PaymentProvider, {
 import Entity from "../models/Entity/Entity.model";
 import logger from "../utils/Logger";
 import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "crypto";
 
 /**
  * Service class for handling operations related to paymentProviders and their replies.
@@ -52,9 +53,24 @@ export default class PaymentProviderService {
         }
     }
 
-    static async viewPaymentProviderByName(
+    static async viewSinglePaymentProviderByName(
         name: string,
     ): Promise<PaymentProvider | void | null> {
+        try {
+            const paymentProvider: PaymentProvider | null =
+                await PaymentProvider.findOne({
+                    where: { name },
+                });
+            return paymentProvider;
+        } catch (err) {
+            logger.error("Error Reading PaymentProvider");
+            throw err;
+        }
+    }
+
+    static async viewPaymentProviderByName(
+        name: string,
+    ): Promise<PaymentProvider | null> {
         try {
             const paymentProvider: PaymentProvider | null =
                 await PaymentProvider.findOne({
@@ -63,6 +79,26 @@ export default class PaymentProviderService {
             return paymentProvider;
         } catch (err) {
             logger.error("Error Reading PaymentProvider");
+            throw err;
+        }
+    }
+
+    static async upsertPaymentProvider(
+        paymentProvider: string,
+    ): Promise<PaymentProvider | void> {
+        try {
+            const _paymentProvider: PaymentProvider | null =
+                await this.viewPaymentProviderByName(paymentProvider);
+            if (_paymentProvider) {
+                return _paymentProvider;
+            }
+
+            return await this.addPaymentProvider({
+                id: randomUUID(),
+                name: paymentProvider,
+            });
+        } catch (err) {
+            logger.error("Error Logging Event");
             throw err;
         }
     }

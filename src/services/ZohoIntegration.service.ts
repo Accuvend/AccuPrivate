@@ -11,8 +11,9 @@ import logger from "../utils/Logger";
 import { v4 as uuidv4 } from "uuid";
 import ZohoIntegrationSettings from "../models/ZohoIntegrationSettings.model";
 import { ZOHO_BASE_URL } from "../utils/Constants";
-import FormData from 'form-data'
+// import FormData from 'form-data'
 import fs from 'fs'
+
 /**
  * Service class for handling operations related to Zoho Integrations
  */
@@ -116,31 +117,25 @@ export default class ZohoIntegrationService {
         contentType: string = "application/json"
     ) {
         try {
-            let url_body: Object;
-            console.log('called ----->');
+            let url_body: RequestInit ;
             if (body) {
-            // if (body as { [key: string]: any }) {
                 if (contentType === "multipart/form-data") {
-                    // console.log(body, '++++++++');
+                    
                     const formData = new FormData()
                     const newBody : { [key: string]: any } = {...body}
                     for(let key in newBody){
                         const _value: any = newBody[key] 
                         
                         if(key === "file"){ 
-                          // console.log(_value , "file ++++ uploading now ")
-                          formData.append(key,_value.buffer, _value.originalname)
+                        formData.append(key,new Blob([_value.buffer], {type: _value.mimetype}), _value.originalname)
                         }
                         else formData.append(key, _value)
                     }
-
-                    console.log(formData,contentType)
                     
                     url_body = {
                         method,
                         mode: "no-cors",
                         headers: {
-                            "Content-Type": contentType,
                             Authorization: `Zoho-oauthtoken ${zohoSettings.accesstoken}`,
                             Orgid: zohoSettings.organizationId,
                         },
@@ -169,15 +164,13 @@ export default class ZohoIntegrationService {
                     },
                 };
             }
-            console.log(ZOHO_BASE_URL + url);
+            
             const apiresponse = await fetch(ZOHO_BASE_URL + url, url_body);
             if (contentType === "multipart/form-data") {
-              const apidata = await apiresponse.text()
-              console.log(apidata)
+              const apidata = await apiresponse.json()
               return apidata;
             }else{
               const apidata = await apiresponse.json();
-              console.log(apidata)
               return apidata;
             }
               

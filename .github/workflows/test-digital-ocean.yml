@@ -138,7 +138,7 @@ jobs:
         echo "KAFKA_LOGS=$KAFKA_LOGS" >> .env
         echo "KAFKA_REGION=$KAFKA_REGION" >> .env
         echo "KAFKA_BROKER=$KAFKA_BROKER" >> .env
-        echo "KAFKA_CA_CERT=$KAFKA_CA_CERT" >> .env
+        echo "KAFKA_CA_CERT=\"$KAFKA_CA_CERT\"" >> .env
         echo "KAFKA_CLIENT_ID=$KAFKA_CLIENT_ID" >> .env
         echo "KAFKA_PASSWORD=$KAFKA_PASSWORD" >> .env
         echo "KAFKA_USERNAME=$KAFKA_USERNAME" >> .env

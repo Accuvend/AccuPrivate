@@ -3,7 +3,7 @@ npm run build
 echo "In the build.sh"
 cat .env
 ls -a
-if [-f "./.env"]; then 
+if [ -f "./.env" ]; then 
   cp .env dist/.env
   echo ".env file found and copied"
 else

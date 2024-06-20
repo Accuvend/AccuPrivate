@@ -101,7 +101,7 @@ export class DataVendController {
             email,
             bundleCode,
             channel,
-            paymentProviderId,
+            paymentProvider,
         } = req.query as Record<string, string>;
         // TODO: Add request type for request authenticated by API keys
         const partnerId = (req as any).key;
@@ -127,13 +127,11 @@ export class DataVendController {
             throw new BadRequestError("Invalid product code for data");
         }
 
-        const existingPaymentProvider =
-            await PaymentProviderService.viewSinglePaymentProvider(
-                paymentProviderId,
-            );
-        if (!existingPaymentProvider) {
-            throw new NotFoundError("Payment provider not found");
-        }
+        const existingPaymentProvider = paymentProvider
+            ? await PaymentProviderService.upsertPaymentProvider(
+                  paymentProvider,
+              )
+            : null;
 
         const amount = dataBundle.bundleAmount.toString();
         const superAgent = await DataHandlerUtil.getBestVendorForPurchase(
@@ -149,7 +147,7 @@ export class DataVendController {
                 {
                     id: transactionId,
                     amount: amount,
-                    paymentProviderId,
+                    paymentProviderId: existingPaymentProvider?.id,
                     status: Status.PENDING,
                     disco: disco,
                     bundleId: dataBundle.id,

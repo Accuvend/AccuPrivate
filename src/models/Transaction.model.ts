@@ -129,7 +129,7 @@ export default class Transaction extends Model<ITransaction | Transaction> {
     @ForeignKey(() => PaymentProvider)
     @IsUUID(4)
     @Column({ type: DataType.STRING, allowNull: true })
-    paymentProviderId: string;
+    paymentProviderId?: string;
 
     @Column({ type: DataType.STRING, allowNull: true })
     irechargeAccessToken: string;
@@ -286,7 +286,7 @@ export interface ITransaction {
     partnerId: string; // Unique identifier of the Partner associated with the transaction
     meterId?: string; // Unique identifier of the Meter associated with the transaction
     reference: string;
-    paymentProviderId: string;
+    paymentProviderId?: string;
     productCodeId: string;
     irechargeAccessToken?: string;
     vendorReferenceId: string;

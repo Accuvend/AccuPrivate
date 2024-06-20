@@ -505,8 +505,14 @@ export class AirtimeVendController {
         res: Response,
         next: NextFunction,
     ) {
-        const { paymentProviderId, phoneNumber, amount, email, networkProvider, channel } =
-            req.query as Record<string, string>;
+        const {
+            paymentProvider,
+            phoneNumber,
+            amount,
+            email,
+            networkProvider,
+            channel,
+        } = req.query as Record<string, string>;
         let disco = networkProvider;
 
         const existingProductCodeForDisco =
@@ -515,10 +521,11 @@ export class AirtimeVendController {
             throw new NotFoundError("Product code not found for disco");
         }
 
-        const existingPaymentProvider = await PaymentProviderService.viewSinglePaymentProvider(paymentProviderId)
-        if (!existingPaymentProvider) {
-            throw new NotFoundError("Payment provider not found");
-        }
+        const existingPaymentProvider = paymentProvider
+            ? await PaymentProviderService.upsertPaymentProvider(
+                  paymentProvider,
+              )
+            : null;
 
         disco = existingProductCodeForDisco.masterProductCode;
 
@@ -547,7 +554,7 @@ export class AirtimeVendController {
                     paymentType: PaymentType.PAYMENT,
                     transactionTimestamp: new Date(),
                     partnerId: partnerId,
-                    paymentProviderId,
+                    paymentProviderId: existingPaymentProvider?.id,
                     reference,
                     networkProvider: networkProvider,
                     productType: existingProductCodeForDisco.category,

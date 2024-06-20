@@ -489,7 +489,7 @@ export default class VendorController {
                     vendType,
                     channel,
                     amount,
-                    paymentProviderId,
+                    paymentProvider,
                 }: valideMeterRequestBody = req.body;
                 let { disco } = req.body;
                 const partnerId = (req as any).key;
@@ -517,17 +517,11 @@ export default class VendorController {
                     );
                 }
 
-                const existingPaymentProvider =
-                    await PaymentProviderService.viewSinglePaymentProvider(
-                        paymentProviderId,
-                    );
-                if (!existingPaymentProvider) {
-                    throw new NotFoundError(
-                        "Payment provider not found",
-                        errorMeta,
-                    );
-                }
-
+                const existingPaymentProvider = paymentProvider
+                    ? await PaymentProviderService.upsertPaymentProvider(
+                          paymentProvider,
+                      )
+                    : null;
                 if (parseInt(amount.toString()) < 1000) {
                     logger.error("Mininum vend amount is 1000", {
                         meta: { transactionId },
@@ -568,9 +562,10 @@ export default class VendorController {
                             superagent: superagent,
                             paymentType: PaymentType.PAYMENT,
                             transactionTimestamp: new Date(),
-                            disco: disco, partnerId: partnerId,
+                            disco: disco,
+                            partnerId: partnerId,
                             reference: transactionReference,
-                            paymentProviderId,
+                            paymentProviderId: existingPaymentProvider?.id,
                             transactionType:
                                 transactionTypes[
                                     existingProductCodeForDisco.category

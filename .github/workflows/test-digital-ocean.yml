@@ -93,7 +93,7 @@ jobs:
         SU_HOST_EMAIL_3=${{ secrets.SU_HOST_EMAIL_3}}
         KAFKA_LOGS=${{ secrets.KAFKA_LOGS}}
         KAFKA_REGION=${{ secrets.KAFKA_REGION}}
-        KAFKA_CA_CERT=${{ secrets.KAFKA_CA_CERT}}
+        KAFKA_CA_CERT="${{ secrets.KAFKA_CA_CERT}}"
         KAFKA_BROKER=${{ secrets.KAFKA_BROKER}}
         KAFKA_CLIENT_ID=${{ secrets.TEST_KAFKA_CLIENT_ID}}
         KAFKA_PASSWORD=${{ secrets.KAFKA_PASSWORD}}

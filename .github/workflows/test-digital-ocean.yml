@@ -260,6 +260,7 @@ jobs:
           ls ./src/models
           ./build.sh
           ls ./dist/models
+          cp .env ./dist/.env
           ls | grep -q dist.zip && echo "dist.zip exists in the directory" || echo "dist.zip does not exist in the directory"
           if [ -d "./dist.zip" ]; then
             echo "It's a directory"

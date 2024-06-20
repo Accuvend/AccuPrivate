@@ -320,7 +320,27 @@ jobs:
           ls -R dist
           cp ./dist.zip testdodist.zip
           aws s3 cp ./testdodist.zip s3://staging-bucket-deployment/ 
-
+  # Creating Droplet if Droplet doesn't exist 
+  create-infra:
+    name: create-infra
+    if : github.ref == 'refs/heads/do_build_test'
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: restore dist 
+        uses: actions/cache@v2
+        with:
+          path: ./dist.zip
+          key: dist-zip
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      - name: Check if Test-Droplet exist
+        run: |
+          doctl compute droplet list --tag-name test-server
+      
   # # Depolys the backend to build
   # deploy-build:
   #   name: deploy-build

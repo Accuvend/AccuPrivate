@@ -20,7 +20,7 @@ jobs:
   #       with:
   #         node-version: 18
   #     - run: npm ci
-  #     - run: npm test
+  ##     - run: npm test
 
   # Generates the Env file and pushes to s3 bucket 
   generate-env-file:
@@ -260,7 +260,6 @@ jobs:
           ls ./src/models
           ./build.sh
           ls ./dist/models
-          cat .env
           cp .env ./dist/.env
           ls | grep -q dist.zip && echo "dist.zip exists in the directory" || echo "dist.zip does not exist in the directory"
           if [ -d "./dist.zip" ]; then
@@ -277,6 +276,7 @@ jobs:
           unzip dist.zip -d ./dist_1
           ls -R dist_1
           rm -rf dist_1
+          cat dist_1/.env
           
       - name: cache dist.zip
         uses: actions/cache@v2

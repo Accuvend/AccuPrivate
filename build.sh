@@ -1,5 +1,6 @@
 
 npm run build
+echo "In the build.sh"
 cat .env
 cp package.json dist/package.json
 ls ./src/utils/Email/templates && cp -r src/utils/Email/templates dist/utils/Email/  && rm -f ./dist/utils/Email/templates/index.ts  && ls ./dist/utils/Email/templates

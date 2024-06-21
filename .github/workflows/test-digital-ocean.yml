@@ -346,10 +346,84 @@ jobs:
       - name: Create Droplet if it does not Exist
         run: |
           DROPLETS=$(doctl compute droplet list --tag-name test-server)
-          if echo DROPLETS | grep -q "test-server" ; then
+          if echo DROPLETS | grep -q "[0-9]" ; then
             #create test droplet
             echo "Server Doesnt Exists Already"
             echo "Creating Server....."
+            doctl compute droplet create \
+              --image ubuntu-24-04-x64 \
+              --size s-2vcpu-4gb \
+              --region lon1 \
+              --vpc-uuid 24ba8ae6-424c-4a8c-86a4-494407271093 \
+              --user-data #!/bin/bash
+              sudo apt-get update
+              sudo apt-get -y zip
+              # Step 1: Install PostgreSQL and configure using .env
+              sudo apt-get install -y postgresql-client postgresql-client-common postgresql-contrib
+              # step install ngnix 
+              sudo apt-get -y install nginx
+              sudo systemctl enable nginx
+              sudo systemctl start nginx
+              #install node and pm2
+              curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - &&\
+              sudo apt-get install -y nodejs
+              sudo apt-get -y install build-essential
+              sudo npm install -g pm2
+          
+              #Updating Nginx 
+          
+              # Path to the Nginx default site configuration file
+              NGINX_DEFAULT="/etc/nginx/sites-available/default"
+          
+              # Backup the original file
+              sudo cp $NGINX_DEFAULT "${NGINX_DEFAULT}.bak"
+          
+              # Define the new configuration for the location block
+              NEW_LOCATION_BLOCK=$(cat << 'EOF'
+              location / {
+                  proxy_pass http://localhost:3000;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection 'upgrade';
+                  proxy_set_header Host $host;
+                  proxy_cache_bypass $http_upgrade;
+              }
+              EOF
+              )
+          
+              # Use awk to replace the location / block in the configuration file
+              sudo awk -v new_block="$NEW_LOCATION_BLOCK" '
+              BEGIN {
+                  block = 0;
+              }
+              /location \// {
+                  block = 1;
+              }
+              block && /\}/ {
+                  print new_block;
+                  block = 0;
+                  next;
+              }
+              !block
+              ' $NGINX_DEFAULT > "${NGINX_DEFAULT}.tmp"
+          
+              # Move the temporary file to the original configuration file
+              sudo mv "${NGINX_DEFAULT}.tmp" $NGINX_DEFAULT
+          
+              # Test the new configuration
+              sudo nginx -t
+          
+              # Reload Nginx to apply the changes
+              if [ $? -eq 0 ]; then
+                  sudo systemctl reload nginx
+              else
+                  echo "Nginx configuration test failed. Reverting to the original configuration."
+                  sudo mv "${NGINX_DEFAULT}.bak" $NGINX_DEFAULT
+                  sudo systemctl reload nginx
+              fi \
+              --enable-monitoring \
+              --tag-names 'test-server' \
+              test-server-lon1
             echo "Server Created"
           else
             #create test server

@@ -349,6 +349,7 @@ jobs:
           DROPLETS2=$(doctl compute droplet list --tag-name test-server --format "Tags" --no-header | head -n 1 )
           DROPLETS=$(doctl compute droplet list --tag-name test-server --format "Tags" --no-header | head -n 1 )
           echo $DROPLETS
+          echo DROPLETS | grep -q 'test-server'
           if echo DROPLETS | grep -q 'test-server' ; then
             #create test server
             echo "Server Exists Already"

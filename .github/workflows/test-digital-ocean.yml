@@ -420,9 +420,9 @@ jobs:
 
           #assign ip to the test-server
           TAG_NAME="test-server"
-          TEST_DROPLET_ID = doctl compute droplet list --tag-name test-server
           DROPLET_ID=$(doctl compute droplet list --tag-name $TAG_NAME --format "ID" --no-header | head -n 1)
-
+          echo $DROPLET_ID
+          
           if [ -n "$DROPLET_ID" ]; then
               echo "Droplet ID for tag $TAG_NAME is $DROPLET_ID"
           else

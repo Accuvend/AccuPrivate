@@ -325,6 +325,7 @@ jobs:
   create-infra:
     name: create-infra
     needs: [push-build]
+    environment: Test_Digital_Ocean
     if : github.ref == 'refs/heads/do_build_test'
     runs-on: ubuntu-latest
     steps:

@@ -345,9 +345,12 @@ jobs:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
       - name: Create Droplet if it does not Exist
         run: |
-          doctl compute droplet list --tag-name test-server
+          echo doctl compute droplet list --tag-name test-server | grep -q test-server;
           DROPLETS=$(doctl compute droplet list --tag-name test-server)
-          if echo DROPLETS | grep -q "[0-9]" ; then
+          if echo DROPLETS | grep -q "test-server" ; then
+            #create test server
+            echo "Server Exists Already"
+          else
             #create test droplet
             echo "Server Doesnt Exists Already"
             echo "Creating Server....."
@@ -412,10 +415,7 @@ jobs:
               --enable-monitoring \
               --tag-names 'test-server' \
               test-server-lon1
-            echo "Server Created"
-          else
-            #create test server
-            echo "Server Exists Already"
+             echo "Server Created"
           fi
          
       

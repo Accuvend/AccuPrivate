@@ -417,6 +417,19 @@ jobs:
               test-server-lon1
              echo "Server Created"
           fi
+
+          #assign ip to the test-server
+          TAG_NAME="test-server"
+          TEST_DROPLET_ID = doctl compute droplet list --tag-name test-server
+          DROPLET_ID=$(doctl compute droplet list --tag-name $TAG_NAME --format "ID" --no-header | head -n 1)
+
+          if [ -n "$DROPLET_ID" ]; then
+              echo "Droplet ID for tag $TAG_NAME is $DROPLET_ID"
+          else
+              echo "No droplet found with tag $TAG_NAME"
+              exit 1
+          fi
+          
          
       
   # # Depolys the backend to build

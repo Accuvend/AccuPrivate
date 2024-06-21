@@ -345,6 +345,7 @@ jobs:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
       - name: Create Droplet if it does not Exist
         run: |
+          doctl compute droplet list --tag-name test-server
           DROPLETS=$(doctl compute droplet list --tag-name test-server)
           if echo DROPLETS | grep -q "[0-9]" ; then
             #create test droplet

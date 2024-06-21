@@ -345,10 +345,10 @@ jobs:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
       - name: Create Droplet if it does not Exist
         run: |
-          doctl compute droplet list --tag-name test-server --format "Tags" --no-header | head -n 1
+          # doctl compute droplet list --tag-name test-server --format "Tags" --no-header | head -n 1
           DROPLETS2=$(doctl compute droplet list --tag-name test-server --format "tag-name" --no-header | head -n 1 | grep -q test-server2)
           DROPLETS=$(doctl compute droplet list --tag-name test-server)
-          echo DROPLETS2
+          echo $DROPLETS2
           exit 1
           if echo DROPLETS | grep -q "test-server" ; then
             #create test server

@@ -348,13 +348,15 @@ jobs:
           # doctl compute droplet list --tag-name test-server --format "Tags" --no-header | head -n 1
           DROPLETS2=$(doctl compute droplet list --tag-name test-server --format "Tags" --no-header | head -n 1 )
           DROPLETS=$(doctl compute droplet list --tag-name test-server --format "Tags" --no-header | head -n 1 )
-          if echo DROPLETS | grep -q "test-server" ; then
+          echo $DROPLETS
+          if echo DROPLETS | grep -q 'test-server' ; then
             #create test server
             echo "Server Exists Already"
           else
             #create test droplet
             echo "Server Doesnt Exists Already"
             echo "Creating Server....."
+            exit 1
             doctl compute droplet create \
               --image ubuntu-24-04-x64 \
               --size s-2vcpu-4gb \
@@ -423,7 +425,7 @@ jobs:
           TAG_NAME="test-server"
           DROPLET_ID=$(doctl compute droplet list --tag-name $TAG_NAME --format "ID" --no-header | head -n 1)
           echo $DROPLET_ID
-          
+          echo ${{ secrets.DROP_RESERVE_IP }}
           if [ -n "$DROPLET_ID" ]; then
               echo "Droplet ID for tag $TAG_NAME is $DROPLET_ID"
           else

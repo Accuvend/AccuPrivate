@@ -345,8 +345,10 @@ jobs:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
       - name: Create Droplet if it does not Exist
         run: |
-          echo doctl compute droplet list --tag-name test-server | grep -q test-server;
+          doctl compute droplet list --tag-name test-server;
+          doctl compute droplet list --tag-name test-server | grep -q test-server;
           DROPLETS=$(doctl compute droplet list --tag-name test-server)
+          exit 1
           if echo DROPLETS | grep -q "test-server" ; then
             #create test server
             echo "Server Exists Already"
@@ -429,6 +431,9 @@ jobs:
               echo "No droplet found with tag $TAG_NAME"
               exit 1
           fi
+          #attaching ip to droplet 
+          doctl compute reserved-ip-action ${{ secrets.DROP_RESERVE_IP }} $DROPLET_ID
+          
           
          
       

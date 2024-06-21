@@ -346,10 +346,7 @@ jobs:
       - name: Create Droplet if it does not Exist
         run: |
           # doctl compute droplet list --tag-name test-server --format "Tags" --no-header | head -n 1
-          DROPLETS2=$(doctl compute droplet list --tag-name test-server --format "Tags" --no-header | head -n 1 )
           DROPLETS=$(doctl compute droplet list --tag-name test-server --format "Tags" --no-header | head -n 1 )
-          echo $DROPLETS
-          echo $DROPLETS | grep 'test-server'
           if echo $DROPLETS | grep -q 'test-server' ; then
             #create test server
             echo "Server Exists Already"
@@ -434,7 +431,7 @@ jobs:
               exit 1
           fi
           #attaching ip to droplet 
-          doctl compute reserved-ip-action ${{ secrets.DROP_RESERVE_IP }} $DROPLET_ID
+          doctl compute reserved-ip-action assign ${{ secrets.DROP_RESERVE_IP }} $DROPLET_ID
           
           
          

@@ -146,4 +146,3 @@ export default class BuypowerAirtimeApi extends BuyPowerApi {
         }
     }
 }
-

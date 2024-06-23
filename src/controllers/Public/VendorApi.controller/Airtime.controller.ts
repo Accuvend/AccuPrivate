@@ -38,6 +38,7 @@ import VendorProductService from "../../../services/VendorProduct.service";
 import {
     generateRandomString,
     generateRandonNumbers,
+    generateVendorReference,
 } from "../../../utils/Helper";
 import logger, { Logger } from "../../../utils/Logger";
 import BundleService from "../../../services/Bundle.service";
@@ -558,10 +559,7 @@ export class AirtimeVendController {
                     reference,
                     networkProvider: networkProvider,
                     productType: existingProductCodeForDisco.category,
-                    vendorReferenceId:
-                        superAgent.toUpperCase() === "IRECHARGE"
-                            ? generateRandonNumbers(10)
-                            : reference,
+                    vendorReferenceId: await generateVendorReference(),
                     transactionType: TransactionType.AIRTIME,
                     productCodeId: existingProductCodeForDisco.id,
                     previousVendors: [superAgent],
@@ -681,6 +679,22 @@ export class AirtimeVendController {
                 vendorDiscoCode,
                 transaction,
             });
+
+        const retryRecord = {
+            retryCount: 1,
+            attempt: 0,
+            reference: [
+                superAgent === "IRECHARGE"
+                    ? transaction.vendorReferenceId
+                    : transaction.reference, // Vendor reference id is only for irecharge,
+            ],
+            vendor: superAgent,
+        } as ITransaction["retryRecord"][number];
+
+        await transaction.update({
+            retryRecord: [retryRecord],
+            reference: retryRecord.reference[0], // Incase irecharge is the selectedVendor change the reference to the vendor reference id
+        });
 
         await transaction
             .update({

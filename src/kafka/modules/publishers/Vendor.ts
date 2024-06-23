@@ -402,6 +402,7 @@ export class VendorPublisher extends ProducerFactory {
             message: {
                 log: data.log,
                 error: data.error,
+                requeryCount: data.requeryCount,
                 transactionId: data.transactionId,
                 timeStamp: data.timeStamp,
                 retryCount: data.retryCount,
@@ -475,7 +476,7 @@ export class VendorPublisher extends ProducerFactory {
                     vendType: data.meter.vendType,
                     id: data.meter.id,
                     token: data.meter.token,
-            },
+                },
                 user: {
                     name: data.user.name,
                     email: data.user.email,
@@ -601,6 +602,7 @@ export class VendorPublisher extends ProducerFactory {
                 error: data.error,
                 transactionId: data.transactionId,
                 timeStamp: data.timeStamp,
+                requeryCount: data.requeryCount,
                 retryCount: data.retryCount,
                 superAgent: data.superAgent,
                 vendorRetryRecord: data.vendorRetryRecord,

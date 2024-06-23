@@ -1058,8 +1058,7 @@ export default class VendorService {
         reference: string,
         transactionId: string,
     ) {
-        const response = await IRechargeVendorService.validateMeter({
-            disco,
+        const response = await IRechargeVendorService.validateMeter({ disco,
             meterNumber,
             reference,
         });

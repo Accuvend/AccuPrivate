@@ -431,6 +431,9 @@ jobs:
              echo "Server Created"
           fi
 
+          #wait for 40 seconds 
+          sleep 40 
+
           #assign ip to the test-server
           TAG_NAME="test-server"
           DROPLET_ID=$(doctl compute droplet list --tag-name $TAG_NAME --format "ID" --no-header | head -n 1)
@@ -442,11 +445,12 @@ jobs:
               echo "No droplet found with tag $TAG_NAME"
               exit 1
           fi
+          
           #attaching ip to droplet 
           doctl compute reserved-ip-action assign ${{ secrets.DROP_RESERVE_IP }} $DROPLET_ID
           
-      - name: Wait for droplet to be ready
-        run: sleep 40 # Adjust as necessary
+      # - name: Wait for droplet to be ready
+      #   run: sleep 40 # Adjust as necessary
 
 
   # Creating Droplet if Droplet doesn't exist 

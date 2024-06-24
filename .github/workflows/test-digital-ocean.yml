@@ -363,7 +363,7 @@ jobs:
               --image ubuntu-24-04-x64 \
               --size s-2vcpu-4gb \
               --region lon1 \
-              --ssh-key $SSH_KEY_ID \
+              --ssh-keys $SSH_KEY_ID \
               --vpc-uuid 24ba8ae6-424c-4a8c-86a4-494407271093 \
               --user-data '#!/bin/bash
               sudo apt-get update

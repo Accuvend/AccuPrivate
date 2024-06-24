@@ -489,7 +489,7 @@ jobs:
           set PASSWORD "${{ secrets.SSH_PASSWORD }}";
           set SSH_KEY_PATH "~/.ssh/id_rsa";
 
-          spawn ssh -o StrictHostKeyChecking=no -i $SSH_KEY_PATH $SSH_USER@$DROPLET_IP 'echo "Hello, world!"' ;
+          spawn ssh -o StrictHostKeyChecking=no -i $SSH_KEY_PATH $SSH_USER@$DROPLET_IP "nginx -v" ;
 
           expect {
              "Enter passphrase for key" {

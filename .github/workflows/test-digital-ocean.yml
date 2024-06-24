@@ -476,12 +476,12 @@ jobs:
       - name: Run Check if ngnix is setup
         run: |
           COMMANDS="sudo nginx -v"
-          sshpass -p ${{ secrets.SSH_PASSWORD }} ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa root@${{ secrets.DROP_RESERVE_IP }} << EOF
-          $COMMANDS
-          EOF
+          sshpass -p ${{ secrets.SSH_PASSWORD }} ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa root@${{ secrets.DROP_RESERVE_IP }} 'sudo nginx -v && logout' #<< EOF
+          # $COMMANDS
+          # EOF
       - name: Run Check if pm2 is setup
         run: |
-          COMMANDS="sudo pm2 list"
+          COMMANDS="sudo pm2 list && logout"
           sshpass -p ${{ secrets.SSH_PASSWORD }} ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa root@${{ secrets.DROP_RESERVE_IP }} << EOF
           $COMMANDS
           EOF

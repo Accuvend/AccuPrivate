@@ -489,7 +489,7 @@ jobs:
           set PASSWORD "${{ secrets.SSH_PASSWORD }}";
           set SSH_KEY_PATH "~/.ssh/id_rsa";
 
-          spawn ssh -o StrictHostKeyChecking=no -i $SSH_KEY_PATH $SSH_USER@$DROPLET_IP;
+          spawn ssh -o StrictHostKeyChecking=no -i $SSH_KEY_PATH $SSH_USER@$DROPLET_IP 'echo "Hello, world!"' ;
 
           expect {
              "Enter passphrase for key" {
@@ -507,13 +507,7 @@ jobs:
                 exp_continue;
              }
           }
-
-          expect "$ ";
-          send "echo \\"Hello, world!\\"\r";
-
-          expect "$ ";
-          send "exit\r";
-
+          
           expect eof;
           '
       - name: Run Check if pm2 is setup

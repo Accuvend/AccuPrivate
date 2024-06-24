@@ -867,9 +867,11 @@ export class DataTransactionEventService {
     public async addScheduleRetryEvent({
         timeStamp,
         waitTime,
+        retryRecord,
     }: {
         timeStamp: string;
         waitTime: number;
+        retryRecord: Transaction["retryRecord"][number];
     }): Promise<Event> {
         const event: ICreateEvent = {
             transactionId: this.transaction.id,
@@ -881,6 +883,7 @@ export class DataTransactionEventService {
                 phone: this.phoneNumber,
                 superagent: this.superAgent,
                 partnerEmail: this.partner,
+                retryRecord: retryRecord,
             }),
             source: "API",
             eventTimestamp: new Date(),

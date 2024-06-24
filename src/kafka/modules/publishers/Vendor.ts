@@ -707,6 +707,7 @@ export class VendorPublisher extends ProducerFactory {
                 transactionId: data.transactionId,
                 timeStamp: data.timeStamp,
                 retryCount: data.retryCount,
+                requeryCount: data.requeryCount,
                 superAgent: data.superAgent,
                 waitTime: data.waitTime,
                 vendorRetryRecord: data.vendorRetryRecord,

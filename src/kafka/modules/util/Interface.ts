@@ -352,6 +352,7 @@ export interface PublisherEventAndParameters
         timeStamp: Date;
         error: { code: number; cause: TransactionErrorCause };
         retryCount: number;
+        requeryCount: number;
         superAgent: Transaction["superagent"];
         waitTime: number;
         vendorRetryRecord: VendorRetryRecord;

@@ -67,6 +67,7 @@ export default class MessageProcessorFactory {
                     meta: {
                         messageData,
                         errorData: error,
+                        errorStack: (error as Error).stack,
                         transactionId: messageData.value.transactionId,
                     },
                 },
@@ -117,6 +118,7 @@ export default class MessageProcessorFactory {
                     meta: {
                         messageData: messagePayload.message,
                         errorData: error,
+                        errorStack: (error as Error).stack,
                         transactionId: data.value.transactionId,
                     },
                 },

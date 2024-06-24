@@ -185,7 +185,7 @@ export class AirtimeHandlerUtil {
             lastVendorRetryRecord.reference.push(newTransactionReference);
         }
 
-        // const isFirstRetry = initialRetryRecord[0].reference.length === 2;
+        // const isFirstRetry = initialRetryRecord[0].reference.lVending request with BAXIength === 2;
         return {
             retryRecord,
             newTransactionReference,
@@ -441,7 +441,6 @@ export class AirtimeHandlerUtil {
     }: TokenPurchaseData<T>) {
         let superAgent = transaction.superagent as ITransaction["superagent"];
         try {
-
             const {
                 retryRecord,
                 newTransactionReference,
@@ -495,7 +494,7 @@ export class AirtimeHandlerUtil {
                 amount: data.amount,
                 email: data.email,
                 transactionId: transaction.id,
-                reference: updatedTraansaction.reference
+                reference: updatedTraansaction.reference,
             };
             const vendResponse = await VendorService.purchaseAirtime({
                 data: _data,
@@ -582,21 +581,17 @@ export class AirtimeHandlerUtil {
         if (!product) throw new CustomError("Product code not found");
 
         const vendorProducts = await product.$get("vendorProducts");
-        // Populate all te vendors
+
+        // Populate all the vendors
         const vendors = await Promise.all(
             vendorProducts.map(async (vendorProduct) => {
                 const vendor = await vendorProduct.$get("vendor");
                 if (!vendor) throw new CustomError("Vendor not found");
-                vendorProduct.vendor = vendor;
                 return vendor;
             }),
         );
 
-        // Check other vendors, sort them according to their commission rates
-        // If the current vendor is the vendor with the highest commission rate, then switch to the vendor with the next highest commission rate
-        // If the next vendor has been used before, switch to the next vendor with the next highest commission rate
-        // If all the vendors have been used before, switch to the vendor with the highest commission rate
-
+        // Sort vendorProducts according to their commission rates
         const sortedVendorProductsAccordingToCommissionRate =
             vendorProducts.sort(
                 (a, b) =>
@@ -604,6 +599,7 @@ export class AirtimeHandlerUtil {
                     b.bonus -
                     (a.commission * amount + a.bonus),
             );
+
         const vendorRates = sortedVendorProductsAccordingToCommissionRate.map(
             (vendorProduct) => {
                 const vendor = vendorProduct.vendor;
@@ -617,11 +613,13 @@ export class AirtimeHandlerUtil {
             },
         );
 
+        // Filter out the current vendor
         const sortedOtherVendors = vendorRates.filter(
             (vendorRate) => vendorRate.vendorName !== currentVendor,
         );
 
-        nextBestVendor: for (const vendorRate of sortedOtherVendors) {
+        // Try to find the next best vendor that hasn't been tried yet
+        for (const vendorRate of sortedOtherVendors) {
             if (!previousVendors.includes(vendorRate.vendorName)) {
                 console.log({
                     currentVendor,
@@ -632,24 +630,17 @@ export class AirtimeHandlerUtil {
             }
         }
 
-        if (previousVendors.length === vendors.length) {
-            // If all vendors have been used before, switch to the vendor with the highest commission rate
-            return vendorRates.sort(
-                (a, b) =>
-                    b.commission * amount +
-                    b.bonus -
-                    (a.commission * amount + a.bonus),
-            )[0].vendorName as Transaction["superagent"];
-        }
-
-        // If the current vendor is the vendor with the highest commission rate, then switch to the vendor with the next highest commission rate
+        // If all other vendors have been tried, switch to the vendor with the highest commission rate
+        // that isn't the current vendor (because we filtered it out already)
+        const nextBestVendor =
+            sortedOtherVendors[0]?.vendorName || vendorRates[0].vendorName;
 
         console.log({
             currentVendor,
-            newVendor: sortedOtherVendors[0].vendorName,
+            newVendor: nextBestVendor,
         });
 
-        return sortedOtherVendors[0].vendorName as Transaction["superagent"];
+        return nextBestVendor as Transaction["superagent"];
     }
 }
 
@@ -1020,7 +1011,7 @@ class AirtimeHandler extends Registry {
                                 },
                             },
                             eventService: transactionEventService,
-                            retryCount: data.retryCount + 1,
+                            retryCount: data.retryCount ,
                             requeryCount: data.requeryCount,
                             superAgent: data.superAgent,
                             transactionTimedOutFromBuypower: false,
@@ -1075,7 +1066,7 @@ class AirtimeHandler extends Registry {
                                 },
                             },
                             eventService: transactionEventService,
-                            retryCount: data.retryCount + 1,
+                            retryCount: data.retryCount ,
                             requeryCount: data.requeryCount,
                             superAgent: data.superAgent,
                             transactionTimedOutFromBuypower: false,

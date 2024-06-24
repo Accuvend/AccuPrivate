@@ -1,6 +1,7 @@
-import { NextFunction, Request, Response } from "express";
+import { NextFunction, Request, Response, response } from "express";
 import TransactionService from "../../../services/Transaction.service";
 import Transaction, {
+    ITransaction,
     PaymentType,
     Status,
     TransactionType,
@@ -33,6 +34,7 @@ import {
 import ResponseTrimmer from "../../../utils/ResponseTrimmer";
 import BundleService from "../../../services/Bundle.service";
 import PaymentProviderService from "../../../services/PaymentProvider.service";
+import logger from "../../../utils/Logger";
 require("newrelic");
 
 class DataValidator {
@@ -138,7 +140,9 @@ export class DataVendController {
             dataBundle.id,
             dataBundle.bundleAmount,
         );
+        console.log("Best vendor for purchase", { superAgent });
 
+        const reference = generateRandomString(10);
         console.log({ vendors: dataBundle.vendors });
 
         const transactionId = uuidv4();
@@ -159,7 +163,7 @@ export class DataVendController {
                     productCodeId: existingProductCodeForDisco.id,
                     previousVendors: [superAgent],
                     networkProvider: existingProductCodeForDisco.productName,
-                    reference: transactionId,
+                    reference: reference,
                     productType: "DATA",
                     vendorReferenceId: await generateVendorReference(),
                     retryRecord: [],
@@ -234,8 +238,19 @@ export class DataVendController {
         }
 
         // Check if transaction is already completed
-        if (transaction.status === Status.COMPLETE) {
+        if (
+            transaction.status.toUpperCase() === Status.COMPLETE.toUpperCase()
+        ) {
             throw new BadRequestError("Transaction already completed");
+        }
+
+        // Check if reference has been used before
+        const existingTransaction: Transaction | null =
+            await TransactionService.viewSingleTransactionByBankRefID(
+                bankRefId,
+            );
+        if (existingTransaction) {
+            throw new BadRequestError("Duplicate reference");
         }
 
         await TransactionService.updateSingleTransaction(transactionId, {
@@ -261,6 +276,21 @@ export class DataVendController {
         if (!transaction.bundleId) {
             throw new BadRequestError("Bundle code is required");
         }
+        const retryRecord = {
+            retryCount: 1,
+            attempt: 0,
+            reference: [
+                superAgent === "IRECHARGE"
+                    ? transaction.vendorReferenceId
+                    : transaction.reference, // Vendor reference id is only for irecharge,
+            ],
+            vendor: superAgent,
+        } as ITransaction["retryRecord"][number];
+
+        await transaction.update({
+            retryRecord: [retryRecord],
+            reference: retryRecord.reference[0], // Incase irecharge is the selectedVendor change the reference to the vendor reference id
+        });
 
         await VendorPublisher.publshEventForDataPurchaseInitiate({
             transactionId: transactionId,
@@ -277,11 +307,9 @@ export class DataVendController {
             },
         });
 
-        res.status(200).json({
+        const responseData = {
             message: "Data request sent successfully",
             data: {
-                // transaction,
-                // removed to allow proper mapping
                 transaction: {
                     amount: transaction.dataValues?.amount,
                     transactionId: transaction.dataValues?.id,
@@ -292,6 +320,10 @@ export class DataVendController {
                     networkProvider: transaction.dataValues?.networkProvider,
                 },
             },
+        };
+        res.status(200).json(responseData);
+        logger.info("Vend response sent to partner", {
+            meta: { transactionId: transaction.id, response: responseData },
         });
     }
 

@@ -7,7 +7,7 @@ import {
     LOGO_URL,
 } from "../../Constants";
 import { IReceiptEmailTemplateProps } from "../../Interface";
-import Transaction from "../../../models/Transaction.model";
+import Transaction, { ITransaction } from "../../../models/Transaction.model";
 import { randomUUID } from "crypto";
 import { IBundle } from "../../../models/Bundle.model";
 import { string } from "zod";
@@ -50,6 +50,27 @@ class EmailTemplate {
                 unit: units,
                 receiptUrl: ACCUVEND_RECEIPT_BASE_URL,
             }),
+        );
+    };
+    processing_airtime_order_confirmation = async ({
+        transaction,
+        phone,
+        name,
+    }: {
+        transaction: ITransaction;
+        phone: string;
+        name: string;
+    }) => {
+        return container(
+            await ejs.renderFile(
+                __dirname + "/processing-airtime-order-confirmation.ejs",
+                {
+                    transaction,
+                    phone,
+                    name,
+                    orderConfirmationUrl: ACCUVEND_ORDER_CONFIRMATION_BASE_URL,
+                },
+            ),
         );
     };
     processing_order_confirmation = async ({

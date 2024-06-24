@@ -720,7 +720,7 @@ export default class VendorController {
                     reference: [
                         selectedVendor === "IRECHARGE"
                             ? transaction.vendorReferenceId
-                            : transaction.vendorReferenceId, // Vendor reference id is only for irecharge,
+                            : transaction.reference, // Vendor reference id is only for irecharge,
                     ],
                     vendor: superagent,
                 } as ITransaction["retryRecord"][number];

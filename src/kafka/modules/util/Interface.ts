@@ -68,8 +68,6 @@ export interface PublisherEventAndParameters
         scheduledMessagePayload: PublisherEventAndParameters[TOPICS.AIRTIME_PURCHASE_INITIATED_BY_CUSTOMER] & {
             retryRecord: Transaction["retryRecord"];
             newVendor: Transaction["superagent"];
-            newTransactionReference: string;
-            irechargeAccessToken: string;
             previousVendors: Transaction["superagent"][];
         };
     };
@@ -280,6 +278,7 @@ export interface PublisherEventAndParameters
         timeStamp: Date;
         error: { code: number; cause: TransactionErrorCause };
         retryCount: number;
+        requeryCount: number;
         superAgent: Transaction["superagent"];
         vendorRetryRecord: VendorRetryRecord;
         waitTime: number;
@@ -353,6 +352,7 @@ export interface PublisherEventAndParameters
         timeStamp: Date;
         error: { code: number; cause: TransactionErrorCause };
         retryCount: number;
+        requeryCount: number;
         superAgent: Transaction["superagent"];
         waitTime: number;
         vendorRetryRecord: VendorRetryRecord;

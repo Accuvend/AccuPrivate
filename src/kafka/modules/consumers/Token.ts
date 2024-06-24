@@ -230,6 +230,15 @@ export class TokenHandlerUtil {
                 ? await generateVendorReference()
                 : randomUUID();
 
+        let accessToken = transaction.irechargeAccessToken;
+        if (currentVendor === "IRECHARGE") {
+            accessToken = await this.generateNewAccessTokenForIrecharge({
+                transaction,
+                newReference: newTransactionReference,
+                meter: transaction.meter,
+            });
+        }
+
         if (
             currentVendor != lastVendorRetryRecord.vendor ||
             lastVendorRetryEntryReachedLimit
@@ -248,15 +257,10 @@ export class TokenHandlerUtil {
             lastVendorRetryRecord.reference.push(newTransactionReference);
         }
 
-        let accessToken = transaction.irechargeAccessToken;
-        if (currentVendor === "IRECHARGE") {
-            accessToken = await this.generateNewAccessTokenForIrecharge({
-                transaction,
-                newReference: newTransactionReference,
-                meter: transaction.meter,
-            });
-        }
-
+        // Set the access token for the last vendor retry entry
+        const lastVendorRetryEntry = retryRecord[retryRecord.length - 1];
+        lastVendorRetryEntry.accessToken = currentVendor === 'IRECHARGE' ? accessToken : undefined
+        
         // const isFirstRetry = initialRetryRecord[0].reference.length === 2;
         return {
             retryRecord,

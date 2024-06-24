@@ -336,9 +336,6 @@ jobs:
         with:
           path: ./dist.zip
           key: dist-zip
-      - name: check token
-        run: |
-          echo ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
         with:
@@ -347,6 +344,14 @@ jobs:
         run: |
           # doctl compute droplet list --tag-name test-server --format "Tags" --no-header | head -n 1
           DROPLETS=$(doctl compute droplet list --tag-name test-server --format "Tags" --no-header | head -n 1 )
+          SSH_KEY_ID=$(doctl compute ssh-key list --format Name,ID --no-header | grep 'Test_server_SSH_key' | awk '{print $2}')
+          # Check if the SSH key ID was found
+          if [ -n "$SSH_KEY_ID" ]; then
+              echo "SSH key ID for '$SSH_KEY_NAME' is $SSH_KEY_ID"
+          else
+              echo "SSH key '$SSH_KEY_NAME' not found"
+              exit 1
+          fi
           if echo $DROPLETS | grep -q 'test-server' ; then
             #create test server
             echo "Server Exists Already"
@@ -359,6 +364,7 @@ jobs:
               --image ubuntu-24-04-x64 \
               --size s-2vcpu-4gb \
               --region lon1 \
+              --ssh-key $SSH_KEY_ID \
               --vpc-uuid 24ba8ae6-424c-4a8c-86a4-494407271093 \
               --user-data '#!/bin/bash
               sudo apt-get update
@@ -412,7 +418,14 @@ jobs:
                   echo "Nginx configuration test failed. Reverting to the original configuration."
                   sudo mv "${NGINX_DEFAULT}.bak" $NGINX_DEFAULT
                   sudo systemctl reload nginx
-              fi' \
+              fi
+              # using certbot to install ssl 
+              sudo apt-get remove certbot
+              sudo snap install --classic certbot
+              sudo ln -s /snap/bin/certbot /usr/bin/certbot
+              sudo certbot --nginx -d api-dev1.accuvend.ng
+              sudo certbot renew --dry-run 
+              ' \
               --enable-monitoring \
               --tag-names 'test-server' \
               test-server-lon1
@@ -432,6 +445,49 @@ jobs:
           fi
           #attaching ip to droplet 
           doctl compute reserved-ip-action assign ${{ secrets.DROP_RESERVE_IP }} $DROPLET_ID
+          
+      - name: Wait for droplet to be ready
+        run: sleep 40 # Adjust as necessary
+
+
+  # Creating Droplet if Droplet doesn't exist 
+  deploy-build:
+    name: deploy-build
+    needs: [create-infra]
+    environment: Test_Digital_Ocean
+    if : github.ref == 'refs/heads/do_build_test'
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: restore dist 
+        uses: actions/cache@v2
+        with:
+          path: ./dist.zip
+          key: dist-zip
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+      - name: Run Check if ngnix is setup
+        run: |
+          COMMANDS="sudo nginx -v"
+          sshpass -p ${{ secrets.SSH_PASSWORD }} ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa root@${{ secrets.DROP_RESERVE_IP }} << EOF
+          $COMMANDS
+          EOF
+      - name: Run Check if pm2 is setup
+        run: |
+          COMMANDS="sudo pm2 list"
+          sshpass -p ${{ secrets.SSH_PASSWORD }} ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa root@${{ secrets.DROP_RESERVE_IP }} << EOF
+          $COMMANDS
+          EOF
+      
+      
+          
+     
+
+          
           
           
          

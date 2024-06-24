@@ -480,9 +480,42 @@ jobs:
         run: |
           COMMANDS="sudo nginx -v"
           expect -v
-          # sshpass -p ${{ secrets.SSH_PASSWORD }} ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa root@${{ secrets.DROP_RESERVE_IP }} 'sudo nginx -v && logout' #<< EOF
-          # $COMMANDS
-          # EOF
+      - name: Run expect script
+        run: |
+          expect -c '
+          set timeout -1;
+          set SSH_USER "${{ secrets.SSH_USER }}";
+          set DROPLET_IP "${{ secrets.DROPLET_IP }}";
+          set PASSWORD "${{ secrets.PASSWORD }}";
+          set SSH_KEY_PATH "~/.ssh/id_rsa";
+
+          spawn ssh -o StrictHostKeyChecking=no -i $SSH_KEY_PATH $SSH_USER@$DROPLET_IP;
+
+          expect {
+             "Enter passphrase for key" {
+                send "$PASSWORD\r";
+                exp_continue;
+             }
+             "password:" {
+                send "$PASSWORD\r";
+             }
+          }
+
+          expect {
+             "*yes/no" {
+                send "yes\r";
+                exp_continue;
+             }
+          }
+
+          expect "$ ";
+          send "echo \\"Hello, world!\\"\r";
+
+          expect "$ ";
+          send "exit\r";
+
+          expect eof;
+          '
       - name: Run Check if pm2 is setup
         run: |
           expect -v

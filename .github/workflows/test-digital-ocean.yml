@@ -474,6 +474,8 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
+      - name: Install expect
+        run: sudo apt-get update && sudo apt-get install -y expect
       - name: Run Check if ngnix is setup
         run: |
           COMMANDS="sudo nginx -v"

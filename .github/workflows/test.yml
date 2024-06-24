@@ -194,6 +194,8 @@ jobs:
         echo "SU_HOST_EMAIL_3=$SU_HOST_EMAIL_3" >> .env
         echo "NODE_TLS_REJECT_UNAUTHORIZED=0" >> .env
         echo "ACCUVEND_RECEIPT_BASE_URL=$ACCUVEND_RECEIPT_BASE_URL" >> .env
+        echo "ACCUVEND_ORDER_CONFIRMATION_BASE_URL=$ACCUVEND_RECEIPT_BASE_URL" >> .env
+        echo "ACCUVEND_USER_INVITER_URL=n" >> .env
         
         cat .env
     - name: push to state to s3

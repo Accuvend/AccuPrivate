@@ -140,6 +140,7 @@ export class DataVendController {
             dataBundle.id,
             dataBundle.bundleAmount,
         );
+        console.log("Best vendor for purchase", { superAgent });
 
         const reference = generateRandomString(10);
         console.log({ vendors: dataBundle.vendors });

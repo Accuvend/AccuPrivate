@@ -689,9 +689,9 @@ export class DataHandlerUtil {
         const sortedVendorProductsAccordingToCommissionRate =
             vendorProducts.sort(
                 (a, b) =>
-                    b.commission * amount +
-                    b.bonus -
-                    (a.commission * amount + a.bonus),
+                   (( b.commission/100) * amount +
+                    b.bonus) -
+                    ((a.commission/100) * amount + a.bonus),
             );
 
         const vendorRates = sortedVendorProductsAccordingToCommissionRate.map(

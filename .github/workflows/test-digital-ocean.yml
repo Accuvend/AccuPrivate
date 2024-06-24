@@ -484,9 +484,9 @@ jobs:
         run: |
           expect -c '
           set timeout -1;
-          set SSH_USER "${{ secrets.SSH_USER }}";
-          set DROPLET_IP "${{ secrets.DROPLET_IP }}";
-          set PASSWORD "${{ secrets.PASSWORD }}";
+          set SSH_USER "root";
+          set DROPLET_IP "${{ secrets.DROP_RESERVE_IP }}";
+          set PASSWORD "${{ secrets.SSH_PASSWORD }}";
           set SSH_KEY_PATH "~/.ssh/id_rsa";
 
           spawn ssh -o StrictHostKeyChecking=no -i $SSH_KEY_PATH $SSH_USER@$DROPLET_IP;

@@ -347,7 +347,7 @@ jobs:
           SSH_KEY_ID=$(doctl compute ssh-key list --format Name,ID --no-header | grep 'Test_server_SSH_key' | awk '{print $2}')
           # Check if the SSH key ID was found
           if [ -n "$SSH_KEY_ID" ]; then
-              echo "SSH key ID for '$SSH_KEY_NAME' is $SSH_KEY_ID"
+              echo "SSH key ID is $SSH_KEY_ID"
           else
               echo "SSH key '$SSH_KEY_NAME' not found"
               exit 1
@@ -359,7 +359,6 @@ jobs:
             #create test droplet
             echo "Server Doesnt Exists Already"
             echo "Creating Server....."
-            exit 1
             doctl compute droplet create \
               --image ubuntu-24-04-x64 \
               --size s-2vcpu-4gb \

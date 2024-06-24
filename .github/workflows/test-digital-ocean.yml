@@ -354,7 +354,7 @@ jobs:
           fi
           if echo $DROPLETS | grep -q 'test-server' ; then
             #create test server
-            echo "Server Exists Already"
+            echo "Server Exists Already ..."
           else
             #create test droplet
             echo "Server Doesnt Exists Already"

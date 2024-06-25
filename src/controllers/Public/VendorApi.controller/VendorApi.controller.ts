@@ -40,7 +40,7 @@ import {
     TransactionErrorCause,
 } from "../../../kafka/modules/util/Interface";
 import logger, { Logger } from "../../../utils/Logger";
-import { error } from "console";
+import { assert, error } from "console";
 import TransactionEventService from "../../../services/TransactionEvent.service";
 import { AirtimeVendController } from "./Airtime.controller";
 import ProductService from "../../../services/Product.service";
@@ -58,7 +58,7 @@ import {
 } from "../../../utils/Helper";
 import { TokenUtil } from "../../../utils/Auth/Token";
 import VendorModelService from "../../../services/Vendor.service";
-import { AxiosError } from "axios";
+import { Axios, AxiosError } from "axios";
 import PowerUnitService from "../../../services/PowerUnit.service";
 import { PartnerProfile } from "../../../models/Entity/Profiles";
 import UserMeterService from "../../../services/UserMeter.service";
@@ -67,6 +67,9 @@ import { Database } from "../../../models";
 import sequelize from "sequelize";
 import { throws } from "assert";
 import PaymentProviderService from "../../../services/PaymentProvider.service";
+import { DataHandlerUtil } from "../../../kafka/modules/consumers/Data";
+import { AirtimeHandlerUtil } from "../../../kafka/modules/consumers/Airtime";
+import { assertExists } from "../../../utils/TypeUtils";
 
 enum MessageType {
     INFORMATION = "INFORMATION",
@@ -1371,8 +1374,11 @@ export default class VendorController {
         if (!transaction) {
             throw new NotFoundError("Transaction not found");
         }
-        const meter = await transaction.$get("meter");
-        if (!meter) {
+        const meter = transaction.transactionType === TransactionType.ELECTRICITY ? await transaction.$get("meter"): null;
+        if (
+            !meter &&
+            transaction.transactionType === TransactionType.ELECTRICITY
+        ) {
             throw new InternalServerError("Meter not found");
         }
 
@@ -1402,27 +1408,43 @@ export default class VendorController {
                 admin: req.user.user,
             },
         });
-        const requeryResult = await TokenHandlerUtil.processRequeryRequest(
+
+        if (
+            transaction.transactionType != TransactionType.ELECTRICITY &&
+            transaction.transactionType != TransactionType.AIRTIME &&
+            transaction.transactionType != TransactionType.DATA
+        ) {
+            throw new BadRequestError(
+                "Transaction type not supported for manual requery",
+            );
+        }
+
+        const requeryHandler = {
+            DATA: DataHandlerUtil,
+            AIRTIME: AirtimeHandlerUtil,
+            ELECTRICITY: TokenHandlerUtil,
+        } as const;
+        const requeryResult = await requeryHandler[transaction.transactionType].processRequeryRequest(
             transaction,
-        ).catch((e) => e ?? {});
+        ).catch((e) => (e as AxiosError | Error) ?? {});
 
         logger.info("Requeried transaction successfully", logMeta);
         console.log({ requeryResult: requeryResult });
+
         const discoCode = vendorProduct.schemaData.code;
         const response =
             await ResponseValidationUtil.validateTransactionCondition({
                 requestType: "REQUERY",
                 vendor: vendor.name,
-                // transactionType: transaction.transactionType,
                 httpCode:
                     requeryResult instanceof AxiosError
                         ? requeryResult.status
-                        : requeryResult.httpStatusCode,
+                        : (requeryResult as any).httpStatusCode,
                 responseObject:
                     requeryResult instanceof AxiosError
                         ? requeryResult.response?.data
                         : requeryResult,
-                vendType: meter.vendType,
+                vendType: meter?.vendType ?? "POSTPAID", // Other transaction types excluding electricity can be treated as postpaid
                 disco: discoCode,
                 transactionId: transaction.id,
                 isError: requeryResult instanceof AxiosError,
@@ -1442,17 +1464,21 @@ export default class VendorController {
                         transactionId: transaction.id,
                         status: transaction.status,
                     },
-                    meter: {
-                        disco: meter.disco,
-                        number: meter.meterNumber,
-                        address: meter.address,
-                        phone: meter.userId,
-                        vendType: meter.vendType,
-                        name: meter.userId,
-                    },
                 } as Record<string, any>,
             },
         };
+
+        if (transaction.transactionType === TransactionType.ELECTRICITY) {
+            assertExists(meter, "Meter not found");
+            responseMessage.successful.data.meter = {
+                disco: meter.disco,
+                number: meter.meterNumber,
+                address: meter.address,
+                phone: meter.userId,
+                vendType: meter.vendType,
+                name: meter.userId,
+            };
+        }
 
         if (response.action === 1) {
             if (response.vendType === "PREPAID") {

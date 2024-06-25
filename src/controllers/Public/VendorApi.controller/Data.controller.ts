@@ -129,6 +129,15 @@ export class DataVendController {
             throw new BadRequestError("Invalid product code for data");
         }
 
+        if (
+            existingProductCodeForDisco.productName.toUpperCase() !==
+            disco.toUpperCase()
+        ) {
+            throw new BadRequestError(
+                "Bundle code does not match network provider",
+            );
+        }
+
         const existingPaymentProvider = paymentProvider
             ? await PaymentProviderService.upsertPaymentProvider(
                   paymentProvider,
@@ -143,7 +152,6 @@ export class DataVendController {
         console.log("Best vendor for purchase", { superAgent });
 
         const reference = generateRandomString(10);
-        console.log({ vendors: dataBundle.vendors });
 
         const transactionId = uuidv4();
         const transaction: Transaction =

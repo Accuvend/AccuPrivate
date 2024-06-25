@@ -5,12 +5,24 @@ import { basicAuth } from "../middlewares/Auth";
 import RBACMiddelware from "../middlewares/Rbac";
 import { RoleEnum } from "../models/Role.model";
 
-export const router: Router = express.Router()
+export const router: Router = express.Router();
 
 router
-    .get('/info', BundleController.getSingleDataBundle)
-    .get('/', BundleController.getDataBundles)
-    .post('/create', basicAuth('access'), RBACMiddelware.validateRole([RoleEnum.SuperAdmin]), AuthenticatedController(BundleController.addNewBundle))
-    .patch('/', basicAuth('access'), RBACMiddelware.validateRole([RoleEnum.SuperAdmin]), AuthenticatedController(BundleController.addNewBundle))
+    .get("/", BundleController.getDataBundlesAsUser)
+    .use(
+        basicAuth("access"),
+        RBACMiddelware.validateRole([RoleEnum.SuperAdmin, RoleEnum.Admin]),
+    )
+    .get(
+        "/private/info",
+        AuthenticatedController(BundleController.getSingleDataBundle),
+    )
+    .get(
+        "/private",
+        AuthenticatedController(BundleController.getDataBundlesAsAdmin),
+    )
+    .post("/create", AuthenticatedController(BundleController.addNewBundle))
+    .patch("/", AuthenticatedController(BundleController.addNewBundle));
 
-export default router
+export default router;
+

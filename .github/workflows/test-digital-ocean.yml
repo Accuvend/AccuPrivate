@@ -474,6 +474,9 @@ jobs:
                 #}" > /root/default
 
               sudo cp /root/default /etc/nginx/sites-available/default
+              sudo mv /root/default /etc/nginx/sites-available/default
+              echo "now ---working" >> /etc/nginx/sites-available/test.txt
+              
           
               # Test the new configuration
               sudo nginx -t

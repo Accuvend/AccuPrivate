@@ -657,89 +657,10 @@ jobs:
           
           expect eof;
           '
-      
-       
-  # # Depolys the backend to build
-  # deploy-build:
-  #   name: deploy-build
-  #   needs: [push-build]
-  #   if : github.ref == 'refs/heads/do_build_test'
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: chechkout
-  #       uses: actions/checkout@v2
-  #     - name: restore dist 
-  #       uses: actions/cache@v2
-  #       with:
-  #         path: ./dist.zip
-  #         key: dist-zip
-  #     - name: Configure AWS Credentials
-  #       uses: aws-actions/configure-aws-credentials@v4
-  #       with:
-  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #         aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET_KEY }}
-  #         aws-region: eu-west-2
-  #     - name: get ip address for staging ec2
-  #       id: get_ip_address_ec2
-  #       run: |
-  #         EC2_HOST_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Test-core-engine" --query "Reservations[].Instances[].[PublicIpAddress]" --output text)
-  #         echo "EC2_HOST_IP=$EC2_HOST_IP" >> $GITHUB_OUTPUT
-  #     - name: SSH to EC2 Instance
-  #       env: 
-  #         PRIVATE_KEY: ${{ secrets.SAND_BOX_SSH_KEY }}
-  #         GITHUB_RUN_NUMBER: ${{ secrets.GITHUB_RUN_NUMBER }}
-  #         EC2_HOST_IP: ${{steps.get_ip_address_ec2.outputs.EC2_HOST_IP}}
-  #       run: |
-  #         echo "$EC2_HOST_IP"
-  #         echo "$PRIVATE_KEY" > private_key.pem && chmod 400 private_key.pem 
-  #         ssh -o StrictHostKeyChecking=no -i 'private_key.pem' ubuntu@${EC2_HOST_IP} '
-  #           cd /home/ubuntu/
-  #           pm2 stop server #stop the server 
-  #           # GET THE LATEST_SUCCESSFUL_RUN_ID 
-  #           if aws s3 cp s3://accuvend-bucket-configuration/test_staging_last_run.txt ./test_staging_last_run.txt | grep "does not exist" 
-  #           then
-  #               echo 'FILE DOES NOT EXIST'
-  #               LAST_SUCCESSFUL_RUN_NUMBER=0               
-  #           else
-  #               echo 'FILE EXIST'
-  #               LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./test_staging_last_run.txt | cut -d "=" -f2)            
-  #           fi
-  #           #rename the old folder 
-  #           echo "$LAST_SUCCESSFUL_RUN_NUMBER"
-  #           if [ -d "dist" ]; then
-  #               mv "dist" "dist"_"$LAST_SUCCESSFUL_RUN_NUMBER"
-  #               echo "Folder renamed to dist"_"$LAST_SUCCESSFUL_RUN_NUMBER"
-  #           else
-  #               echo "Folder does not exist."
-  #           fi
-  #           # download build latest
-  #           aws s3 cp s3://staging-bucket-deployment/testdist.zip dist.zip
-  #           #unzip latest build
-  #           unzip dist.zip
-  #           # cd 
-  #           cd dist
-
-  #           # Get ENV file
-  #           aws s3 cp s3://accuvend-bucket-configuration/test.env ./.env
-            
-  #           #GET DATABASE CREDENTINALS
-  #           DB_USERNAME=$(grep DB_USER_NAME ./.env | cut -d "=" -f2) &&\
-  #           DB_PASSWORD=$(grep DB_PASSWORD ./.env | cut -d "=" -f2) &&\
-  #           DB_NAME=$(grep DB_DB_NAME ./.env | cut -d "=" -f2) &&\
-  #           DB_PORT=$(grep DB_PORT ./.env | cut -d "=" -f2) &&\
-  #           DB_HOST=$(grep DB_HOST ./.env | cut -d "=" -f2)
-          
-  #           echo "DB_URL=postgres://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=require" >> .env
-  #           echo "LOG_DB_URL=postgres://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=require" >> .env
-  #           #install depencendies in dist folder
-  #           npm install
-            
-  #           #Set up restart server 
-  #           pm2 start server.js --time'
-          
   # Smoke Test to check if server is up and running 
   smoke-test:
     name: smoke-test
+    environment: Test_Digital_Ocean
     if : github.ref == 'refs/heads/do_build_test'
     runs-on: ubuntu-latest
     needs: [deploy-build]
@@ -817,24 +738,26 @@ jobs:
   #             pm2 start server.js --time'
             
   #         fi 
-  # # Fail stage initiate on successful roll back 
-  # fail-stage-on-rollback: 
-  #   name:  fail-stage-on-rollback
-  #   if : github.ref == 'refs/heads/do_build_test'
-  #   needs: [roll-back, smoke-test ]
-  #   runs-on: ubuntu-latest
-  #   steps: 
-  #     - name: fail stage if roll back 
-  #       run: |
-  #         echo "${{needs.smoke-test.outputs.smoke_test_result}}"
-  #         if [[ "${{needs.smoke-test.outputs.smoke_test_result}}" == "1" ]];
-  #         then 
-  #           echo "No rollback"
-  #           exit 0
-  #         else
-  #           echo "Rollback occured no need to update LAST_SUCCESSFUL_RUN"  
-  #           exit 1
-  #         fi
+  # Fail stage initiate on successful roll back 
+  
+  fail-stage-on-rollback: 
+    name:  fail-stage-on-rollback
+    if : github.ref == 'refs/heads/do_build_test'
+    # needs: [roll-back, smoke-test ]
+    needs: [smoke-test]
+    runs-on: ubuntu-latest
+    steps: 
+      - name: fail stage if roll back 
+        run: |
+          echo "${{needs.smoke-test.outputs.smoke_test_result}}"
+          if [[ "${{needs.smoke-test.outputs.smoke_test_result}}" == "1" ]];
+          then 
+            echo "No rollback"
+            exit 0
+          else
+            echo "Rollback occured no need to update LAST_SUCCESSFUL_RUN"  
+            exit 1
+          fi
 
   # # Clean up of old artificats on successful deployment 
   # clean-up:

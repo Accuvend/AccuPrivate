@@ -476,11 +476,11 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
       - name: Install expect
         run: sudo apt-get update && sudo apt-get install -y expect
-      - name: Run Check if ngnix is setup
+      - name: Run expect script setup
         run: |
           COMMANDS="sudo nginx -v"
           expect -v
-      - name: Run expect script
+      - name: Run Check if pm2 and ngnix is setup
         run: |
           expect -c '
           set timeout -1;
@@ -489,7 +489,7 @@ jobs:
           set PASSWORD "${{ secrets.SSH_PASSWORD }}";
           set SSH_KEY_PATH "~/.ssh/id_rsa";
 
-          spawn ssh -o StrictHostKeyChecking=no -i $SSH_KEY_PATH $SSH_USER@$DROPLET_IP "nginx -v" ;
+          spawn ssh -o StrictHostKeyChecking=no -i $SSH_KEY_PATH $SSH_USER@$DROPLET_IP "nginx -v && pm2 --version " ;
 
           expect {
              "Enter passphrase for key" {
@@ -510,13 +510,57 @@ jobs:
           
           expect eof;
           '
-      - name: Run Check if pm2 is setup
+      - name: Copy dist.zip to server 
         run: |
-          expect -v
+          
           # COMMANDS="sudo pm2 list && logout"
           # sshpass -p ${{ secrets.SSH_PASSWORD }} ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa root@${{ secrets.DROP_RESERVE_IP }} << EOF
           # $COMMANDS
           # EOF
+          if [ -d "./dist.zip" ]; then
+            echo "It's a directory"
+          else
+            echo "It's not a directory"
+          fi
+          if [ -f "./dist.zip" ]; then
+              echo "It's a file"
+          else
+              echo "It's not a file"
+          fi
+
+          expect -c '
+          set timeout -1;
+          set SSH_USER "root";
+          set DROPLET_IP "${{ secrets.DROP_RESERVE_IP }}";
+          set PASSWORD "${{ secrets.SSH_PASSWORD }}";
+          set SSH_KEY_PATH "~/.ssh/id_rsa";
+          set LOCAL_FILE_PATH="./dist.zip"
+          set REMOTE_FILE_PATH="./dist.zip"
+
+          spawn scp -o StrictHostKeyChecking=no -i $SSH_KEY_PATH $LOCAL_FILE_PATH $SSH_USER@$DROPLET_IP:$REMOTE_FILE_PATH ;
+
+          expect {
+             "Enter passphrase for key" {
+                send "$PASSWORD\r";
+                exp_continue;
+             }
+             "password:" {
+                send "$PASSWORD\r";
+             }
+          }
+
+          expect {
+             "*yes/no" {
+                send "yes\r";
+                exp_continue;
+             }
+          }
+          
+          expect eof;
+          '
+
+          
+          
       
       
           

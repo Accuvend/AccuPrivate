@@ -534,8 +534,8 @@ jobs:
           set DROPLET_IP "${{ secrets.DROP_RESERVE_IP }}";
           set PASSWORD "${{ secrets.SSH_PASSWORD }}";
           set SSH_KEY_PATH "~/.ssh/id_rsa";
-          set LOCAL_FILE_PATH="./dist.zip"
-          set REMOTE_FILE_PATH="./dist.zip"
+          set LOCAL_FILE_PATH "./dist.zip"
+          set REMOTE_FILE_PATH "./dist.zip"
 
           spawn scp -o StrictHostKeyChecking=no -i $SSH_KEY_PATH $LOCAL_FILE_PATH $SSH_USER@$DROPLET_IP:$REMOTE_FILE_PATH ;
 

@@ -283,48 +283,48 @@ jobs:
       - run: |
           tsc --version
 
-  # Pushes the build zip to s3 bucket
-  push-build:
-    name: push-build
-    needs: [build-backend]
-    if : github.ref == 'refs/heads/do_build_test'
-    runs-on: ubuntu-latest
-    steps:
-      - name: chechkout
-        uses: actions/checkout@v2
-      - name: restore dist.zip
-        uses: actions/cache@v2
-        with:
-          path: ./dist.zip
-          key: dist-zip
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET_KEY }}
-          aws-region: eu-west-2
-      - name: push to state to s3
-        run: |
-          ls | grep -q dist.zip && echo "dist.zip exists in the directory" || echo "dist.zip does not exist in the directory"
-          if [ -d "./dist.zip" ]; then
-            echo "It's a directory"
-          else
-            echo "It's not a directory"
-          fi
-          if [ -f "./dist.zip" ]; then
-              echo "It's a file"
-          else
-              echo "It's not a file"
-          fi
-          unzip dist.zip 
-          ls -R dist
-          cp ./dist.zip testdodist.zip
-          aws s3 cp ./testdodist.zip s3://staging-bucket-deployment/ 
+  
+  # push-build:
+  #   name: push-build
+  #   needs: [build-backend]
+  #   if : github.ref == 'refs/heads/do_build_test'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: chechkout
+  #       uses: actions/checkout@v2
+  #     - name: restore dist.zip
+  #       uses: actions/cache@v2
+  #       with:
+  #         path: ./dist.zip
+  #         key: dist-zip
+  #     - name: Configure AWS Credentials
+  #       uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  #         aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET_KEY }}
+  #         aws-region: eu-west-2
+  #     - name: push to state to s3
+  #       run: |
+  #         ls | grep -q dist.zip && echo "dist.zip exists in the directory" || echo "dist.zip does not exist in the directory"
+  #         if [ -d "./dist.zip" ]; then
+  #           echo "It's a directory"
+  #         else
+  #           echo "It's not a directory"
+  #         fi
+  #         if [ -f "./dist.zip" ]; then
+  #             echo "It's a file"
+  #         else
+  #             echo "It's not a file"
+  #         fi
+  #         unzip dist.zip 
+  #         ls -R dist
+  #         cp ./dist.zip testdodist.zip
+  #         # aws s3 cp ./testdodist.zip s3://staging-bucket-deployment/ 
   
   # Creating Droplet if Droplet doesn't exist 
   create-infra:
     name: create-infra
-    needs: [push-build]
+    needs: [build-backend]
     environment: Test_Digital_Ocean
     if : github.ref == 'refs/heads/do_build_test'
     runs-on: ubuntu-latest
@@ -454,9 +454,9 @@ jobs:
       #   run: sleep 40 # Adjust as necessary
 
 
-  # Creating Droplet if Droplet doesn't exist 
-  deploy-build:
-    name: deploy-build
+  # Push Build to server
+  push-build:
+    name: push-build
     needs: [create-infra]
     environment: Test_Digital_Ocean
     if : github.ref == 'refs/heads/do_build_test'
@@ -512,11 +512,6 @@ jobs:
           '
       - name: Copy dist.zip to server 
         run: |
-          
-          # COMMANDS="sudo pm2 list && logout"
-          # sshpass -p ${{ secrets.SSH_PASSWORD }} ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa root@${{ secrets.DROP_RESERVE_IP }} << EOF
-          # $COMMANDS
-          # EOF
           if [ -d "./dist.zip" ]; then
             echo "It's a directory"
           else
@@ -558,7 +553,106 @@ jobs:
           
           expect eof;
           '
+          
+  deploy-build:
+    name: deploy-build
+    needs: [push-build]
+    environment: Test_Digital_Ocean
+    if : github.ref == 'refs/heads/do_build_test'
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: restore dist 
+        uses: actions/cache@v2
+        with:
+          path: ./dist.zip
+          key: dist-zip
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+      - name: Install expect
+        run: sudo apt-get update && sudo apt-get install -y expect
+      - name: Run expect script setup
+        run: |
+          expect -v
+      - name: SSH to droplet
+        run: |
+          expect -c '
+          set timeout -1;
+          set SSH_USER "root";
+          set DROPLET_IP "${{ secrets.DROP_RESERVE_IP }}";
+          set PASSWORD "${{ secrets.SSH_PASSWORD }}";
+          set SSH_KEY_PATH "~/.ssh/id_rsa";
 
+          spawn ssh -o StrictHostKeyChecking=no -i $SSH_KEY_PATH $SSH_USER@$DROPLET_IP "
+            pm2 stop server #stop the server 
+            # GET THE LATEST_SUCCESSFUL_RUN_ID 
+            if [ -f "./dist.zip" ]; then
+                echo 'FILE DOES NOT EXIST'
+                LAST_SUCCESSFUL_RUN_NUMBER=0               
+            else
+                echo 'FILE EXIST'
+                LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./test_staging_last_run.txt | cut -d "=" -f2)            
+            fi
+            #rename the old folder 
+            echo "$LAST_SUCCESSFUL_RUN_NUMBER"
+            if [ -d "dist" ]; then
+                mv "dist" "dist"_"$LAST_SUCCESSFUL_RUN_NUMBER"
+                echo "Folder renamed to dist"_"$LAST_SUCCESSFUL_RUN_NUMBER"
+            else
+                echo "Folder does not exist."
+            fi
+            #unzip latest build
+            unzip dist.zip
+            # cd 
+            cd dist
+
+            # Get ENV file            
+            #GET DATABASE CREDENTINALS
+            DB_USERNAME=$(grep DB_USER_NAME ./.env | cut -d "=" -f2) &&\
+            DB_PASSWORD=$(grep DB_PASSWORD ./.env | cut -d "=" -f2) &&\
+            DB_NAME=$(grep DB_DB_NAME ./.env | cut -d "=" -f2) &&\
+            DB_PORT=$(grep DB_PORT ./.env | cut -d "=" -f2) &&\
+            DB_HOST=$(grep DB_HOST ./.env | cut -d "=" -f2)
+          
+            echo "DB_URL=postgres://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=require" >> .env
+            echo "LOG_DB_URL=postgres://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=require" >> .env
+            #install depencendies in dist folder
+            npm install
+            
+            #Set up restart server 
+            pm2 start server.js --time          
+          " ;
+
+          expect {
+             "Enter passphrase for key" {
+                send "$PASSWORD\r";
+                exp_continue;
+             }
+             "password:" {
+                send "$PASSWORD\r";
+             }
+          }
+
+          expect {
+             "*yes/no" {
+                send "yes\r";
+                exp_continue;
+             }
+          }
+          
+          expect eof;
+          '
+      - name: Copy dist.zip to server 
+        run: |
+          echo "hello"
+          # COMMANDS="sudo pm2 list && logout"
+          # sshpass -p ${{ secrets.SSH_PASSWORD }} ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa root@${{ secrets.DROP_RESERVE_IP }} << EOF
+          # $COMMANDS
+          # EOF
           
           
       

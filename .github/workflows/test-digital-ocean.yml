@@ -471,7 +471,7 @@ jobs:
                 #       location / {
                 #               try_files $uri $uri/ =404;
                 #       }
-                #}" > $NGINX_DEFAULT
+                #}" > /root/default
           
               # Test the new configuration
               sudo nginx -t

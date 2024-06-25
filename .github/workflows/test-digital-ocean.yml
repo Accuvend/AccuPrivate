@@ -473,7 +473,7 @@ jobs:
                 #       }
                 #}" > /root/default
 
-              cp /root/default $NGINX_DEFAULT
+              sudo cp /root/default /etc/nginx/sites-available/default
           
               # Test the new configuration
               sudo nginx -t

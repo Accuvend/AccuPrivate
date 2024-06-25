@@ -104,6 +104,7 @@ export class DataVendController {
             bundleCode,
             channel,
             paymentProvider,
+            networkProvider,
         } = req.query as Record<string, string>;
         // TODO: Add request type for request authenticated by API keys
         const partnerId = (req as any).key;
@@ -131,7 +132,7 @@ export class DataVendController {
 
         if (
             existingProductCodeForDisco.productName.toUpperCase() !==
-            disco.toUpperCase()
+            networkProvider.toUpperCase()
         ) {
             throw new BadRequestError(
                 "Bundle code does not match network provider",

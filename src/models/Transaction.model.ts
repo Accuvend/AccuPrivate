@@ -22,6 +22,7 @@ import { NigerianDate } from "../utils/Date";
 import ProductCode from "./ProductCode.model";
 import Bundle from "./Bundle.model";
 import PaymentProvider from "./PaymentProvider.model";
+import Product from "./Product.model";
 
 // Define enums for status and payment type
 export enum Status {
@@ -121,7 +122,7 @@ export default class Transaction extends Model<ITransaction | Transaction> {
     @Column({ type: DataType.STRING, allowNull: true })
     productType: string;
 
-    @ForeignKey(() => ProductCode)
+    @ForeignKey(() => Product)
     @IsUUID(4)
     @Column({ type: DataType.STRING, allowNull: true })
     productCodeId: string;

@@ -282,44 +282,6 @@ jobs:
           key: dist-zip
       - run: |
           tsc --version
-
-  
-  # push-build:
-  #   name: push-build
-  #   needs: [build-backend]
-  #   if : github.ref == 'refs/heads/do_build_test'
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: chechkout
-  #       uses: actions/checkout@v2
-  #     - name: restore dist.zip
-  #       uses: actions/cache@v2
-  #       with:
-  #         path: ./dist.zip
-  #         key: dist-zip
-  #     - name: Configure AWS Credentials
-  #       uses: aws-actions/configure-aws-credentials@v4
-  #       with:
-  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #         aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET_KEY }}
-  #         aws-region: eu-west-2
-  #     - name: push to state to s3
-  #       run: |
-  #         ls | grep -q dist.zip && echo "dist.zip exists in the directory" || echo "dist.zip does not exist in the directory"
-  #         if [ -d "./dist.zip" ]; then
-  #           echo "It's a directory"
-  #         else
-  #           echo "It's not a directory"
-  #         fi
-  #         if [ -f "./dist.zip" ]; then
-  #             echo "It's a file"
-  #         else
-  #             echo "It's not a file"
-  #         fi
-  #         unzip dist.zip 
-  #         ls -R dist
-  #         cp ./dist.zip testdodist.zip
-  #         # aws s3 cp ./testdodist.zip s3://staging-bucket-deployment/ 
   
   # Creating Droplet if Droplet doesn't exist 
   create-infra:
@@ -696,15 +658,7 @@ jobs:
           expect eof;
           '
       
-      
-          
-     
-
-          
-          
-          
-         
-      
+       
   # # Depolys the backend to build
   # deploy-build:
   #   name: deploy-build
@@ -783,37 +737,31 @@ jobs:
   #           #Set up restart server 
   #           pm2 start server.js --time'
           
-  # # Smoke Test to check if server is up and running 
-  # smoke-test:
-  #   name: smoke-test
-  #   if : github.ref == 'refs/heads/do_build_test'
-  #   runs-on: ubuntu-latest
-  #   needs: [deploy-build]
-  #   outputs:
-  #     smoke_test_result: ${{ steps.check_server_status.outputs.smoke_test_result }}
-  #   steps:
-  #   - name: Configure AWS Credentials
-  #     uses: aws-actions/configure-aws-credentials@v4
-  #     with:
-  #       aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #       aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET_KEY }}
-  #       aws-region: eu-west-2
-  #   - name: check if server is up and running 
-  #     id: check_server_status
-  #     run : |
-  #       EC2_HOST_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Test-core-engine" --query "Reservations[].Instances[].[PublicIpAddress]" --output text)
-  #       sleep 30 # wait 30 seconds to make sure the server is up and running before somke test 
-  #       echo "http://${EC2_HOST_IP}/healthcheck"
-  #       if curl "http://${EC2_HOST_IP}/healthcheck" | grep "Server is working"
-  #       then
-  #           echo "SMOKE_TEST_RESULT PASSED"
-  #           echo "smoke_test_result=1" >> "$GITHUB_OUTPUT"
-  #       else
-  #           echo "SMOKE_TEST_RESULT FAILED"
-  #           echo "smoke_test_result=0" >> "$GITHUB_OUTPUT"
-  #       fi
-  #   - name: check if smoke test result is saved  
-  #     run : echo "${{steps.check_server_status.outputs.smoke_test_result}}"
+  # Smoke Test to check if server is up and running 
+  smoke-test:
+    name: smoke-test
+    if : github.ref == 'refs/heads/do_build_test'
+    runs-on: ubuntu-latest
+    needs: [deploy-build]
+    outputs:
+      smoke_test_result: ${{ steps.check_server_status.outputs.smoke_test_result }}
+    steps:
+    - name: check if server is up and running 
+      id: check_server_status
+      run : |
+        
+        sleep 30 # wait 30 seconds to make sure the server is up and running before somke test 
+        echo "http://${{ secrets.DROP_RESERVE_IP }}/healthcheck"
+        if curl "http://${{ secrets.DROP_RESERVE_IP }}/healthcheck" | grep "Server is working"
+        then
+            echo "SMOKE_TEST_RESULT PASSED"
+            echo "smoke_test_result=1" >> "$GITHUB_OUTPUT"
+        else
+            echo "SMOKE_TEST_RESULT FAILED"
+            echo "smoke_test_result=0" >> "$GITHUB_OUTPUT"
+        fi
+    - name: check if smoke test result is saved  
+      run : echo "${{steps.check_server_status.outputs.smoke_test_result}}"
 
   # # Roll back when smoke test fails
   # roll-back:

@@ -581,68 +581,122 @@ jobs:
       - name: SSH to droplet
         run: |
           echo '
-              #!/usr/bin/expect -f
-
-              set timeout -1
-              set SSH_USER "root"
-              set DROPLET_IP [lindex $argv 0]
-              set PASSWORD [lindex $argv 1]
-              set SSH_KEY_PATH "~/.ssh/id_rsa"
-              
-              spawn ssh -o StrictHostKeyChecking=no -i $SSH_KEY_PATH $SSH_USER@$DROPLET_IP {
-                  pm2 stop server
-                  if { [file exists ./test_staging_last_run.txt] } {
-                      puts "FILE EXISTS"
-                      set LAST_SUCCESSFUL_RUN_NUMBER [exec sh -c "grep LAST_SUCCESSFUL_RUN_ID ./test_staging_last_run.txt | cut -d '=' -f2"]
-                  } else {
-                      puts "FILE DOES NOT EXIST"
-                      set LAST_SUCCESSFUL_RUN_NUMBER 0
-                  }
-                  puts $LAST_SUCCESSFUL_RUN_NUMBER
-                  if { [file isdirectory dist] } {
-                      exec mv dist dist_$LAST_SUCCESSFUL_RUN_NUMBER
-                      puts "Folder renamed to dist_$LAST_SUCCESSFUL_RUN_NUMBER"
-                  } else {
-                      puts "Folder does not exist."
-                  }
-                  exec unzip dist.zip
-                  cd dist
-              
-                  set DB_USERNAME [exec sh -c "grep DB_USER_NAME ./.env | cut -d '=' -f2"]
-                  set DB_PASSWORD [exec sh -c "grep DB_PASSWORD ./.env | cut -d '=' -f2"]
-                  set DB_NAME [exec sh -c "grep DB_DB_NAME ./.env | cut -d '=' -f2"]
-                  set DB_PORT [exec sh -c "grep DB_PORT ./.env | cut -d '=' -f2"]
-                  set DB_HOST [exec sh -c "grep DB_HOST ./.env | cut -d '=' -f2"]
-              
-                  exec sh -c "echo DB_URL=postgres://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=require >> .env"
-                  exec sh -c "echo LOG_DB_URL=postgres://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=require >> .env"
-              
-                  exec npm install
-                  exec pm2 start server.js --time
-              }
-              
-              expect {
-                  "Enter passphrase for key" {
-                      send "$PASSWORD\r"
-                      exp_continue
-                  }
-                  "password:" {
-                      send "$PASSWORD\r"
-                      exp_continue
-                  }
-                  "*yes/no" {
-                      send "yes\r"
-                      exp_continue
-                  }
-              }
-              
-              expect eof
+          #!/usr/bin/expect -f
+      
+          set timeout -1
+          set SSH_USER "root"
+          set DROPLET_IP [lindex $argv 0]
+          set PASSWORD [lindex $argv 1]
+          set SSH_KEY_PATH "~/.ssh/id_rsa"
           
-          ' >>  deploy_expect_script.exp
+          spawn ssh -o StrictHostKeyChecking=no -i $SSH_KEY_PATH $SSH_USER@$DROPLET_IP
+          expect {
+              "Enter passphrase for key" {
+                  send "$PASSWORD\r"
+                  exp_continue
+              }
+              "password:" {
+                  send "$PASSWORD\r"
+                  exp_continue
+              }
+              "*yes/no" {
+                  send "yes\r"
+                  exp_continue
+              }
+          }
+          
+          expect {
+              -re ".*\\\$" {
+                  send "pm2 stop server\r"
+                  send "if { [file exists ./test_staging_last_run.txt] } { set LAST_SUCCESSFUL_RUN_NUMBER [exec sh -c \\"grep LAST_SUCCESSFUL_RUN_ID ./test_staging_last_run.txt | cut -d = -f2\\"] } else { set LAST_SUCCESSFUL_RUN_NUMBER 0 }\r"
+                  send "if { [file isdirectory dist] } { exec mv dist dist_\$LAST_SUCCESSFUL_RUN_NUMBER }\r"
+                  send "exec unzip dist.zip\r"
+                  send "cd dist\r"
+                  send "set DB_USERNAME [exec sh -c \\"grep DB_USER_NAME ./.env | cut -d = -f2\\"]\r"
+                  send "set DB_PASSWORD [exec sh -c \\"grep DB_PASSWORD ./.env | cut -d = -f2\\"]\r"
+                  send "set DB_NAME [exec sh -c \\"grep DB_DB_NAME ./.env | cut -d = -f2\\"]\r"
+                  send "set DB_PORT [exec sh -c \\"grep DB_PORT ./.env | cut -d = -f2\\"]\r"
+                  send "set DB_HOST [exec sh -c \\"grep DB_HOST ./.env | cut -d = -f2\\"]\r"
+                  send "exec sh -c \\"echo DB_URL=postgres://\$DB_USERNAME:\$DB_PASSWORD@\$DB_HOST:\$DB_PORT/\$DB_NAME?sslmode=require >> .env\\"\r"
+                  send "exec sh -c \\"echo LOG_DB_URL=postgres://\$DB_USERNAME:\$DB_PASSWORD@\$DB_HOST:\$DB_PORT/\$DB_NAME?sslmode=require >> .env\\"\r"
+                  send "exec npm install\r"
+                  send "exec pm2 start server.js --time\r"
+              }
+          }
+          
+          expect eof
+          ' > deploy_expect_script.exp
+          
           cat deploy_expect_script.exp
           chmod +x deploy_expect_script.exp
           DROPLET_IP="${{ secrets.DROP_RESERVE_IP }}"
           PASSWORD="${{ secrets.SSH_PASSWORD }}"
+          
+          # Run the expect script with the necessary arguments
+          expect deploy_expect_script.exp $DROPLET_IP $PASSWORD
+          # echo '
+          #     #!/usr/bin/expect -f
+
+          #     set timeout -1
+          #     set SSH_USER "root"
+          #     set DROPLET_IP [lindex $argv 0]
+          #     set PASSWORD [lindex $argv 1]
+          #     set SSH_KEY_PATH "~/.ssh/id_rsa"
+              
+          #     spawn ssh -o StrictHostKeyChecking=no -i $SSH_KEY_PATH $SSH_USER@$DROPLET_IP {
+          #         pm2 stop server
+          #         if { [file exists ./test_staging_last_run.txt] } {
+          #             puts "FILE EXISTS"
+          #             set LAST_SUCCESSFUL_RUN_NUMBER [exec sh -c "grep LAST_SUCCESSFUL_RUN_ID ./test_staging_last_run.txt | cut -d '=' -f2"]
+          #         } else {
+          #             puts "FILE DOES NOT EXIST"
+          #             set LAST_SUCCESSFUL_RUN_NUMBER 0
+          #         }
+          #         puts $LAST_SUCCESSFUL_RUN_NUMBER
+          #         if { [file isdirectory dist] } {
+          #             exec mv dist dist_$LAST_SUCCESSFUL_RUN_NUMBER
+          #             puts "Folder renamed to dist_$LAST_SUCCESSFUL_RUN_NUMBER"
+          #         } else {
+          #             puts "Folder does not exist."
+          #         }
+          #         exec unzip dist.zip
+          #         cd dist
+              
+          #         set DB_USERNAME [exec sh -c "grep DB_USER_NAME ./.env | cut -d '=' -f2"]
+          #         set DB_PASSWORD [exec sh -c "grep DB_PASSWORD ./.env | cut -d '=' -f2"]
+          #         set DB_NAME [exec sh -c "grep DB_DB_NAME ./.env | cut -d '=' -f2"]
+          #         set DB_PORT [exec sh -c "grep DB_PORT ./.env | cut -d '=' -f2"]
+          #         set DB_HOST [exec sh -c "grep DB_HOST ./.env | cut -d '=' -f2"]
+              
+          #         exec sh -c "echo DB_URL=postgres://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=require >> .env"
+          #         exec sh -c "echo LOG_DB_URL=postgres://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=require >> .env"
+              
+          #         exec npm install
+          #         exec pm2 start server.js --time
+          #     }
+              
+          #     expect {
+          #         "Enter passphrase for key" {
+          #             send "$PASSWORD\r"
+          #             exp_continue
+          #         }
+          #         "password:" {
+          #             send "$PASSWORD\r"
+          #             exp_continue
+          #         }
+          #         "*yes/no" {
+          #             send "yes\r"
+          #             exp_continue
+          #         }
+          #     }
+              
+          #     expect eof
+          
+          # ' >>  deploy_expect_script.exp
+          # cat deploy_expect_script.exp
+          # chmod +x deploy_expect_script.exp
+          # DROPLET_IP="${{ secrets.DROP_RESERVE_IP }}"
+          # PASSWORD="${{ secrets.SSH_PASSWORD }}"
           
           # Run the expect script with the necessary arguments
           expect deploy_expect_script.exp $DROPLET_IP $PASSWORD

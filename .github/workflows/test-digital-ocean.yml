@@ -581,17 +581,14 @@ jobs:
       - name: create deployment script
         run: |
           echo '
-          echo "$EC2_HOST_IP"
-          echo "$PRIVATE_KEY" > private_key.pem && chmod 400 private_key.pem 
-          ssh -o StrictHostKeyChecking=no -i 'private_key.pem' ubuntu@${EC2_HOST_IP} '
             cd /home/ubuntu/
             pm2 stop server #stop the server 
             # GET THE LATEST_SUCCESSFUL_RUN_ID 
             if [ -f "./test_staging_last_run.txt" ]; then
-                echo 'FILE DOES NOT EXIST'
+                echo "FILE DOES NOT EXIST"
                 LAST_SUCCESSFUL_RUN_NUMBER=0               
             else
-                echo 'FILE EXIST'
+                echo "FILE EXIST"
                 LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./test_staging_last_run.txt | cut -d "=" -f2)            
             fi
             #rename the old folder 
@@ -622,7 +619,7 @@ jobs:
             npm install
             
             #Set up restart server 
-            pm2 start server.js --time'
+            pm2 start server.js --time
           ' >> deploy.sh
           
           cat deploy.sh

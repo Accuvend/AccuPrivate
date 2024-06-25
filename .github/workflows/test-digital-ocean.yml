@@ -590,20 +590,20 @@ jobs:
           spawn ssh -o StrictHostKeyChecking=no -i $SSH_KEY_PATH $SSH_USER@$DROPLET_IP "
             pm2 stop server #stop the server 
             # GET THE LATEST_SUCCESSFUL_RUN_ID 
-            if [ -f "./dist.zip" ]; then
-                echo 'FILE DOES NOT EXIST'
+            if [ -f \"./test_staging_last_run.txt\" ]; then
+                echo \"FILE DOES NOT EXIST\"
                 LAST_SUCCESSFUL_RUN_NUMBER=0               
             else
-                echo 'FILE EXIST'
-                LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./test_staging_last_run.txt | cut -d "=" -f2)            
+                echo \"FILE DOES NOT EXIST\"
+                LAST_SUCCESSFUL_RUN_NUMBER=\$(grep LAST_SUCCESSFUL_RUN_ID ./test_staging_last_run.txt | cut -d \"=\" -f2)           
             fi
             #rename the old folder 
-            echo "$LAST_SUCCESSFUL_RUN_NUMBER"
-            if [ -d "dist" ]; then
-                mv "dist" "dist"_"$LAST_SUCCESSFUL_RUN_NUMBER"
-                echo "Folder renamed to dist"_"$LAST_SUCCESSFUL_RUN_NUMBER"
+            echo \$LAST_SUCCESSFUL_RUN_NUMBER
+            if [ -d \"dist\" ]; then
+                 mv \"dist\" \"dist_\$LAST_SUCCESSFUL_RUN_NUMBER\"
+                 echo \"Folder renamed to dist_\$LAST_SUCCESSFUL_RUN_NUMBER\"
             else
-                echo "Folder does not exist."
+                 echo \"Folder does not exist.\"
             fi
             #unzip latest build
             unzip dist.zip
@@ -612,14 +612,14 @@ jobs:
 
             # Get ENV file            
             #GET DATABASE CREDENTINALS
-            DB_USERNAME=$(grep DB_USER_NAME ./.env | cut -d "=" -f2) &&\
-            DB_PASSWORD=$(grep DB_PASSWORD ./.env | cut -d "=" -f2) &&\
-            DB_NAME=$(grep DB_DB_NAME ./.env | cut -d "=" -f2) &&\
-            DB_PORT=$(grep DB_PORT ./.env | cut -d "=" -f2) &&\
-            DB_HOST=$(grep DB_HOST ./.env | cut -d "=" -f2)
+            DB_USERNAME=\$(grep DB_USER_NAME ./.env | cut -d \"=\" -f2) && \
+            DB_PASSWORD=\$(grep DB_PASSWORD ./.env | cut -d \"=\" -f2) && \
+            DB_NAME=\$(grep DB_DB_NAME ./.env | cut -d \"=\" -f2) && \
+            DB_PORT=\$(grep DB_PORT ./.env | cut -d \"=\" -f2) && \
+            DB_HOST=\$(grep DB_HOST ./.env | cut -d \"=\" -f2)
           
-            echo "DB_URL=postgres://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=require" >> .env
-            echo "LOG_DB_URL=postgres://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=require" >> .env
+            echo \"DB_URL=postgres://\$DB_USERNAME:\$DB_PASSWORD@\$DB_HOST:\$DB_PORT/\$DB_NAME?sslmode=require\" >> .env
+            echo \"LOG_DB_URL=postgres://\$DB_USERNAME:\$DB_PASSWORD@\$DB_HOST:\$DB_PORT/\$DB_NAME?sslmode=require\" >> .env
             #install depencendies in dist folder
             npm install
             

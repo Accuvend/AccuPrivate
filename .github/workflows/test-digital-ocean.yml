@@ -264,7 +264,7 @@ jobs:
           else
             echo "It's not a directory"
           fi
-          if [ -f "./dist." ]; then
+          if [ -f "./dist.zip" ]; then
               echo "It's a file"
           else
               echo "It's not a file"
@@ -377,6 +377,7 @@ jobs:
               #install node and pm2
               curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - &&\
               sudo apt-get install -y nodejs
+              sudo apt-get install -y zip 
               sudo apt-get -y install build-essential
               sudo npm install -g pm2
           
@@ -581,16 +582,16 @@ jobs:
       - name: create deployment script
         run: |
           echo '
-            cd /home/ubuntu/
             pm2 stop server #stop the server 
             # GET THE LATEST_SUCCESSFUL_RUN_ID 
-            if [ -f "./test_staging_last_run.txt" ]; then
-                echo "FILE DOES NOT EXIST"
-                LAST_SUCCESSFUL_RUN_NUMBER=0               
-            else
+           if [ -f "./test_staging_last_run.txt" ]; then
                 echo "FILE EXIST"
-                LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./test_staging_last_run.txt | cut -d "=" -f2)            
+                LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./test_staging_last_run.txt | cut -d "=" -f2)      
+            else
+                echo "FILE DOES NOT EXIST"
+                LAST_SUCCESSFUL_RUN_NUMBER=0              
             fi
+            
             #rename the old folder 
             echo "$LAST_SUCCESSFUL_RUN_NUMBER"
             if [ -d "dist" ]; then

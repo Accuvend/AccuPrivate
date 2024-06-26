@@ -40,8 +40,11 @@ import {
     TransactionErrorCause,
 } from "../../../kafka/modules/util/Interface";
 import logger, { Logger } from "../../../utils/Logger";
-import { error } from "console";
-import TransactionEventService from "../../../services/TransactionEvent.service";
+import { assert, error } from "console";
+import TransactionEventService, {
+    AirtimeTransactionEventService,
+    DataTransactionEventService,
+} from "../../../services/TransactionEvent.service";
 import { AirtimeVendController } from "./Airtime.controller";
 import ProductService from "../../../services/Product.service";
 import VendorProduct, {
@@ -58,7 +61,7 @@ import {
 } from "../../../utils/Helper";
 import { TokenUtil } from "../../../utils/Auth/Token";
 import VendorModelService from "../../../services/Vendor.service";
-import { AxiosError } from "axios";
+import { Axios, AxiosError } from "axios";
 import PowerUnitService from "../../../services/PowerUnit.service";
 import { PartnerProfile } from "../../../models/Entity/Profiles";
 import UserMeterService from "../../../services/UserMeter.service";
@@ -67,6 +70,11 @@ import { Database } from "../../../models";
 import sequelize from "sequelize";
 import { throws } from "assert";
 import PaymentProviderService from "../../../services/PaymentProvider.service";
+import { DataHandlerUtil } from "../../../kafka/modules/consumers/Data";
+import { AirtimeHandlerUtil } from "../../../kafka/modules/consumers/Airtime";
+import { assertExists } from "../../../utils/TypeUtils";
+import { IPartnerProfile } from "../../../models/Entity/Profiles/PartnerProfile.model";
+import { normalize } from "path";
 
 enum MessageType {
     INFORMATION = "INFORMATION",
@@ -441,6 +449,556 @@ function transformPhoneNumber(phoneNumber: string) {
 }
 
 export default class VendorController {
+    private static async handleResponseValidationResultForElectricity({
+        requeryResult,
+        validationResult,
+        transaction,
+        disco,
+        lastSuperAgentUsed,
+    }: {
+        disco: string;
+        lastSuperAgentUsed: ITransaction["superagent"];
+        validationResult: Awaited<
+            ReturnType<
+                typeof ResponseValidationUtil.validateTransactionCondition
+            >
+        >;
+        requeryResult: Awaited<
+            ReturnType<typeof TokenHandlerUtil.processRequeryRequest>
+        >;
+        transaction: Transaction;
+    }) {
+        const { meter, partner, user } =
+            await TransactionService.populateRelations({
+                transaction,
+                fields: ["meter", "partner", "user"],
+                strict: true,
+            });
+        const product = await ProductService.viewSingleProduct(
+            transaction.productCodeId,
+        );
+        if (!product) {
+            throw new InternalServerError("Product not found");
+        }
+
+        const eventMessage = {
+            meter: {
+                meterNumber: meter.meterNumber,
+                disco: disco,
+                vendType: meter.vendType,
+                id: meter.id,
+            },
+            transactionId: transaction.id,
+            error: {
+                code: (requeryResult instanceof AxiosError
+                    ? requeryResult.response?.data?.responseCode
+                    : undefined) as number | 0,
+                cause: TransactionErrorCause.UNKNOWN,
+            },
+        };
+
+        const transactionEventService = new TransactionEventService(
+            transaction,
+            eventMessage.meter,
+            lastSuperAgentUsed,
+            partner.email,
+        );
+
+        const logMeta = {
+            meta: {
+                transactionId: transaction.id,
+            },
+        };
+        const response = validationResult;
+        switch (response.action) {
+            case -1:
+                logger.error(
+                    "Transaction condition pending - Requery",
+                    logMeta,
+                );
+                await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
+                    {
+                        eventData: {
+                            ...eventMessage,
+                            error: {
+                                ...eventMessage.error,
+                                cause: TransactionErrorCause.UNEXPECTED_ERROR,
+                            },
+                        },
+                        requeryCount: 1,
+                        eventService: transactionEventService,
+                        retryCount: 1,
+                        superAgent: lastSuperAgentUsed,
+                        tokenInResponse: null,
+                        transactionTimedOutFromBuypower: false,
+                        vendorRetryRecord: {
+                            retryCount: 1,
+                        },
+                    },
+                );
+                break;
+            case 0:
+                logger.error("Transaction condition not met - Retry", logMeta);
+                await TokenHandlerUtil.triggerEventToRetryTransactionWithNewVendor(
+                    {
+                        transaction: transaction,
+                        transactionEventService: transactionEventService,
+                        manual: true,
+                        meter: eventMessage.meter,
+                        vendorRetryRecord: {
+                            retryCount: 1,
+                        },
+                    },
+                );
+                break;
+            case 1:
+                logger.info("Transaction condition met - Successful", logMeta);
+
+                logger.info("Token from vend", {
+                    meta: {
+                        transactionId: transaction.id,
+                        tokenFromVend:
+                            response.vendType === "PREPAID"
+                                ? response.token
+                                : undefined,
+                    },
+                });
+
+                logger.info("Transaction condition met - Successful", logMeta);
+                const token =
+                    response.vendType == "PREPAID" ? response.token : undefined;
+                const discoLogo =
+                    DISCO_LOGO[
+                        product.productName as keyof typeof DISCO_LOGO
+                    ] ?? LOGO_URL;
+                let powerUnit =
+                    await PowerUnitService.viewSinglePowerUnitByTransactionId(
+                        transaction.id,
+                    );
+
+                powerUnit = powerUnit
+                    ? await PowerUnitService.updateSinglePowerUnit(
+                          powerUnit.id,
+                          {
+                              tokenFromVend: token,
+                              tokenUnits: response.tokenUnits,
+                              transactionId: transaction.id,
+                          },
+                      )
+                    : await PowerUnitService.addPowerUnit({
+                          id: uuidv4(),
+                          transactionId: transaction.id,
+                          disco: meter.disco,
+                          discoLogo,
+                          amount: transaction.amount,
+                          meterId: meter.id,
+                          superagent:
+                              lastSuperAgentUsed as ITransaction["superagent"],
+                          tokenFromVend: token,
+                          tokenNumber: 0,
+                          tokenUnits: response.tokenUnits,
+                          address: transaction.meter.address,
+                      });
+                token &&
+                    (await TransactionService.updateSingleTransaction(
+                        transaction.id,
+                        {
+                            powerUnitId: powerUnit?.id,
+                            tokenFromVend: token,
+                        },
+                    ));
+
+                await transactionEventService.addTokenReceivedEvent(
+                    token ?? "",
+                );
+                await VendorPublisher.publishEventForTokenReceivedFromVendor({
+                    transactionId: transaction!.id,
+                    user: {
+                        name: user.name as string,
+                        email: user.email,
+                        address: user.address,
+                        phoneNumber: user.phoneNumber,
+                    },
+                    partner: {
+                        email: partner.email,
+                    },
+                    meter: {
+                        id: meter.id,
+                        meterNumber: meter.meterNumber,
+                        disco: transaction!.disco,
+                        vendType: meter.vendType,
+                        token: token ?? "",
+                    },
+                    tokenUnits: response.tokenUnits,
+                });
+                logger.info("Saving token to cache");
+                const twoMinsExpiry = 2 * 60;
+                token &&
+                    (await TokenUtil.saveTokenToCache({
+                        key: "transaction_token:" + transaction.id,
+                        token: (response as any).token ?? "",
+                        expiry: twoMinsExpiry,
+                    }));
+
+                await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
+                    {
+                        eventData: {
+                            ...eventMessage,
+                            error: {
+                                ...eventMessage.error,
+                                cause: TransactionErrorCause.UNEXPECTED_ERROR,
+                            },
+                        },
+                        eventService: transactionEventService,
+                        retryCount: 1,
+                        requeryCount: 1,
+                        superAgent: lastSuperAgentUsed,
+                        tokenInResponse: null,
+                        transactionTimedOutFromBuypower: false,
+                        vendorRetryRecord: { retryCount: 1 },
+                    },
+                );
+                break;
+            default:
+                await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
+                    {
+                        eventData: {
+                            meter: meter!,
+                            transactionId: transaction.id,
+                            error: {
+                                code: 202,
+                                cause: TransactionErrorCause.NO_TOKEN_IN_RESPONSE,
+                            },
+                        },
+                        eventService: transactionEventService,
+                        retryCount: 1,
+                        requeryCount: 1,
+                        superAgent: lastSuperAgentUsed,
+                        tokenInResponse: null,
+                        transactionTimedOutFromBuypower: false,
+                        vendorRetryRecord: { retryCount: 1 },
+                    },
+                );
+        }
+    }
+
+    private static async handleResponseValidationResultForAirtime({
+        validationResult,
+        transaction,
+        disco,
+        lastSuperAgentUsed,
+        phone,
+    }: {
+        phone: string;
+        disco: string;
+        lastSuperAgentUsed: ITransaction["superagent"];
+        validationResult: Awaited<
+            ReturnType<
+                typeof ResponseValidationUtil.validateTransactionCondition
+            >
+        >;
+        requeryResult: Awaited<
+            ReturnType<typeof TokenHandlerUtil.processRequeryRequest>
+        >;
+        transaction: Transaction;
+    }) {
+        const { user, partner } = await TransactionService.populateRelations({
+            transaction,
+            fields: ["user", "partner"],
+            strict: true,
+        });
+
+        const eventMessage = {
+            phone: {
+                phoneNumber: phone,
+                amount: parseInt(transaction.amount, 10),
+            },
+            disco: disco,
+            transactionId: transaction.id,
+            error: {
+                code: 202,
+                cause: TransactionErrorCause.UNEXPECTED_ERROR,
+            },
+        };
+
+        const logMeta = {
+            meta: {
+                transactionId: transaction.id,
+            },
+        };
+
+        const transactionEventService = new AirtimeTransactionEventService(
+            transaction,
+            lastSuperAgentUsed,
+            partner.email,
+            phone,
+        );
+
+        const validationResponse = validationResult;
+        switch (validationResponse.action) {
+            case -1:
+                logger.error(
+                    "Transaction condition pending - Requery",
+                    logMeta,
+                );
+                await AirtimeHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
+                    {
+                        eventData: {
+                            ...eventMessage,
+                            error: {
+                                ...eventMessage.error,
+                                cause: TransactionErrorCause.UNEXPECTED_ERROR,
+                            },
+                        },
+                        eventService: transactionEventService,
+                        retryCount: 1,
+                        requeryCount: 1,
+                        superAgent: lastSuperAgentUsed,
+                        transactionTimedOutFromBuypower: false,
+                        vendorRetryRecord: {
+                            retryCount: 1,
+                        },
+                    },
+                );
+                break;
+            case 0:
+                logger.error("Transaction condition failed - Retry", logMeta);
+                await AirtimeHandlerUtil.triggerEventToRetryTransactionWithNewVendor(
+                    {
+                        eventData: eventMessage,
+                        transaction,
+                        transactionEventService,
+                        phone: eventMessage.phone,
+                        vendorRetryRecord: {
+                            retryCount: 1,
+                        },
+                    },
+                );
+                break;
+            case 1:
+                logger.info("Transaction condition met - Successful", logMeta);
+                await TransactionService.updateSingleTransaction(
+                    transaction.id,
+                    { status: Status.COMPLETE },
+                );
+                await transactionEventService.addAirtimeReceivedFromVendorRequeryEvent();
+                await VendorPublisher.publishEventForAirtimeReceivedFromVendor({
+                    transactionId: transaction.id,
+                    phone: eventMessage.phone,
+                    partner,
+                    user,
+                });
+
+                break;
+            default:
+                logger.error("Transaction condition were not met", logMeta);
+                await AirtimeHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
+                    {
+                        eventData: {
+                            ...eventMessage,
+                            error: {
+                                ...eventMessage.error,
+                                cause: TransactionErrorCause.UNEXPECTED_ERROR,
+                            },
+                        },
+                        eventService: transactionEventService,
+                        retryCount: 1,
+                        requeryCount: 1,
+                        superAgent: lastSuperAgentUsed,
+                        transactionTimedOutFromBuypower: false,
+                        vendorRetryRecord:
+                            transaction.retryRecord[
+                                transaction.retryRecord.length - 1
+                            ],
+                    },
+                );
+                break;
+        }
+    }
+
+    private static async handleResponseValidationResultForData({
+        transaction,
+        validationResult,
+        lastSuperAgentUsed,
+        phone,
+    }: {
+        phone: string;
+        disco: string;
+        lastSuperAgentUsed: ITransaction["superagent"];
+        validationResult: Awaited<
+            ReturnType<
+                typeof ResponseValidationUtil.validateTransactionCondition
+            >
+        >;
+        requeryResult: Awaited<
+            ReturnType<typeof TokenHandlerUtil.processRequeryRequest>
+        >;
+        transaction: Transaction;
+    }) {
+        const { bundle, partner } = await TransactionService.populateRelations({
+            transaction,
+            fields: ["bundle", "partner"],
+            strict: true,
+        });
+
+        const dataBundle = await transaction.$get("bundle");
+        if (!dataBundle) throw new Error("Bundle not found");
+
+        const product = await dataBundle.$get("product");
+        if (!product) throw new Error("Product not found");
+
+        const vendorProducts = await dataBundle.$get("vendorProducts");
+        const vendorAndDiscos = await Promise.all(
+            vendorProducts.map(async (vendorProduct) => {
+                const vendor = await vendorProduct.$get("vendor");
+                if (!vendor) throw new Error("Vendor not found");
+                return {
+                    vendorName: vendor.name,
+                    discoCode: (
+                        vendorProduct.schemaData as VendorProductSchemaData.BUYPOWERNG
+                    ).code,
+                    dataCode: vendorProduct.schemaData.datacode,
+                };
+            }),
+        );
+
+        const vendorProduct = vendorAndDiscos.find(
+            (data) => data.vendorName === transaction.superagent,
+        );
+        const vendorProductCode = vendorProduct?.dataCode;
+        if (!vendorProductCode)
+            throw new Error("Vendor product code not found");
+
+        const disco = vendorProduct.discoCode;
+
+        // find MTN, GLO, AIRTEL, 9MOBILE In the product code using regex
+        const validMasterProductCode = product.masterProductCode.match(
+            /MTN|GLO|AIRTEL|9MOBILE/g,
+        );
+        if (!validMasterProductCode) throw new Error("Product code not found");
+
+        const network = transaction.networkProvider;
+        if (!network) throw new Error("Network not found");
+
+        const transactionEventService = new DataTransactionEventService(
+            transaction,
+            lastSuperAgentUsed,
+            partner.email,
+            phone,
+        );
+        await transactionEventService.addDataTranasctionRequeryInitiated();
+
+        const logMeta = {
+            meta: {
+                transactionId: transaction.id,
+            },
+        };
+        const error = {
+            code: 202,
+            cause: TransactionErrorCause.MANUAL_RETRY_TRIGGERED,
+        };
+        const eventMessage = {
+            phone: {
+                phoneNumber: phone,
+                amount: parseInt(transaction.amount, 10),
+            },
+            disco: disco,
+            transactionId: transaction.id,
+            error: error,
+        };
+
+        const validationResponse = validationResult;
+        switch (validationResponse.action) {
+            case -1:
+                logger.info("Transaction condition pending - Requery", logMeta);
+                await DataHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
+                    {
+                        eventData: {
+                            ...eventMessage,
+                            error: {
+                                ...eventMessage.error,
+                                cause: TransactionErrorCause.UNEXPECTED_ERROR,
+                            },
+                        },
+                        bundle: bundle,
+                        eventService: transactionEventService,
+                        retryCount: 1,
+                        requeryCount: 1,
+                        superAgent: lastSuperAgentUsed,
+                        transactionTimedOutFromBuypower: false,
+                        vendorRetryRecord: {
+                            retryCount: 1,
+                        },
+                    },
+                );
+                break;
+            case 0:
+                logger.error("Transaction condition failed - Retry", logMeta);
+                await DataHandlerUtil.triggerEventToRetryTransactionWithNewVendor(
+                    {
+                        transaction,
+                        bundle,
+                        transactionEventService,
+                        phone: {
+                            phoneNumber: phone,
+                            amount: parseInt(transaction.amount, 10),
+                        },
+                        vendorRetryRecord: {
+                            retryCount: 1,
+                        },
+                    },
+                );
+                break;
+            case 1:
+                logger.info("Transaction condition passed - Complete", logMeta);
+                await TransactionService.updateSingleTransaction(
+                    transaction.id,
+                    { status: Status.COMPLETE },
+                );
+                await transactionEventService.addDataReceivedFromVendorRequeryEvent();
+                await VendorPublisher.publishEventForDataReceivedFromVendor({
+                    phone: {
+                        phoneNumber: phone,
+                        amount: parseInt(transaction.amount, 10),
+                    },
+                    transactionId: transaction.id,
+                    user: {
+                        name: transaction.user.name as string,
+                        email: transaction.user.email,
+                        address: transaction.user.address,
+                        phoneNumber: transaction.user.phoneNumber,
+                    },
+                    partner: {
+                        email: transaction.partner.email,
+                    },
+                    bundle,
+                });
+
+                break;
+            default:
+                logger.error("Transaction condition were not met", logMeta);
+                await DataHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
+                    {
+                        eventData: {
+                            ...eventMessage,
+                            error: {
+                                ...eventMessage.error,
+                                cause: TransactionErrorCause.UNEXPECTED_ERROR,
+                            },
+                        },
+                        eventService: transactionEventService,
+                        bundle,
+                        retryCount: 1,
+                        requeryCount: 1,
+                        superAgent: lastSuperAgentUsed,
+                        transactionTimedOutFromBuypower: false,
+                        vendorRetryRecord: { retryCount: 1 },
+                    },
+                );
+                break;
+        }
+    }
+
     static async validateMeterMock(
         req: Request,
         res: Response,
@@ -1371,8 +1929,14 @@ export default class VendorController {
         if (!transaction) {
             throw new NotFoundError("Transaction not found");
         }
-        const meter = await transaction.$get("meter");
-        if (!meter) {
+        const meter =
+            transaction.transactionType === TransactionType.ELECTRICITY
+                ? await transaction.$get("meter")
+                : null;
+        if (
+            !meter &&
+            transaction.transactionType === TransactionType.ELECTRICITY
+        ) {
             throw new InternalServerError("Meter not found");
         }
 
@@ -1402,27 +1966,43 @@ export default class VendorController {
                 admin: req.user.user,
             },
         });
-        const requeryResult = await TokenHandlerUtil.processRequeryRequest(
-            transaction,
-        ).catch((e) => e ?? {});
+
+        if (
+            transaction.transactionType != TransactionType.ELECTRICITY &&
+            transaction.transactionType != TransactionType.AIRTIME &&
+            transaction.transactionType != TransactionType.DATA
+        ) {
+            throw new BadRequestError(
+                "Transaction type not supported for manual requery",
+            );
+        }
+
+        const requeryHandler = {
+            DATA: DataHandlerUtil,
+            AIRTIME: AirtimeHandlerUtil,
+            ELECTRICITY: TokenHandlerUtil,
+        } as const;
+        const requeryResult = await requeryHandler[transaction.transactionType]
+            .processRequeryRequest(transaction)
+            .catch((e) => (e as AxiosError | Error) ?? {});
 
         logger.info("Requeried transaction successfully", logMeta);
         console.log({ requeryResult: requeryResult });
+
         const discoCode = vendorProduct.schemaData.code;
         const response =
             await ResponseValidationUtil.validateTransactionCondition({
                 requestType: "REQUERY",
                 vendor: vendor.name,
-                // transactionType: transaction.transactionType,
                 httpCode:
                     requeryResult instanceof AxiosError
                         ? requeryResult.status
-                        : requeryResult.httpStatusCode,
+                        : (requeryResult as any).httpStatusCode,
                 responseObject:
                     requeryResult instanceof AxiosError
                         ? requeryResult.response?.data
                         : requeryResult,
-                vendType: meter.vendType,
+                vendType: meter?.vendType ?? "POSTPAID", // Other transaction types excluding electricity can be treated as postpaid
                 disco: discoCode,
                 transactionId: transaction.id,
                 isError: requeryResult instanceof AxiosError,
@@ -1442,17 +2022,21 @@ export default class VendorController {
                         transactionId: transaction.id,
                         status: transaction.status,
                     },
-                    meter: {
-                        disco: meter.disco,
-                        number: meter.meterNumber,
-                        address: meter.address,
-                        phone: meter.userId,
-                        vendType: meter.vendType,
-                        name: meter.userId,
-                    },
                 } as Record<string, any>,
             },
         };
+
+        if (transaction.transactionType === TransactionType.ELECTRICITY) {
+            assertExists(meter, "Meter not found");
+            responseMessage.successful.data.meter = {
+                disco: meter.disco,
+                number: meter.meterNumber,
+                address: meter.address,
+                phone: meter.userId,
+                vendType: meter.vendType,
+                name: meter.userId,
+            };
+        }
 
         if (response.action === 1) {
             if (response.vendType === "PREPAID") {
@@ -1490,20 +2074,22 @@ export default class VendorController {
             );
         }
 
-        const meter = await transaction.$get("meter");
-        if (!meter) {
-            throw new InternalServerError("Meter not found");
+        if (
+            transaction.transactionType !== TransactionType.ELECTRICITY &&
+            transaction.transactionType !== TransactionType.DATA &&
+            transaction.transactionType !== TransactionType.AIRTIME
+        ) {
+            throw new BadRequestError(
+                "Transaction type not supported for manual retry",
+            );
         }
 
-        const partner = await transaction.$get("partner");
-        if (!partner) {
-            throw new InternalServerError("Partner not found");
-        }
-
-        const user = await transaction.$get("user");
-        if (!user) {
-            throw new InternalServerError("User not found");
-        }
+        const { user, meter, partner } =
+            await TransactionService.populateRelations({
+                transaction,
+                fields: ["user", "meter", "partner"],
+                strict: false,
+            });
 
         const logMeta = { transactionId, admin: req.user.user };
         logger.info("Initiated manual retry", logMeta);
@@ -1538,11 +2124,14 @@ export default class VendorController {
 
         logger.info("Requeried transaction successfully", logMeta);
         console.log({ requeryResult: requeryResult.response?.data });
+        if (transaction.transactionType === TransactionType.ELECTRICITY) {
+            assertExists(meter, "Meter not found");
+        }
+
         const response =
             await ResponseValidationUtil.validateTransactionCondition({
                 requestType: "REQUERY",
                 vendor: vendor.name,
-                // transactionType: transaction.transactionType,
                 httpCode:
                     requeryResult instanceof AxiosError
                         ? requeryResult.status
@@ -1551,212 +2140,33 @@ export default class VendorController {
                     requeryResult instanceof AxiosError
                         ? requeryResult.response?.data
                         : requeryResult,
-                vendType: meter.vendType,
+                vendType: meter?.vendType ?? "POSTPAID",
                 disco: discoCode,
                 transactionId: transaction.id,
                 isError: requeryResult instanceof AxiosError,
             });
-        const disco = vendorProduct.schemaData.code;
 
         logger.info("Response validation completed", {
             ...logMeta,
             validationResponse: response,
         });
-        const eventMessage = {
-            meter: {
-                meterNumber: meter.meterNumber,
-                disco: disco,
-                vendType: meter.vendType,
-                id: meter.id,
-            },
-            transactionId: transaction.id,
-            error: {
-                code: (requeryResult instanceof AxiosError
-                    ? requeryResult.response?.data?.responseCode
-                    : undefined) as number | 0,
-                cause: TransactionErrorCause.UNKNOWN,
-            },
+
+        const validationResponseHandler = {
+            ELECTRICITY:
+                VendorController.handleResponseValidationResultForElectricity,
+            DATA: VendorController.handleResponseValidationResultForData,
+            AIRTIME: VendorController.handleResponseValidationResultForAirtime,
+        } as const;
+        const args = {
+            disco: discoCode,
+            lastSuperAgentUsed,
+            validationResult: response,
+            requeryResult,
+            transaction,
+            phone: user!?.phoneNumber,
         };
 
-        const transactionEventService = new TransactionEventService(
-            transaction,
-            eventMessage.meter,
-            lastSuperAgentUsed,
-            partner.email,
-        );
-        await TransactionService.updateSingleTransaction(transaction.id, {
-            status: Status.INPROGRESS,
-        });
-        switch (response.action) {
-            case -1:
-                logger.error(
-                    "Transaction condition pending - Requery",
-                    logMeta,
-                );
-                await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
-                    {
-                        eventData: {
-                            ...eventMessage,
-                            error: {
-                                ...eventMessage.error,
-                                cause: TransactionErrorCause.UNEXPECTED_ERROR,
-                            },
-                        },
-                        requeryCount: 1,
-                        eventService: transactionEventService,
-                        retryCount: 1,
-                        superAgent: lastSuperAgentUsed,
-                        tokenInResponse: null,
-                        transactionTimedOutFromBuypower: false,
-                        vendorRetryRecord: {
-                            retryCount: 1,
-                        },
-                    },
-                );
-                break;
-            case 0:
-                logger.error("Transaction condition not met - Retry", logMeta);
-                await TokenHandlerUtil.triggerEventToRetryTransactionWithNewVendor(
-                    {
-                        transaction: transaction,
-                        transactionEventService: transactionEventService,
-                        manual: true,
-                        meter: eventMessage.meter,
-                        vendorRetryRecord: {
-                            retryCount: 1,
-                        },
-                    },
-                );
-                break;
-            case 1:
-                logger.info("Transaction condition met - Successful", logMeta);
-
-                logger.info("Token from vend", {
-                    meta: {
-                        transactionId: transaction.id,
-                        tokenFromVend:
-                            response.vendType === "PREPAID"
-                                ? response.token
-                                : undefined,
-                    },
-                });
-
-                logger.info("Transaction condition met - Successful", logMeta);
-                const token =
-                    response.vendType == "PREPAID" ? response.token : undefined;
-                const discoLogo =
-                    DISCO_LOGO[
-                        product.productName as keyof typeof DISCO_LOGO
-                    ] ?? LOGO_URL;
-                let powerUnit =
-                    await PowerUnitService.viewSinglePowerUnitByTransactionId(
-                        transactionId,
-                    );
-
-                powerUnit = powerUnit
-                    ? await PowerUnitService.updateSinglePowerUnit(
-                          powerUnit.id,
-                          {
-                              tokenFromVend: token,
-                              tokenUnits: response.tokenUnits,
-                              transactionId: transactionId,
-                          },
-                      )
-                    : await PowerUnitService.addPowerUnit({
-                          id: uuidv4(),
-                          transactionId: transactionId,
-                          disco: meter.disco,
-                          discoLogo,
-                          amount: transaction.amount,
-                          meterId: meter.id,
-                          superagent:
-                              lastSuperAgentUsed as ITransaction["superagent"],
-                          tokenFromVend: token,
-                          tokenNumber: 0,
-                          tokenUnits: response.tokenUnits,
-                          address: transaction.meter.address,
-                      });
-                token &&
-                    (await TransactionService.updateSingleTransaction(
-                        transactionId,
-                        {
-                            powerUnitId: powerUnit?.id,
-                            tokenFromVend: token,
-                        },
-                    ));
-
-                await transactionEventService.addTokenReceivedEvent(
-                    token ?? "",
-                );
-                await VendorPublisher.publishEventForTokenReceivedFromVendor({
-                    transactionId: transaction!.id,
-                    user: {
-                        name: user.name as string,
-                        email: user.email,
-                        address: user.address,
-                        phoneNumber: user.phoneNumber,
-                    },
-                    partner: {
-                        email: partner.email,
-                    },
-                    meter: {
-                        id: meter.id,
-                        meterNumber: meter.meterNumber,
-                        disco: transaction!.disco,
-                        vendType: meter.vendType,
-                        token: token ?? "",
-                    },
-                    tokenUnits: response.tokenUnits,
-                });
-                logger.info("Saving token to cache");
-                const twoMinsExpiry = 2 * 60;
-                token &&
-                    (await TokenUtil.saveTokenToCache({
-                        key: "transaction_token:" + transaction.id,
-                        token: (response as any).token ?? "",
-                        expiry: twoMinsExpiry,
-                    }));
-
-                await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
-                    {
-                        eventData: {
-                            ...eventMessage,
-                            error: {
-                                ...eventMessage.error,
-                                cause: TransactionErrorCause.UNEXPECTED_ERROR,
-                            },
-                        },
-                        eventService: transactionEventService,
-                        retryCount: 1,
-                        requeryCount: 1,
-                        superAgent: lastSuperAgentUsed,
-                        tokenInResponse: null,
-                        transactionTimedOutFromBuypower: false,
-                        vendorRetryRecord: { retryCount: 1 },
-                    },
-                );
-                break;
-            default:
-                await TokenHandlerUtil.triggerEventToRequeryTransactionTokenFromVendor(
-                    {
-                        eventData: {
-                            meter: meter!,
-                            transactionId: transactionId,
-                            error: {
-                                code: 202,
-                                cause: TransactionErrorCause.NO_TOKEN_IN_RESPONSE,
-                            },
-                        },
-                        eventService: transactionEventService,
-                        retryCount: 1,
-                        requeryCount: 1,
-                        superAgent: lastSuperAgentUsed,
-                        tokenInResponse: null,
-                        transactionTimedOutFromBuypower: false,
-                        vendorRetryRecord: { retryCount: 1 },
-                    },
-                );
-        }
+        await validationResponseHandler[transaction.transactionType](args);
 
         const responseMessage = {
             retry: {
@@ -1771,17 +2181,21 @@ export default class VendorController {
                         transactionId: transaction.id,
                         status: transaction.status,
                     },
-                    meter: {
-                        disco: meter.disco,
-                        number: meter.meterNumber,
-                        address: meter.address,
-                        phone: meter.userId,
-                        vendType: meter.vendType,
-                        name: meter.userId,
-                    },
                 } as Record<string, any>,
             },
         };
+
+        if (transaction.transactionType === TransactionType.ELECTRICITY) {
+            assertExists(meter, "Meter not found");
+            responseMessage.successful.data.meter = {
+                disco: meter.disco,
+                number: meter.meterNumber,
+                address: meter.address,
+                phone: meter.userId,
+                vendType: meter.vendType,
+                name: meter.userId,
+            };
+        }
 
         if (response.action === 1) {
             if (response.vendType === "PREPAID") {

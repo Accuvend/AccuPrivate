@@ -15,6 +15,7 @@ import { $GetType, Sequelize } from "sequelize-typescript";
 import Bundle from "../models/Bundle.model";
 import PaymentProvider from "../models/PaymentProvider.model";
 import { CustomError } from "../utils/Errors";
+import Product from "../models/Product.model";
 
 type RelationTypeMap = {
     user: User;
@@ -139,7 +140,7 @@ export default class TransactionService {
                     "createdAt",
                     "updatedAt",
                     "channel",
-                    "retryRecord"
+                    "retryRecord",
                     //...attributesMap
                 ],
                 order: [["transactionTimestamp", "DESC"]],
@@ -207,7 +208,7 @@ export default class TransactionService {
                 "createdAt",
                 "updatedAt",
                 "channel",
-                "retryRecord"
+                "retryRecord",
             ],
             order: [["transactionTimestamp", "DESC"]], // Sorting transactions by transaction timestamp in descending order
         });

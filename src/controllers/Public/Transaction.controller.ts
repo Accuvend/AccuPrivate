@@ -34,6 +34,7 @@ interface getTransactionsRequestBody extends ITransaction {
     disco: string;
     superagent: "BUYPOWERNG" | "BAXI" | "IRECHARGE";
     includes?: string;
+    paymentProviderId: string ;
 }
 
 export default class TransactionController {
@@ -73,6 +74,7 @@ export default class TransactionController {
             disco,
             superagent,
             partnerId,
+            paymentProviderId,
         } = req.query as any as getTransactionsRequestBody;
 
         const query = { where: {} } as any;
@@ -91,6 +93,7 @@ export default class TransactionController {
         }
         if (partnerId) query.where.partnerId = partnerId;
         if (userId) query.where.userId = userId;
+        if ( paymentProviderId) query.where.paymentProviderId =  paymentProviderId
 
         const requestWasMadeByAnAdmin =
             [RoleEnum.Admin].includes(req.user.user.entity.role) ||
@@ -180,6 +183,7 @@ export default class TransactionController {
             superagent,
             partnerId,
             includes,
+            paymentProviderId,
         } = req.query as any as getTransactionsRequestBody;
 
         // Initializing query object
@@ -229,7 +233,7 @@ export default class TransactionController {
         }
         if (partnerId) query.where.partnerId = partnerId;
         if (userId) query.where.userId = userId;
-
+        if( paymentProviderId) query.where.paymentProviderId =  paymentProviderId;
         // Handling access control based on user roles
         const requestWasMadeByAnAdmin =
             [RoleEnum.Admin].includes(req.user.user.entity.role) ||
@@ -421,6 +425,7 @@ export default class TransactionController {
             disco,
             superagent,
             partnerId,
+            paymentProviderId
         } = req.query as any as getTransactionsRequestBody;
 
         // Constructs the query object for Sequelize
@@ -441,7 +446,7 @@ export default class TransactionController {
             query.offset = Math.abs(parseInt(page) - 1) * parseInt(limit);
         }
         if (partnerId) query.where.partnerId = partnerId;
-
+        if ( paymentProviderId) query.where.paymentProviderId =  paymentProviderId
         // Checks if the request was made by an admin
         const requestWasMadeByAnAdmin =
             [RoleEnum.Admin].includes(req.user.user.entity.role) ||

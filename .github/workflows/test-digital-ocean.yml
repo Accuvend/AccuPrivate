@@ -28,7 +28,7 @@ jobs:
     # needs: [push-build]
     environment: Test_Digital_Ocean
     runs-on: ubuntu-latest
-    if : github.ref == 'refs/heads/do_build_test'
+    if : github.ref == 'refs/heads/build'
     steps:
     - name: chechkout
       uses: actions/checkout@v2
@@ -210,7 +210,7 @@ jobs:
   scan-backend: 
     name: scan-backend
     runs-on: ubuntu-latest
-    if : github.ref == 'refs/heads/do_build_test'
+    if : github.ref == 'refs/heads/build'
     # needs: [test-backend]
     needs: [generate-env-file]
     steps: 
@@ -234,7 +234,7 @@ jobs:
   build-backend:
     name: build-backend
     needs: [scan-backend]
-    if : github.ref == 'refs/heads/do_build_test'
+    if : github.ref == 'refs/heads/build'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -288,7 +288,7 @@ jobs:
     name: create-infra
     needs: [build-backend]
     environment: Test_Digital_Ocean
-    if : github.ref == 'refs/heads/do_build_test'
+    if : github.ref == 'refs/heads/build'
     runs-on: ubuntu-latest
     steps:
       - name: checkout
@@ -440,7 +440,7 @@ jobs:
     name: push-build
     needs: [create-infra]
     environment: Test_Digital_Ocean
-    if : github.ref == 'refs/heads/do_build_test'
+    if : github.ref == 'refs/heads/build'
     runs-on: ubuntu-latest
     steps:
       - name: checkout
@@ -539,7 +539,7 @@ jobs:
     name: deploy-build
     needs: [push-build]
     environment: Test_Digital_Ocean
-    if : github.ref == 'refs/heads/do_build_test'
+    if : github.ref == 'refs/heads/build'
     runs-on: ubuntu-latest
     steps:
       - name: checkout
@@ -680,7 +680,7 @@ jobs:
   smoke-test:
     name: smoke-test
     environment: Test_Digital_Ocean
-    if : github.ref == 'refs/heads/do_build_test'
+    if : github.ref == 'refs/heads/build'
     runs-on: ubuntu-latest
     needs: [deploy-build]
     outputs:
@@ -709,7 +709,7 @@ jobs:
     name: roll-back
     needs: smoke-test
     environment: Test_Digital_Ocean
-    if : github.ref == 'refs/heads/do_build_test'
+    if : github.ref == 'refs/heads/build'
     runs-on: ubuntu-latest
     steps:
       - name: checkout
@@ -843,7 +843,7 @@ jobs:
   fail-stage-on-rollback: 
     name:  fail-stage-on-rollback
     environment: Test_Digital_Ocean
-    if : github.ref == 'refs/heads/do_build_test'
+    if : github.ref == 'refs/heads/build'
     needs: [roll-back, smoke-test ]
     # needs: [smoke-test]
     runs-on: ubuntu-latest
@@ -864,7 +864,7 @@ jobs:
   clean-up:
     name: clean-up
     needs: [roll-back, smoke-test ]
-    if : github.ref == 'refs/heads/do_build_test'
+    if : github.ref == 'refs/heads/build'
     environment: Test_Digital_Ocean
     runs-on: ubuntu-latest
     steps: 
@@ -1040,8 +1040,8 @@ jobs:
   save-latest-successful_run:
     name: save-latest-successful-run
     environment: Test_Digital_Ocean
-    # if : github.ref == 'refs/heads/do_build_test' && needs.smoke-test.outputs.smoke_test_result == '1'
-    if : github.ref == 'refs/heads/do_build_test'
+    # if : github.ref == 'refs/heads/build' && needs.smoke-test.outputs.smoke_test_result == '1'
+    if : github.ref == 'refs/heads/build'
     needs: [fail-stage-on-rollback , clean-up]
     # needs: [roll-back, smoke-test]
     runs-on: ubuntu-latest

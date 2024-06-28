@@ -20,6 +20,11 @@ router
         AuthenticatedController(TransactionController.getTransactions),
     )
     .get(
+        "/api/",
+        validateApiKey,
+        AuthenticatedController(TransactionController.getTransactions),
+    )
+    .get(
         "/kpi",
         AuthenticatedController(TransactionController.getTransactionsKPI),
     )

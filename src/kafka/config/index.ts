@@ -49,6 +49,23 @@ const getKafkaConfig = (configType: string): kafka.KafkaConfig => {
             connectionTimeout: 450000,
             logLevel: isNaN(parseInt(KAFA_LOGS)) ? 0 : parseInt(KAFA_LOGS),
         }
+    }else if(configType === 'development'){
+        console.log('connected using development')
+        return {
+            clientId: KAFKA_CLIENT_ID,
+            brokers: [KAFKA_BROKER],
+            logLevel: isNaN(parseInt(KAFA_LOGS)) ? 0 : parseInt(KAFA_LOGS),
+            // clientId: KAFKA_CLIENT_ID,
+            // brokers: [KAFKA_BROKER],
+            // connectionTimeout: 450000,
+            // ssl: true,
+            // sasl: {
+            //     mechanism: "plain",
+            //     username: KAFKA_USERNAME,
+            //     password: KAFKA_PASSWORD,
+            // },
+            // logLevel: isNaN(parseInt(KAFA_LOGS)) ? 0 : parseInt(KAFA_LOGS),
+        }
     }else{
         return {
             clientId: KAFKA_CLIENT_ID,
@@ -65,24 +82,24 @@ const getKafkaConfig = (configType: string): kafka.KafkaConfig => {
     }
 }
 
-const kafkaConfig: kafka.KafkaConfig =
-    NODE_ENV === "development"
-        ? {
-            clientId: KAFKA_CLIENT_ID,
-            brokers: [KAFKA_BROKER],
-            logLevel: isNaN(parseInt(KAFA_LOGS)) ? 0 : parseInt(KAFA_LOGS),
-            // clientId: KAFKA_CLIENT_ID,
-            // brokers: [KAFKA_BROKER],
-            // connectionTimeout: 450000,
-            // ssl: true,
-            // sasl: {
-            //     mechanism: "plain",
-            //     username: KAFKA_USERNAME,
-            //     password: KAFKA_PASSWORD,
-            // },
-            // logLevel: isNaN(parseInt(KAFA_LOGS)) ? 0 : parseInt(KAFA_LOGS),
-        }
-        : getKafkaConfig(KAFKA_ENV) ;
+const kafkaConfig: kafka.KafkaConfig = getKafkaConfig(KAFKA_ENV) ;
+    // NODE_ENV === "development"
+    //     ? {
+    //         clientId: KAFKA_CLIENT_ID,
+    //         brokers: [KAFKA_BROKER],
+    //         logLevel: isNaN(parseInt(KAFA_LOGS)) ? 0 : parseInt(KAFA_LOGS),
+    //         // clientId: KAFKA_CLIENT_ID,
+    //         // brokers: [KAFKA_BROKER],
+    //         // connectionTimeout: 450000,
+    //         // ssl: true,
+    //         // sasl: {
+    //         //     mechanism: "plain",
+    //         //     username: KAFKA_USERNAME,
+    //         //     password: KAFKA_PASSWORD,
+    //         // },
+    //         // logLevel: isNaN(parseInt(KAFA_LOGS)) ? 0 : parseInt(KAFA_LOGS),
+    //     }
+    //     : getKafkaConfig(KAFKA_ENV) ;
 console.log(KAFKA_ENV)
 const Kafka = new kafka.Kafka(kafkaConfig);
 

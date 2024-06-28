@@ -842,6 +842,7 @@ jobs:
   
   fail-stage-on-rollback: 
     name:  fail-stage-on-rollback
+    environment: Test_Digital_Ocean
     if : github.ref == 'refs/heads/do_build_test'
     needs: [roll-back, smoke-test ]
     # needs: [smoke-test]
@@ -864,6 +865,7 @@ jobs:
     name: clean-up
     needs: [roll-back, smoke-test ]
     if : github.ref == 'refs/heads/do_build_test'
+    environment: Test_Digital_Ocean
     runs-on: ubuntu-latest
     steps: 
       - name: Delete cache
@@ -1038,6 +1040,7 @@ jobs:
   # # Add RUN_id has last successful run
   save-latest-successful_run:
     name: save-latest-successful-run
+    environment: Test_Digital_Ocean
     # if : github.ref == 'refs/heads/do_build_test' && needs.smoke-test.outputs.smoke_test_result == '1'
     if : github.ref == 'refs/heads/do_build_test'
     needs: [fail-stage-on-rollback , clean-up]

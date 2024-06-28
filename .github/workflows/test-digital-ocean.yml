@@ -760,6 +760,7 @@ jobs:
           
           expect eof;
           '
+          
   # Smoke Test to check if server is up and running 
   smoke-test:
     name: smoke-test
@@ -786,68 +787,149 @@ jobs:
         fi
     - name: check if smoke test result is saved  
       run : echo "${{steps.check_server_status.outputs.smoke_test_result}}"
+  
 
   # # Roll back when smoke test fails
-  # roll-back:
-  #   name: roll-back
-  #   needs: smoke-test
-  #   if : github.ref == 'refs/heads/do_build_test'
-  #   runs-on: ubuntu-latest
-  #   steps: 
-  #     - name: Configure AWS Credentials
-  #       uses: aws-actions/configure-aws-credentials@v4
-  #       with:
-  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #         aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET_KEY }}
-  #         aws-region: eu-west-2
-  #     - name: roll back_server_if_failure 
-  #       env: 
-  #         PRIVATE_KEY: ${{ secrets.SAND_BOX_SSH_KEY }}
-  #         GITHUB_RUN_NUMBER: ${{ secrets.GITHUB_RUN_NUMBER }}
-  #       run: |
-  #         EC2_HOST_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=Test-core-engine" --query "Reservations[].Instances[].[PublicIpAddress]" --output text)
-  #         echo "${{needs.smoke-test.outputs.smoke_test_result}}"
-  #         if [[ "${{needs.smoke-test.outputs.smoke_test_result}}" == "1" ]];
-  #         then 
-  #           echo " No rollback"
-  #         else
-  #           echo "Rolling back...."
-  #           echo "$PRIVATE_KEY" > private_key.pem && chmod 400 private_key.pem
-  #           ssh -o StrictHostKeyChecking=no -i 'private_key.pem' ubuntu@${EC2_HOST_IP} '
-  #             cd /home/ubuntu/
-  #             pm2 stop server #stop the server 
-  #             # GET THE LATEST_SUCCESSFUL_RUN_ID 
-  #             if aws s3 cp s3://accuvend-bucket-configuration/test_staging_last_run.txt ./test_staging_last_run.txt | grep "does not exist" 
-  #             then
-  #                 echo 'FILE DOES NOT EXIST'
-  #                 LAST_SUCCESSFUL_RUN_NUMBER=0               
-  #             else
-  #                 echo 'FILE EXIST'
-  #                 LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./test_staging_last_run.txt | cut -d "=" -f2)            
-  #             fi
-  #             #rename the old folder 
-  #             echo "$LAST_SUCCESSFUL_RUN_NUMBER"
-  #             if [ -d "dist" ] && [ -d "dist"_"$LAST_SUCCESSFUL_RUN_NUMBER" ]; then
-  #                 rm -rf dist
-  #                 mv "dist"_"$LAST_SUCCESSFUL_RUN_NUMBER" "dist"
-  #                 echo "Folder renamed from dist"_"$LAST_SUCCESSFUL_RUN_NUMBER"
-  #             else
-  #                 echo "Folder does not exist."
-  #             fi
-  #             # cd 
-  #             cd dist
-              
-  #             #Set up server 
-  #             pm2 start server.js --time'
+  roll-back:
+    name: roll-back
+    needs: smoke-test
+    environment: Test_Digital_Ocean
+    if : github.ref == 'refs/heads/do_build_test'
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+      - name: restore dist 
+        uses: actions/cache@v2
+        with:
+          path: ./dist.zip
+          key: dist-zip
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+      - name: Install expect
+        run: sudo apt-get update && sudo apt-get install -y expect
+      - name: Run expect script setup
+        run: |
+          expect -v
+      - name: create deployment script
+        run: |
+          echo '
+            pm2 stop server #stop the server 
+            # GET THE LATEST_SUCCESSFUL_RUN_ID 
+           if [ -f "./test_staging_last_run.txt" ]; then
+                echo "FILE EXIST"
+                LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./test_staging_last_run.txt | cut -d "=" -f2)      
+            else
+                echo "FILE DOES NOT EXIST"
+                LAST_SUCCESSFUL_RUN_NUMBER=0              
+            fi
             
-  #         fi 
+            #rename the old folder 
+            echo "$LAST_SUCCESSFUL_RUN_NUMBER"
+            if [ -d "dist" ] && [ -d "dist"_"$LAST_SUCCESSFUL_RUN_NUMBER" ]; then
+                rm -rf dist
+                mv "dist"_"$LAST_SUCCESSFUL_RUN_NUMBER" "dist"
+                echo "Folder renamed from dist"_"$LAST_SUCCESSFUL_RUN_NUMBER"
+            else
+                echo "Folder does not exist."
+            fi
+            
+            # cd 
+            cd dist
+            
+            #Set up restart server 
+            pm2 start server.js --time
+          ' >> rollback.sh
+          
+          cat deploy.sh
+          
+          
+      - name: Copy rollback.sh to server 
+        run: |
+          if [ -f "./rollback.sh" ]; then
+              echo "It's a file"
+          else
+              echo "It's not a file"
+          fi
+
+          expect -c '
+          set timeout -1;
+          set SSH_USER "root";
+          set DROPLET_IP "${{ secrets.DROP_RESERVE_IP }}";
+          set PASSWORD "${{ secrets.SSH_PASSWORD }}";
+          set SSH_KEY_PATH "~/.ssh/id_rsa";
+          set LOCAL_FILE_PATH "./rollback.sh"
+          set REMOTE_FILE_PATH "./rollback.sh"
+
+          spawn scp -o StrictHostKeyChecking=no -i $SSH_KEY_PATH $LOCAL_FILE_PATH $SSH_USER@$DROPLET_IP:$REMOTE_FILE_PATH ;
+
+          expect {
+             "Enter passphrase for key" {
+                send "$PASSWORD\r";
+                exp_continue;
+             }
+             "password:" {
+                send "$PASSWORD\r";
+             }
+          }
+
+          expect {
+             "*yes/no" {
+                send "yes\r";
+                exp_continue;
+             }
+          }
+          
+          expect eof;
+          '
+          
+      - name: Run rollback.sh on server (roll back_server_if_failure )
+        run: |
+          echo "${{needs.smoke-test.outputs.smoke_test_result}}"
+          if [[ "${{needs.smoke-test.outputs.smoke_test_result}}" == "1" ]];
+          then 
+            echo " No rollback"
+          else
+              expect -c '
+              set timeout -1;
+              set SSH_USER "root";
+              set DROPLET_IP "${{ secrets.DROP_RESERVE_IP }}";
+              set PASSWORD "${{ secrets.SSH_PASSWORD }}";
+              set SSH_KEY_PATH "~/.ssh/id_rsa";
+    
+              spawn ssh -o StrictHostKeyChecking=no -i $SSH_KEY_PATH $SSH_USER@$DROPLET_IP "chmod u+x ./rollback.sh && ./rollback.sh" ;
+    
+              expect {
+                 "Enter passphrase for key" {
+                    send "$PASSWORD\r";
+                    exp_continue;
+                 }
+                 "password:" {
+                    send "$PASSWORD\r";
+                 }
+              }
+    
+              expect {
+                 "*yes/no" {
+                    send "yes\r";
+                    exp_continue;
+                 }
+              }
+              
+              expect eof;
+              '
+          fi 
+
   # Fail stage initiate on successful roll back 
   
   fail-stage-on-rollback: 
     name:  fail-stage-on-rollback
     if : github.ref == 'refs/heads/do_build_test'
-    # needs: [roll-back, smoke-test ]
-    needs: [smoke-test]
+    needs: [roll-back, smoke-test ]
+    # needs: [smoke-test]
     runs-on: ubuntu-latest
     steps: 
       - name: fail stage if roll back 
@@ -862,43 +944,142 @@ jobs:
             exit 1
           fi
 
-  # # Clean up of old artificats on successful deployment 
-  # clean-up:
-  #   name: clean-up
-  #   needs: [roll-back, smoke-test ]
-  #   if : github.ref == 'refs/heads/do_build_test'
-  #   runs-on: ubuntu-latest
-  #   steps: 
-  #     - name: Configure AWS Credentials
-  #       uses: aws-actions/configure-aws-credentials@v4
-  #       with:
-  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #         aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET_KEY }}
-  #         aws-region: eu-west-2
+  # Clean up of old artificats on successful deployment 
+  clean-up:
+    name: clean-up
+    needs: [roll-back, smoke-test ]
+    if : github.ref == 'refs/heads/do_build_test'
+    runs-on: ubuntu-latest
+    steps: 
+      - name: Delete cache
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BRANCH: refs/pull/${{ github.event.number }}/merge
+        run: |
+          gh extension install actions/gh-actions-cache
           
-  #     - name: Delete cache
-  #       env:
-  #         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #         REPO: ${{ github.repository }}
-  #         BRANCH: refs/pull/${{ github.event.number }}/merge
-  #       run: |
-  #         gh extension install actions/gh-actions-cache
-          
-  #         echo "Fetching list of cache key"
-  #         echo "$REPO"
-  #         echo "$BRANCH"
-  #         cacheKeysForPR=$(gh actions-cache list -R $REPO -L 100 | cut -f 1 )
+          echo "Fetching list of cache key"
+          echo "$REPO"
+          echo "$BRANCH"
+          cacheKeysForPR=$(gh actions-cache list -R $REPO -L 100 | cut -f 1 )
 
-  #         ## Setting this to not fail the workflow while deleting cache keys.
-  #         set +e
-  #         echo "Deleting caches..."
-  #         for cacheKey in $cacheKeysForPR
-  #         do
-  #             echo "$cacheKey"
-  #             gh actions-cache delete $cacheKey -R $REPO --confirm
-  #         done
-  #         echo "Done deleting cache"
+          ## Setting this to not fail the workflow while deleting cache keys.
+          set +e
+          echo "Deleting caches..."
+          for cacheKey in $cacheKeysForPR
+          do
+              echo "$cacheKey"
+              gh actions-cache delete $cacheKey -R $REPO --confirm
+          done
+          echo "Done deleting cache"
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+      - name: Install expect
+        run: sudo apt-get update && sudo apt-get install -y expect
+      - name: Run expect script setup
+        run: |
+          expect -v
+      - name: create cleanup script
+        run: |
+          echo '
+            pm2 stop server #stop the server 
+            # GET THE LATEST_SUCCESSFUL_RUN_ID 
+           if [ -f "./test_staging_last_run.txt" ]; then
+                echo "FILE EXIST"
+                LAST_SUCCESSFUL_RUN_NUMBER=$(grep LAST_SUCCESSFUL_RUN_ID ./test_staging_last_run.txt | cut -d "=" -f2)      
+            else
+                echo "FILE DOES NOT EXIST"
+                LAST_SUCCESSFUL_RUN_NUMBER=0              
+            fi
+            
+            #rename the old folder 
+            echo "$LAST_SUCCESSFUL_RUN_NUMBER"
+            #delete the old folder 
+            echo "$LAST_SUCCESSFUL_RUN_NUMBER"
+            if [ -d "dist" ] && [ -d "dist"_"$LAST_SUCCESSFUL_RUN_NUMBER" ]; then
+                rm -rf "dist"_"$LAST_SUCCESSFUL_RUN_NUMBER"
+                echo "Folder removed: dist"_"$LAST_SUCCESSFUL_RUN_NUMBER"
+            else
+                echo "Folder does not exist."
+            fi
+          ' >> cleanup.sh
           
+          cat cleanup.sh
+          
+          
+      - name: Copy deploy.sh to server 
+        run: |
+          if [ -f "./cleanup.sh" ]; then
+              echo "It's a file"
+          else
+              echo "It's not a file"
+          fi
+
+          expect -c '
+          set timeout -1;
+          set SSH_USER "root";
+          set DROPLET_IP "${{ secrets.DROP_RESERVE_IP }}";
+          set PASSWORD "${{ secrets.SSH_PASSWORD }}";
+          set SSH_KEY_PATH "~/.ssh/id_rsa";
+          set LOCAL_FILE_PATH "./cleanup.sh"
+          set REMOTE_FILE_PATH "./cleanup.sh"
+
+          spawn scp -o StrictHostKeyChecking=no -i $SSH_KEY_PATH $LOCAL_FILE_PATH $SSH_USER@$DROPLET_IP:$REMOTE_FILE_PATH ;
+
+          expect {
+             "Enter passphrase for key" {
+                send "$PASSWORD\r";
+                exp_continue;
+             }
+             "password:" {
+                send "$PASSWORD\r";
+             }
+          }
+
+          expect {
+             "*yes/no" {
+                send "yes\r";
+                exp_continue;
+             }
+          }
+          
+          expect eof;
+          '
+          
+      - name: cleanup_if_successful
+        run: |
+          expect -c '
+          set timeout -1;
+          set SSH_USER "root";
+          set DROPLET_IP "${{ secrets.DROP_RESERVE_IP }}";
+          set PASSWORD "${{ secrets.SSH_PASSWORD }}";
+          set SSH_KEY_PATH "~/.ssh/id_rsa";
+
+          spawn ssh -o StrictHostKeyChecking=no -i $SSH_KEY_PATH $SSH_USER@$DROPLET_IP "chmod u+x ./cleanup.sh && ./cleanup.sh" ;
+
+          expect {
+             "Enter passphrase for key" {
+                send "$PASSWORD\r";
+                exp_continue;
+             }
+             "password:" {
+                send "$PASSWORD\r";
+             }
+          }
+
+          expect {
+             "*yes/no" {
+                send "yes\r";
+                exp_continue;
+             }
+          }
+          
+          expect eof;
+          '
   #     - name: cleanup_if_successful
   #       env: 
   #         PRIVATE_KEY: ${{ secrets.SAND_BOX_SSH_KEY }}
@@ -940,115 +1121,68 @@ jobs:
   #           exit 1
   #         fi   
   # # Add RUN_id has last successful run
-  # save-latest-successful_run:
-  #   name: save-latest-successful-run
-  #   # if : github.ref == 'refs/heads/do_build_test' && needs.smoke-test.outputs.smoke_test_result == '1'
-  #   if : github.ref == 'refs/heads/do_build_test'
-  #   needs: [fail-stage-on-rollback , clean-up]
-  #   # needs: [roll-back, smoke-test]
-  #   runs-on: ubuntu-latest
-  #   steps: 
-  #     - name: Configure AWS Credentials
-  #       uses: aws-actions/configure-aws-credentials@v4
-  #       with:
-  #         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #         aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET_KEY }}
-  #         aws-region: eu-west-2
-  #     - name: save-succesful-run-id 
-  #       env: 
-  #         PRIVATE_KEY: ${{ secrets.SAND_BOX_SSH_KEY }}
-  #         GITHUB_RUN_NUMBER: ${{ secrets.GITHUB_RUN_NUMBER }}
-  #       run: |
-  #         echo "LAST_SUCCESSFUL_RUN_ID=$GITHUB_RUN_NUMBER" > test_staging_last_run.txt
-  #         aws s3 cp ./test_staging_last_run.txt s3://accuvend-bucket-configuration/test_staging_last_run.txt
+  save-latest-successful_run:
+    name: save-latest-successful-run
+    # if : github.ref == 'refs/heads/do_build_test' && needs.smoke-test.outputs.smoke_test_result == '1'
+    if : github.ref == 'refs/heads/do_build_test'
+    needs: [fail-stage-on-rollback , clean-up]
+    # needs: [roll-back, smoke-test]
+    runs-on: ubuntu-latest
+    steps: 
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET_KEY }}
+          aws-region: eu-west-2
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+      - name: Install expect
+        run: sudo apt-get update && sudo apt-get install -y expect
+      - name: Run expect script setup
+        run: |
+          expect -v
+      - name: save-succesful-run-id 
+        env: 
+          PRIVATE_KEY: ${{ secrets.SAND_BOX_SSH_KEY }}
+          GITHUB_RUN_NUMBER: ${{ secrets.GITHUB_RUN_NUMBER }}
+        run: |
+          echo "LAST_SUCCESSFUL_RUN_ID=$GITHUB_RUN_NUMBER" > test_staging_last_run.txt
+          expect -c '
+          set timeout -1;
+          set SSH_USER "root";
+          set DROPLET_IP "${{ secrets.DROP_RESERVE_IP }}";
+          set PASSWORD "${{ secrets.SSH_PASSWORD }}";
+          set SSH_KEY_PATH "~/.ssh/id_rsa";
+          set LOCAL_FILE_PATH "./test_staging_last_run.txt"
+          set REMOTE_FILE_PATH "./test_staging_last_run.txt"
+
+          spawn scp -o StrictHostKeyChecking=no -i $SSH_KEY_PATH $LOCAL_FILE_PATH $SSH_USER@$DROPLET_IP:$REMOTE_FILE_PATH ;
+
+          expect {
+             "Enter passphrase for key" {
+                send "$PASSWORD\r";
+                exp_continue;
+             }
+             "password:" {
+                send "$PASSWORD\r";
+             }
+          }
+
+          expect {
+             "*yes/no" {
+                send "yes\r";
+                exp_continue;
+             }
+          }
+          
+          expect eof;
+          '
+
         
-  # create-update-environment:
-  #   name: create-environment
-  #   needs: [push-build]
-  #   if : github.ref == 'refs/heads/do_build_test'
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #   - name: Checkout
-  #     uses: actions/checkout@v2
-  #   - name: Configure AWS Credentials 2
-  #     uses: aws-actions/configure-aws-credentials@v4
-  #     with:
-  #       aws-region: eu-west-2
-  #       aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #       aws-secret-access-key: ${{ secrets.AWS_ACCESS_SECRET_KEY }}
-  #   - name: pull terraform state from s3
-  #     run: |
-  #       aws s3 cp s3://build-terraform-item/terraform.tfstate ./terraform/build && echo "Success: The AWS CLI command completed successfully." || echo "Error: The AWS CLI command failed."
-    
-  #   - name: Terraform Setup
-  #     uses: hashicorp/setup-terraform@v3
-  #     env:
-  #       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #       TF_ACTION_WORKING_DIR: 'terraform/build'
-  #       TF_AWS_ACCESS_KEY_ID:  ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #       TF_AWS_SECRET_ACCESS_KEY:  ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  #       TF_VAR_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #       TF_VAR_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  #       TF_VAR_region: "eu-west-2"
-  #       TF_VAR_subnet_1: ${{secrets.SUBNET_1}}
-  #       TF_VAR_subnet_2: ${{secrets.SUBNET_2}}
-  #       TF_VAR_subnet_3: ${{secrets.SUBNET_3}}
-  #       TF_VAR_accountId: ${{secrets.ACCOUNTID}}
-  #       TF_VAR_image_id: ${{secrets.IMAGE_ID}}
-  #       TF_VAR_instance_type: ${{secrets.INSTANCE_TYPE}}
-  #       TF_VAR_kafka_instance_type: "kafka.t3.small"
-  #       TF_VAR_instance_keypair: "build-key-pair"
-      
-  #   - name: Terraform fmt
-  #     id: fmt
-  #     run: | 
-  #        cd terraform/build
-  #        pwd
-  #        terraform fmt -check
-  #     continue-on-error: true
-
-  #   - name: Terraform Init
-  #     id: init
-  #     run:  | 
-  #        cd terraform/build
-  #        pwd
-  #        terraform init
-    
-  #   - name: Terraform Validate
-  #     id: validate
-  #     run:  | 
-  #        cd terraform/build
-  #        pwd
-  #        terraform validate -no-color
-    
-  #   - name: Terraform Plan
-  #     id: plan
-  #     run:  | 
-  #        cd terraform/build
-  #        pwd
-  #        terraform plan -no-color
-  #     continue-on-error: true
-      
-  #   - name: Terraform apply
-  #     id: apply
-  #     run: |
-  #         cd terraform/build
-  #         pwd
-  #         terraform apply -auto-approve -no-color
-  #     continue-on-error: true
-
-  #   - run: echo ${{ steps.plan.outputs.stdout }}
-  #   - run: echo ${{ steps.plan.outputs.stderr }}
-  #   - run: echo ${{ steps.plan.outputs.exitcode }}
-  #   - run: echo ${{ steps.apply.outputs.stdout }}
-  #   - run: echo ${{ steps.apply.outputs.stderr }}
-  #   - run: echo ${{ steps.apply.outputs.exitcode }}
-
-  #   - name: Save tft.state file 
-  #     run: |
-  #         cd terraform/build
-  #         pwd
-  #         aws s3 cp terraform.tfstate s3://build-terraform-item/
       
    
       

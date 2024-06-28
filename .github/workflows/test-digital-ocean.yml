@@ -690,7 +690,7 @@ jobs:
       id: check_server_status
       run : |
         
-        sleep 30 # wait 30 seconds to make sure the server is up and running before somke test 
+        sleep 120 # wait 120 seconds to make sure the server is up and running before somke test 
         echo "http://${{ secrets.DROP_RESERVE_IP }}/healthcheck"
         if curl "http://${{ secrets.DROP_RESERVE_IP }}/healthcheck" | grep "Server is working"
         then

@@ -3,10 +3,10 @@ name: ci-cd - test - digital ocean
 on:
   push:
     branches: 
-      - do_build_test
+      - build
   pull_request: 
     branches: 
-      - do_build_test
+      - build
   workflow_dispatch:
 
 jobs:

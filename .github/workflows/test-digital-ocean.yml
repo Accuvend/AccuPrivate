@@ -759,7 +759,7 @@ jobs:
             pm2 start server.js --time
           ' >> rollback.sh
           
-          cat deploy.sh
+          cat rollback.sh
           
           
       - name: Copy rollback.sh to server 

@@ -20,9 +20,9 @@ router
         AuthenticatedController(TransactionController.getTransactions),
     )
     .get(
-        "/api/",
+        "/v2/all/api",
         validateApiKey,
-        AuthenticatedController(TransactionController.getTransactions),
+        AuthenticatedController(TransactionController.getTransactionsFiltered),
     )
     .get(
         "/kpi",

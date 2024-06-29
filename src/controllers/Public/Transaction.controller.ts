@@ -34,7 +34,7 @@ interface getTransactionsRequestBody extends ITransaction {
     disco: string;
     superagent: "BUYPOWERNG" | "BAXI" | "IRECHARGE";
     includes?: string;
-    paymentProviderId: string ;
+    paymentProviderId: string;
 }
 
 export default class TransactionController {
@@ -46,7 +46,7 @@ export default class TransactionController {
 
         const transaction: Transaction | null = bankRefId
             ? await TransactionService.viewSingleTransactionByBankRefID(
-                  bankRefId,
+                  bankRefId
               )
             : await TransactionService.viewSingleTransaction(transactionId);
         if (!transaction) {
@@ -93,17 +93,18 @@ export default class TransactionController {
         }
         if (partnerId) query.where.partnerId = partnerId;
         if (userId) query.where.userId = userId;
-        if ( paymentProviderId) query.where.paymentProviderId =  paymentProviderId
+        if (paymentProviderId)
+            query.where.paymentProviderId = paymentProviderId;
 
         const requestWasMadeByAnAdmin =
             [RoleEnum.Admin].includes(req.user.user.entity.role) ||
             [RoleEnum.SuperAdmin].includes(req.user.user.entity.role);
         if (!requestWasMadeByAnAdmin) {
             const requestMadeByEnduser = [RoleEnum.EndUser].includes(
-                req.user.user.entity.role,
+                req.user.user.entity.role
             );
             const requestWasMadeByTeamMember = [RoleEnum.TeamMember].includes(
-                req.user.user.entity.role,
+                req.user.user.entity.role
             );
 
             if (requestMadeByEnduser) {
@@ -112,7 +113,7 @@ export default class TransactionController {
                 //To show Partner Data to Teammember
                 const _teamMember =
                     await TeamMemberProfileService.viewSingleTeamMember(
-                        req.user.user.entity.teamMemberProfileId || "",
+                        req.user.user.entity.teamMemberProfileId || ""
                     );
                 query.where.partnerId = _teamMember?.partnerId;
             } else {
@@ -130,7 +131,7 @@ export default class TransactionController {
 
         const totalAmount = transactions.reduce(
             (acc, curr) => acc + parseInt(curr.amount),
-            0,
+            0
         );
 
         const paginationData = {
@@ -169,7 +170,7 @@ export default class TransactionController {
      */
     static async getTransactionsFiltered(
         req: AuthenticatedRequest,
-        res: Response,
+        res: Response
     ) {
         // Extracting request query parameters
         const {
@@ -233,37 +234,43 @@ export default class TransactionController {
         }
         if (partnerId) query.where.partnerId = partnerId;
         if (userId) query.where.userId = userId;
-        if( paymentProviderId) query.where.paymentProviderId =  paymentProviderId;
-        // Handling access control based on user roles
-        const requestWasMadeByAnAdmin =
-            [RoleEnum.Admin].includes(req.user.user.entity.role) ||
-            [RoleEnum.SuperAdmin].includes(req.user.user.entity.role);
-        if (!requestWasMadeByAnAdmin) {
-            const requestMadeByEnduser = [RoleEnum.EndUser].includes(
-                req.user.user.entity.role,
-            );
-            const requestWasMadeByTeamMember = [RoleEnum.TeamMember].includes(
-                req.user.user.entity.role,
-            );
+        if (paymentProviderId)
+            query.where.paymentProviderId = paymentProviderId;
 
-            if (requestMadeByEnduser) {
-                query.where.userId = req.user.user.entity.userId;
-            } else if (requestWasMadeByTeamMember) {
-                // To show Partner Data to Teammember
-                const _teamMember =
-                    await TeamMemberProfileService.viewSingleTeamMember(
-                        req.user.user.entity.teamMemberProfileId || "",
-                    );
-                query.where.partnerId = _teamMember?.partnerId;
-            } else {
-                query.where.partnerId = req.user.user.profile.id;
+        //handling if it is an API call or not
+        if ((req as any).key) {
+            query.where.partnerId  = (req as any).key
+        } else {
+            // Handling access control based on user roles
+            const requestWasMadeByAnAdmin =
+                [RoleEnum.Admin].includes(req.user.user.entity.role) ||
+                [RoleEnum.SuperAdmin].includes(req.user.user.entity.role);
+            if (!requestWasMadeByAnAdmin) {
+                const requestMadeByEnduser = [RoleEnum.EndUser].includes(
+                    req.user.user.entity.role
+                );
+                const requestWasMadeByTeamMember = [
+                    RoleEnum.TeamMember,
+                ].includes(req.user.user.entity.role);
+
+                if (requestMadeByEnduser) {
+                    query.where.userId = req.user.user.entity.userId;
+                } else if (requestWasMadeByTeamMember) {
+                    // To show Partner Data to Teammember
+                    const _teamMember =
+                        await TeamMemberProfileService.viewSingleTeamMember(
+                            req.user.user.entity.teamMemberProfileId || ""
+                        );
+                    query.where.partnerId = _teamMember?.partnerId;
+                } else {
+                    query.where.partnerId = req.user.user.profile.id;
+                }
             }
         }
-
         // Retrieving transactions based on the constructed query
         const transactions: Transaction[] =
             await TransactionService.viewTransactionsWithCustomQueryAndInclude(
-                query,
+                query
             );
         if (!transactions) {
             throw new NotFoundError("Transactions not found");
@@ -272,7 +279,7 @@ export default class TransactionController {
         // Calculating total amount of transactions
         const totalAmount = transactions.reduce(
             (acc, curr) => acc + parseInt(curr.amount),
-            0,
+            0
         );
 
         // Constructing pagination data
@@ -320,7 +327,7 @@ export default class TransactionController {
     static async getTransactionsLatest(
         req: AuthenticatedRequest,
         res: Response,
-        next: NextFunction,
+        next: NextFunction
     ) {
         // Extracts parameters from the request
         const { phoneNumber } = req.params as any as { phoneNumber: string };
@@ -338,13 +345,13 @@ export default class TransactionController {
         }
 
         // Retrieves the ID of the authenticated user's partner profile
-        const partnerBasicAuthId  = req?.user?.user?.profile?.id;
+        const partnerBasicAuthId = req?.user?.user?.profile?.id;
 
         const partnerApiKeyId = (req as any).key;
 
-        let id = ''
-        if(partnerApiKeyId) id = partnerApiKeyId
-        if(partnerBasicAuthId ) id = partnerBasicAuthId
+        let id = "";
+        if (partnerApiKeyId) id = partnerApiKeyId;
+        if (partnerBasicAuthId) id = partnerBasicAuthId;
 
         // Retrieves the partner profile based on the ID
         const partner = await PartnerService.viewSinglePartner(id);
@@ -425,7 +432,7 @@ export default class TransactionController {
             disco,
             superagent,
             partnerId,
-            paymentProviderId
+            paymentProviderId,
         } = req.query as any as getTransactionsRequestBody;
 
         // Constructs the query object for Sequelize
@@ -446,7 +453,8 @@ export default class TransactionController {
             query.offset = Math.abs(parseInt(page) - 1) * parseInt(limit);
         }
         if (partnerId) query.where.partnerId = partnerId;
-        if ( paymentProviderId) query.where.paymentProviderId =  paymentProviderId
+        if (paymentProviderId)
+            query.where.paymentProviderId = paymentProviderId;
         // Checks if the request was made by an admin
         const requestWasMadeByAnAdmin =
             [RoleEnum.Admin].includes(req.user.user.entity.role) ||
@@ -454,7 +462,7 @@ export default class TransactionController {
 
         // Checks if the request was made by a customer
         const requestWasMadeByCustomer = [RoleEnum.EndUser].includes(
-            req.user.user.entity.role,
+            req.user.user.entity.role
         );
         if (requestWasMadeByCustomer) {
             // Restricts data access to the current user's transactions if they are a customer
@@ -463,12 +471,12 @@ export default class TransactionController {
         if (!requestWasMadeByAnAdmin && !requestWasMadeByCustomer) {
             // If the request was made by a team member, restricts data access to their partner's transactions
             const requestWasMadeByTeamMember = [RoleEnum.TeamMember].includes(
-                req.user.user.entity.role,
+                req.user.user.entity.role
             );
             if (requestWasMadeByTeamMember) {
                 const _teamMember =
                     await TeamMemberProfileService.viewSingleTeamMember(
-                        req.user.user.entity.teamMemberProfileId || "",
+                        req.user.user.entity.teamMemberProfileId || ""
                     );
                 query.where.partnerId = _teamMember?.partnerId;
             } else {
@@ -480,11 +488,11 @@ export default class TransactionController {
         // Retrieves the total transaction amount and count based on the constructed query
         const totalTransactionAmount: any =
             await TransactionService.viewTransactionsAmountWithCustomQuery(
-                query,
+                query
             );
         const totalTransactionCount: number =
             await TransactionService.viewTransactionsCountWithCustomQuery(
-                query,
+                query
             );
 
         // Constructs the response object
@@ -618,7 +626,7 @@ export default class TransactionController {
      */
     static async getYesterdaysTransactions(
         req: AuthenticatedRequest,
-        res: Response,
+        res: Response
     ) {
         // Extracts the transaction status from the request query parameters
         const { status } = req.query as any as {
@@ -640,14 +648,14 @@ export default class TransactionController {
         const transactions = status
             ? await TransactionService.viewTransactionsForYesterdayByStatus(
                   partner.id,
-                  status.toUpperCase() as typeof status,
+                  status.toUpperCase() as typeof status
               )
             : await TransactionService.viewTransactionForYesterday(partner.id);
 
         // Calculates the total amount of yesterday's transactions
         const totalAmount = transactions.reduce(
             (acc, curr) => acc + parseInt(curr.amount),
-            0,
+            0
         );
 
         // Sends a JSON response containing the retrieved transactions and total amount

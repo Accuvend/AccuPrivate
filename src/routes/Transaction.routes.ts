@@ -11,6 +11,11 @@ export const router: Router = express.Router();
 router
     .get("/info", TransactionController.getTransactionInfo)
     .get("/api/latest/:phoneNumber",validateApiKey,AuthenticatedController(TransactionController.getTransactionsLatest))
+    .get(
+        "/v2/all/api",
+        validateApiKey,
+        AuthenticatedController(TransactionController.getTransactionsFiltered),
+    )
     .use(basicAuth("access"))
     .get("/latest/:phoneNumber" ,basicAuth("access"), AuthenticatedController(TransactionController.getTransactionsLatest))
     .get("/v2/all",basicAuth("access"),AuthenticatedController(TransactionController.getTransactionsFiltered))
@@ -19,11 +24,7 @@ router
         basicAuth("access"),
         AuthenticatedController(TransactionController.getTransactions),
     )
-    .get(
-        "/v2/all/api",
-        validateApiKey,
-        AuthenticatedController(TransactionController.getTransactionsFiltered),
-    )
+    
     .get(
         "/kpi",
         AuthenticatedController(TransactionController.getTransactionsKPI),

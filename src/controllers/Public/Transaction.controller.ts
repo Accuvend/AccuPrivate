@@ -234,8 +234,7 @@ export default class TransactionController {
         }
         if (partnerId) query.where.partnerId = partnerId;
         if (userId) query.where.userId = userId;
-        if (paymentProviderId)
-            query.where.paymentProviderId = paymentProviderId;
+        if (paymentProviderId) query.where.paymentProviderId = paymentProviderId;
 
         //handling if it is an API call or not
         if ((req as any).key) {

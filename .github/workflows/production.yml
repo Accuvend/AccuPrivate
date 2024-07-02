@@ -214,6 +214,7 @@ jobs:
 
         echo "DB_URL=$DB_URL" >> .env
         echo "LOG_URL=$LOG_DB_URL" >> .env
+        echo "NODE_TLS_REJECT_UNAUTHORIZED=0" >> .env
         cat .env
     - name: push to state to s3
       run: |

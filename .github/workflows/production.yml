@@ -118,6 +118,12 @@ jobs:
         CYBER_PAY_SENDER_ID=${{secrets.CYBER_PAY_SENDER_ID}}
         ZOHO_BASE_URL=${{ secrets.ZOHO_BASE_URL}}
 
+        DB_URL=${{ secrets.DB_URL }}
+        LOG_DB_URL=${{ secrets.LOG_DB_URL }}
+
+         
+            
+
         
 
         echo "ZOHO_BASE_URL=$ZOHO_BASE_URL" >> .env
@@ -205,6 +211,9 @@ jobs:
         echo "SU_HOST_EMAIL_1=$SU_HOST_EMAIL_1" >> .env
         echo "SU_HOST_EMAIL_2=$SU_HOST_EMAIL_2" >> .env
         echo "SU_HOST_EMAIL_3=$SU_HOST_EMAIL_3" >> .env
+
+        echo "DB_URL=$DB_URL" >> .env
+        echo "LOG_URL=$LOG_DB_URL" >> .env
         cat .env
     - name: push to state to s3
       run: |
@@ -404,9 +413,7 @@ jobs:
             echo $DB_HOST
             echo $LOG_DB_HOST
             
-            echo "DB_URL=postgres://$DB_USERNAME:$DB_PASSWORD@$DB_HOST:5432/$DB_NAME" >> .env
-            echo "LOG_DB_URL=postgres://$DB_USERNAME:$DB_PASSWORD@$LOG_DB_HOST:5432/$DB_NAME" >> .env
-            
+           
             #install depencendies in dist folder
             npm install
             
